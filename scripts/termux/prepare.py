@@ -126,6 +126,43 @@ def prepare(upstream, output, lock, full_catalog=False):
 
     patch("scripts/properties.sh", 'TERMUX_APP__PACKAGE_NAME="com.termux"',
           'TERMUX_APP__PACKAGE_NAME="com.terminal.nextgen"')
+    # mpg123 upstream explicitly supports splitting libraries/programs from
+    # output modules to break the PulseAudio -> libsndfile -> decoder cycle.
+    # Keep the player feature through an exact-version runtime dependency;
+    # only the output module needs PulseAudio headers during compilation.
+    mpg = "packages/libmpg123/build.sh"
+    patch(mpg, 'TERMUX_PKG_VERSION="1.33.7"',
+          'TERMUX_PKG_VERSION="1.33.7"\nTERMUX_PKG_REVISION=1')
+    patch(mpg, 'TERMUX_PKG_BUILD_DEPENDS="pulseaudio"',
+          'TERMUX_PKG_ANTI_BUILD_DEPENDS="pulseaudio, mpg123-pulse"\n'
+          'TERMUX_PKG_EXTRA_CONFIGURE_ARGS="\n'
+          '--disable-components\n--enable-programs\n--enable-libmpg123\n'
+          '--enable-libsyn123\n--enable-libout123\n--with-default-audio=pulse\n"')
+    patch("packages/libmpg123/mpg123.subpackage.sh", 'TERMUX_SUBPKG_DEPENDS="pulseaudio"',
+          'TERMUX_SUBPKG_DEPENDS="pulseaudio, mpg123-pulse (= 1.33.7-1)"')
+    module_recipe = '''TERMUX_PKG_HOMEPAGE=https://mpg123.org/
+TERMUX_PKG_DESCRIPTION="PulseAudio output module for mpg123"
+TERMUX_PKG_LICENSE="LGPL-2.1"
+TERMUX_PKG_MAINTAINER="Termi"
+TERMUX_PKG_VERSION="1.33.7"
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_SRCURL=https://downloads.sourceforge.net/sourceforge/mpg123/mpg123-${TERMUX_PKG_VERSION}.tar.bz2
+TERMUX_PKG_SHA256=31d0e35a4ca567ec9b5ebda6c3062bb4435d6d3eacd6ef0d95cadd7854dc03ee
+TERMUX_PKG_DEPENDS="libmpg123 (= 1.33.7-1), pulseaudio"
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+--disable-components
+--enable-libout123-modules
+--with-audio=pulse
+"
+'''
+    module_path = tree / "packages/mpg123-pulse/build.sh"
+    if subprocess.run(["git", "-C", str(upstream), "cat-file", "-e", lock["commit"] + ":packages/mpg123-pulse/build.sh"],
+                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+        raise ValueError("Upstream now supplies mpg123-pulse; review the split instead of replacing it")
+    module_path.parent.mkdir(parents=True)
+    module_path.write_text(module_recipe, encoding="utf-8", newline="\n")
+    patches.append(dict(path="packages/mpg123-pulse/build.sh", action="add",
+                        before_sha256=None, after_sha256=hashlib.sha256(module_path.read_bytes()).hexdigest()))
     # Even without -i, upstream may download an old binary to break a build cycle.
     # Such binaries belong to com.termux, not this prefix. Fail instead.
     for name, relative in (
@@ -266,14 +303,14 @@ PY
     (output / "collect_artifacts.py").write_bytes((ROOT / "scripts/termux/collect_artifacts.py").read_bytes())
     (output / "assemble_bootstrap.py").write_bytes((ROOT / "scripts/termux/assemble_bootstrap.py").read_bytes())
     (output / "patch_go_exec.py").write_bytes((ROOT / "scripts/termux/patch_go_exec.py").read_bytes())
-    for name in ["catalog_graph.py", "catalog_build.py"]:
+    for name in ["catalog_graph.py", "catalog_build.py", "catalog_progress.py"]:
         (output / name).write_bytes((ROOT / "scripts/termux" / name).read_bytes())
     (output / "Dockerfile").write_text(
         f'FROM {lock["builder_image"]}\n'
         'USER root\n'
         'ADD --chown=builder:builder source.tar /home/builder/termux-packages/\n'
         'COPY --chown=builder:builder overlay/ /home/builder/termux-packages/\n'
-        'COPY --chown=builder:builder build-in-container.sh collect_artifacts.py assemble_bootstrap.py patch_go_exec.py catalog_graph.py catalog_build.py upstream.lock.json patches.json source.json /home/builder/\n'
+        'COPY --chown=builder:builder build-in-container.sh collect_artifacts.py assemble_bootstrap.py patch_go_exec.py catalog_graph.py catalog_build.py catalog_progress.py upstream.lock.json patches.json source.json /home/builder/\n'
         # Windows checkout permissions are not executable-bit authority.
         'RUN find /home/builder/termux-packages -name "*.sh" -exec chmod u+x {} +\n'
         'USER builder\nWORKDIR /home/builder/termux-packages\n'

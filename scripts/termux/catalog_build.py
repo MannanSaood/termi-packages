@@ -36,6 +36,12 @@ def next_status(recipe, states, retry_failed):
     return "blocked-dependency" if missing else "ready"
 
 
+def announce(ledger, event, recipe=None):
+    print("TERMI_PROGRESS " + json.dumps(dict(event=event, recipe=recipe,
+          counts=dict(Counter(e["status"] for e in ledger["recipes"].values())),
+          total_recipes=len(ledger["recipes"]), halt=ledger.get("halt"))), flush=True)
+
+
 def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400, retry_failed=False, resume_compile=None,
           budget_seconds=None):
     import fcntl
@@ -64,6 +70,7 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
             raise ValueError("Explicit compile resume requires one previously failed/interrupted recipe and --retry-failed")
         save(state_dir / "plan.json", plan)
         save(ledger_path, ledger)
+        announce(ledger, "batch-start")
         (state_dir / "logs").mkdir(exist_ok=True)
         deadline = time.monotonic() + budget_seconds if budget_seconds is not None else None
         for name, recipe in sorted(plan["recipes"].items(), key=lambda item: (item[1]["rank"] is None, item[1]["rank"] or 0)):
@@ -77,14 +84,17 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
             if remaining < 1:
                 ledger["halt"] = "batch-time-budget"
                 save(ledger_path, ledger)
+                announce(ledger, "halt")
                 return 75
             if shutil.disk_usage(root).free < minimum_free_gib * 1024**3:
                 ledger["halt"] = "insufficient-builder-disk"
                 save(ledger_path, ledger)
+                announce(ledger, "halt")
                 return 75
             entry.update(status="running", started=time.time(), attempts=entry["attempts"] + 1)
             entry.pop("blockers", None)
             save(ledger_path, ledger)
+            announce(ledger, "recipe-start", name)
             command = ["bash", "./build-package.sh", "-a", "aarch64", "-s", "-j", str(jobs), "-o", str(root / "output")]
             if name == resume_compile:
                 command.append("-c")
@@ -103,19 +113,26 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                         process.wait()
                     entry.update(status="interrupted", exit_code=124, ended=time.time())
                     save(ledger_path, ledger)
+                    announce(ledger, "recipe-interrupted", name)
                     if isinstance(error, KeyboardInterrupt):
                         raise
                     if deadline is not None and time.monotonic() >= deadline:
                         ledger["halt"] = "batch-time-budget"
                         save(ledger_path, ledger)
+                        announce(ledger, "halt")
                         return 75
                     continue
             entry.update(status="built" if code == 0 else "failed", exit_code=code, ended=time.time())
             save(ledger_path, ledger)
+            announce(ledger, "recipe-complete", name)
+            if code:
+                from catalog_progress import tail
+                print("TERMI_FAILURE " + json.dumps(dict(recipe=name, exit_code=code,
+                      tail=tail(state_dir / "logs" / f"{name}-{entry['attempts']}.log"))), flush=True)
         save(ledger_path, ledger)
         summary = dict(Counter(entry["status"] for entry in ledger["recipes"].values()))
         save(state_dir / "summary.json", summary)
-        print(json.dumps(summary))
+        announce(ledger, "batch-complete")
         return 0 if all(e["status"] in ("built", "excluded-architecture") for e in ledger["recipes"].values()) else 1
 
 

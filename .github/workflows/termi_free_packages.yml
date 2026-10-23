@@ -26,7 +26,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: free-package-builder-${{ inputs.mode }}
+  group: free-package-builder-${{ inputs.mode }}-${{ inputs.recipes }}
   cancel-in-progress: false
 jobs:
   candidate:
@@ -72,6 +72,7 @@ jobs:
             --mount "type=bind,source=$PWD/build/context,target=/inputs,readonly" \
             --mount "type=bind,source=$PWD/build,target=/results" \
             "$image" bash -lc 'set -eu; mkdir /tmp/source; tar -xf /inputs/source.tar -C /tmp/source; cp -a /inputs/overlay/. /tmp/source/; python3 /work/catalog_graph.py --root /tmp/source --metadata /inputs --output /results/catalog-plan.json'
+          python3 -c 'import json; p=json.load(open("build/catalog-plan.json")); assert not p["cycle_groups"], p["cycle_groups"]; print("Source graph is acyclic")'
       - name: Restore explicit verified checkpoint
         if: inputs.mode != 'plan' && inputs.checkpoint_tag != ''
         env:
@@ -85,6 +86,7 @@ jobs:
       - name: Compile bounded source batch with time left for checkpoint export
         if: inputs.mode != 'plan'
         env:
+          GH_TOKEN: ${{ github.token }}
           RECIPES: ${{ inputs.recipes }}
           CHECKPOINT_TAG: ${{ inputs.checkpoint_tag }}
           CONTINUE_RECIPE: ${{ inputs.continue_recipe }}
@@ -99,7 +101,9 @@ jobs:
           if os.environ['RETRY_FAILED'] == 'true': args += ['--catalog-retry-failed']
           if os.environ['CHECKPOINT_TAG']: args += ['--cache-image','termi-checkpoint:restored']
           if os.environ['CONTINUE_RECIPE']: args += ['--continue-recipe',os.environ['CONTINUE_RECIPE']]
-          subprocess.run(args,check=True)
+          subprocess.run(['python3','scripts/termux/publish_progress.py','--repository',os.environ['GITHUB_REPOSITORY'],
+                          '--tag',f'progress-{os.environ["GITHUB_RUN_ID"]}-{os.environ["GITHUB_RUN_ATTEMPT"]}',
+                          '--build-dir','build/candidate','--',*args],check=True)
           PY
       - name: Preserve catalog or interrupted build as streamed release checkpoint
         if: always() && (inputs.mode == 'full-catalog' || (failure() && inputs.mode == 'packages'))

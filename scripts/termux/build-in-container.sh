@@ -45,6 +45,8 @@ if [ "$mode" = full-catalog ]; then
         --minimum-free-gib "${TERMI_CATALOG_MINIMUM_FREE_GIB:-16}" "${retry[@]}" || result=$?
     cp /home/builder/catalog-state/plan.json /home/builder/artifacts/catalog-plan.json
     cp /home/builder/catalog-state/ledger.json /home/builder/artifacts/catalog-ledger.json
+    python3 /home/builder/catalog_progress.py --root "$PWD" --state /home/builder/catalog-state \
+        --output /home/builder/artifacts/progress.json
     if compgen -G 'output/*.deb' >/dev/null; then
         python3 /home/builder/collect_artifacts.py output /home/builder/artifacts \
             --plan /home/builder/catalog-state/plan.json --resume
@@ -58,16 +60,27 @@ elif [ "$mode" = packages ]; then
         fi
     fi
     printf '%s\n' "$@" > /home/builder/artifacts/requested-recipes.txt
+    mkdir -p /home/builder/catalog-state/logs
+    python3 /home/builder/catalog_progress.py --root "$PWD" --state /home/builder/catalog-state --selected "$@"
     for root in "$@"; do
         recipe=""
         for tree in packages root-packages x11-packages; do
             if [ -f "$tree/$root/build.sh" ]; then recipe="$tree/$root"; fi
         done
-        if [ "${TERMI_CONTINUE_RECIPE:-}" = "$root" ]; then
-            ./build-package.sh -a aarch64 -c -j "$jobs" "$recipe"
-        else
-            ./build-package.sh -a aarch64 -j "$jobs" "$recipe"
-        fi
+        python3 /home/builder/catalog_progress.py --root "$PWD" --state /home/builder/catalog-state \
+            --selected "$@" --recipe "$root" --status running
+        attempt=$(python3 -c 'import json,sys; print(json.load(open("/home/builder/catalog-state/selected-ledger.json"))["recipes"][sys.argv[1]]["attempts"])' "$root")
+        result=0
+        continuation=()
+        if [ "${TERMI_CONTINUE_RECIPE:-}" = "$root" ]; then continuation+=(-c); fi
+        ./build-package.sh -a aarch64 "${continuation[@]}" -j "$jobs" "$recipe" \
+            > >(tee "/home/builder/catalog-state/logs/$root-$attempt.log") 2>&1 || result=$?
+        status=built
+        if [ "$result" -ne 0 ]; then status=failed; fi
+        python3 /home/builder/catalog_progress.py --root "$PWD" --state /home/builder/catalog-state \
+            --selected "$@" --recipe "$root" --status "$status" --exit-code "$result" \
+            --output /home/builder/artifacts/progress.json
+        if [ "$result" -ne 0 ]; then exit "$result"; fi
     done
 elif [ "$mode" = catalog ]; then
     # Explicit owner-approved expansion; dependencies are source-built and the
