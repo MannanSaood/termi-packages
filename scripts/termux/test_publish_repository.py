@@ -11,7 +11,9 @@ from unittest.mock import patch
 import publish_repository as publisher
 import stage_catalog
 import gzip
+import datetime
 import release_plan
+import metadata_pages
 
 
 @unittest.skipUnless(shutil.which("dpkg-deb") and shutil.which("gpg"), "Linux signing tools required")
@@ -174,6 +176,23 @@ class RepositoryTests(unittest.TestCase):
             self.assertEqual(compressed.read_bytes(), (index.parent / "by-hash/SHA256" / publisher.digest(compressed)).read_bytes())
             self.assertIn(publisher.digest(compressed), signed.read_text())
             self.assertIn("Filename: pool/termi-main-", index.read_text())
+            public = Path(self.temp.name) / "public"
+            keyring = self.root / "repository-keyring.gpg"
+            metadata_pages.export(self.root, public / "apt/main", keyring)
+            self.assertEqual({"main": 7}, metadata_pages.verify_pages(public, keyring))
+            self.assertFalse((public / "apt/main/pool").exists())
+            with self.assertRaisesRegex(ValueError, "lifetime"):
+                metadata_pages.verify(public / "apt/main", keyring, "main",
+                    datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=46))
+            extra = public / "private.key"
+            extra.write_text("test-only disallowed file")
+            with self.assertRaisesRegex(ValueError, "non-metadata"):
+                metadata_pages.verify_pages(public, keyring)
+            extra.unlink()
+            page_index = public / "apt/main/dists/stable/main/binary-aarch64/Packages"
+            page_index.write_bytes(page_index.read_bytes() + b"tamper")
+            with self.assertRaisesRegex(ValueError, "checksum"):
+                metadata_pages.verify_pages(public, keyring)
             signed.write_text(signed.read_text().replace("Origin: Termi", "Origin: Evil"))
             self.assertNotEqual(0, subprocess.run(
                 ["gpgv", "--keyring", str(self.root / "repository-keyring.gpg"), str(signed)], capture_output=True).returncode)

@@ -1,0 +1,47 @@
+name: Deploy reviewed signed package metadata
+on:
+  workflow_dispatch:
+    inputs:
+      snapshot_commit:
+        description: Exact reviewed commit containing public/apt signed metadata only
+        required: true
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: termi-package-metadata
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Require an immutable reviewed snapshot reference
+        env:
+          SNAPSHOT: ${{ inputs.snapshot_commit }}
+        run: python3 -c 'import os,re; assert re.fullmatch("[0-9a-f]{40}",os.environ["SNAPSHOT"]), "Require exact commit SHA"'
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: control
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.snapshot_commit }}
+          path: snapshot
+          persist-credentials: false
+      - name: Verify existing signatures, expiry, inventory, indexes and metadata-only site
+        run: |
+          python3 control/scripts/termux/metadata_pages.py --public snapshot/public \
+            --keyring control/packages/termux/repository/repository-keyring.gpg
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
+        with:
+          path: snapshot/public
+          retention-days: 1
+      - name: Deploy verified metadata
+        id: deploy
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e

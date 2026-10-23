@@ -13,7 +13,7 @@ object-store/builder recommendation while the zero-cost constraint applies.
 | Linux builds | Standard public GitHub Actions Ubuntu runner | Enable/approve Actions if GitHub prompts. No paid/larger runner labels. |
 | Packages and sources | Immutable GitHub Release asset batches | No separate storage account. Each asset must be under2GiB; batches reserve capacity below1000assets. |
 | Large compile checkpoints | Compressed container export split into1GiB release assets | No paid cache. Each restore needs its manifest hash and complete build-input identity. |
-| Small signed APT metadata | GitHub Pages, separate main/root/X11 namespaces | Enable Pages when the first reviewed signed snapshot is ready. Keep only metadata there, below1GB. |
+| Small signed APT metadata | GitHub Pages, separate main/root/X11 namespaces | Pages is configured for workflow deployment. Publish the first reviewed signed metadata snapshot; no further storage account needed. |
 | Normal APT paths to release downloads | Cloudflare Workers Free redirector at a free `workers.dev` hostname | A free Cloudflare account and Workers Free access. No R2, custom domain, KV, database or paid Worker plan. |
 | Repository signatures | Existing isolated Termi signing authority | No new signing key needed. Private root stays offline; no key or phone data is published. |
 
@@ -128,3 +128,81 @@ streaming. Worker3tests PASS. Shell workflow blocks parse. Phone unavailable;
 no data access/install/clear/rollback. Live APK and existing proof APT endpoint
 remain unchanged. Remote workflow results and real heavy checkpoint verification
 are recorded in the handover as they become available.
+
+## Execution update — 2026-10-24
+
+The separate public repository is live. Plan run
+[40000802305](https://github.com/MannanSaood/termi-packages/actions/runs/40000802305)
+and actual full-feature `hello` source-build run
+[40001467035](https://github.com/MannanSaood/termi-packages/actions/runs/40001467035)
+passed. The measured runner had86GiB free before reclaim and104GiB afterward;
+this is an observation on that VM, not a guaranteed runner specification.
+
+Whole-catalog source run
+[40003577527](https://github.com/MannanSaood/termi-packages/actions/runs/40003577527)
+and independent Node/npm source run
+[40003582122](https://github.com/MannanSaood/termi-packages/actions/runs/40003582122)
+were launched at commit `24a705c` and are still building at this checkpoint.
+They use separate standard Ubuntu VMs; no phone or local full compile is needed.
+No reliable whole-catalog completion date exists yet. Thousands of recipes,
+dependency failures, disk and memory limits can require many days or longer.
+Candidate outputs are unsigned prereleases, not an available production catalog.
+
+The full-catalog mode now has a3.5hour internal budget,4hour outer compile
+deadline,16GiB disk headroom, persistent per-recipe state and artifact export.
+Remaining work returns a non-success state and is checkpointed. A continuation
+uses the published checkpoint tag, manifest SHA256 and exact context identity.
+Successful recipes are retained; failures/interrupted recipes are retried only
+with explicit `retry_failed`, and `continue_recipe` still requires confirmation
+that upstream's compile continuation is appropriate. These manual runs do not
+automatically dispatch an endless build chain. A subsequent run must use the
+same input commit or an explicitly reviewed fresh build; changed inputs are
+rejected by the cache identity check.
+
+Actual small Docker/GitHub checkpoint roundtrip PASS: fixture4700bytes,
+release `checkpoint-transport-20261023-v1`, manifest SHA256
+`8bc9060312550bfad7d595da6115a3e5ad554850c961d4a20b3051bfef9b82bb`.
+Verified upload, manifest/chunk checks, streamed import, builder identity,
+context label and exact restored bytes. No container was executed. Large,
+multi-hour checkpoint transfers remain unverified; this does not remove RAM or
+disk constraints. A valid Docker `Env:null` response was found and handled.
+
+Latest Linux suite33tests PASS7.744s, including trusted metadata-only Pages
+export, expiry rejection, changed-index rejection, and refusal of unrelated
+files. Worker3tests PASS. The Pages workflow requires an exact snapshot commit,
+verifies signatures with the checked-in existing Termi public key, matches the
+signed inventory/index paths, checks by-hash objects and expiry, and caps the
+site at512MiB. It copies no package pool or private authority to Pages. Pages is
+configured with HTTPS; no signed snapshot has been deployed or app endpoint
+changed. Publication does not require placing private signing keys in this repo.
+
+Prepare a metadata-only site after package/runtime/source/license approval and
+isolated signing, for example:
+
+```sh
+python3 scripts/termux/metadata_pages.py --repository /reviewed/signed-main \
+  --public /new/site/public --keyring packages/termux/repository/repository-keyring.gpg
+```
+
+Commit that `public/apt/main` tree on a dedicated metadata snapshot branch in
+the package repo; pass its exact commit to `termi_package_pages.yml`. Additional
+channels are independently signed and verified. Updating signatures still needs
+the isolated signing process; this deployment workflow cannot approve or renew
+packages. Do not deploy expired snapshots or treat unsigned candidate artifacts
+as release approvals. Source/license export and review must precede promotion.
+
+The existing real Node/npm candidate merged into a118record immutable staging
+snapshot and host APT resolved its runtime closure successfully. The selector
+now follows APT's chosen exact versions, preserving retained old versions and
+epochs. Its release layout was planned without signing/uploading those packages.
+Android install/execute/remove, real HTTPS Worker transport, live source-switch
+migration and owner UI review remain pending. Existing app data and APK are
+untouched. The internal ID remains `com.terminal.nextgen`; visible name is Termi.
+
+**Owner hosting action:** sign into a free Cloudflare account and enable Workers
+Free with a `workers.dev` subdomain, then authenticate Wrangler locally through
+its browser login. Provide the chosen public subdomain/account selection, not a
+password or API secret in chat. The redirector needs no R2 bucket, paid domain,
+KV, database or paid plan. GitHub repository, public Actions, Releases and Pages
+configuration are already available. A donated Linux machine is optional if a
+specific recipe exceeds free runner limits; none is assumed available.
