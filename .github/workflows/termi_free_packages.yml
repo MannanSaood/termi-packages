@@ -1,4 +1,5 @@
 name: Termi free package builder
+run-name: Termi ${{ inputs.mode }}${{ inputs.mode == 'packages' && format(' - {0}', inputs.recipes) || '' }}
 on:
   workflow_dispatch:
     inputs:

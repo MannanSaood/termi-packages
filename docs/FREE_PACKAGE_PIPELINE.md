@@ -104,23 +104,31 @@ multiple accounts to evade quotas or silently rent a VM/larger runner.
 
 ## Full graph and current source blockers
 
-The pinned graph accounts for3,268parentrecipes and6,955provided package aliases,
-including upstream's virtual static aliases; one recipe is architecture-excluded.
+The pinned upstream graph accounts for3,268parentrecipes. Termi adds one
+source-built `mpg123-pulse` recipe, making3,269recipes and6,957provided package
+aliases including upstream's virtual static aliases; one recipe is
+architecture-excluded.
 This is not a count of already built debs. The bounded source-dependency analysis
 initially found three groups before honoring upstream runtime-only anti-build
 annotations. Those annotations remove the two .NET metapackage cycles from the
-compile order without removing their runtime dependencies. One genuine source
-cycle remains:
+compile order without removing their runtime dependencies. The remaining audio
+cycle was resolved on2026-10-24 using mpg123's documented component split:
 
 - `libmp3lame`, `libmpg123`, `libsndfile`, `pulseaudio`.
 
-This requires verified source-built bootstrap stages. It cannot be resolved by
-the forbidden stock Termux binary/cycle fallback. The ledger records cycle
+The decoder libraries and player build first without output modules, retaining
+PulseAudio as the default module choice. The new `mpg123-pulse` recipe builds
+the output module after PulseAudio; `mpg123` depends on that exact module version
+at runtime. Both use checksum-pinned mpg1231.33.7 source and revision1. Runtime
+dependencies remain enforced; only runtime-only module edges are excluded from
+the library's compile ordering. The regenerated complete graph has no cycles.
+No stock Termux binary/cycle fallback is enabled. The ledger records cycle
 members, failed builds and dependency blockers, while allowing independent
 recipes to build. It preserves completed recipes across retries and rejects
 changed build identities. The first upstream full-order check failed and entered
 its expensive cycle printer; it was stopped. The new bounded graph reports the
-actual groups rather than hiding or claiming them resolved.
+actual groups. The earlier cycle is historical; Android verification of the new
+module package is running separately and is not yet a runtime approval.
 
 The collector records parent recipe/channel using that graph. Main/root/X11
 snapshots stage and validate separately; optional channels can depend on main,
@@ -215,3 +223,49 @@ password or API secret in chat. The redirector needs no R2 bucket, paid domain,
 KV, database or paid plan. GitHub repository, public Actions, Releases and Pages
 configuration are already available. A donated Linux machine is optional if a
 specific recipe exceeds free runner limits; none is assumed available.
+
+## Cycle-free source build and live progress — 2026-10-24
+
+Code commit `8a374a9` adds the mpg123 split and live telemetry. The exact source
+hash is31d0e35a4ca567ec9b5ebda6c3062bb4435d6d3eacd6ef0d95cadd7854dc03ee.
+Actual pinned source native Linux libraries/programs compilation PASS without
+PulseAudio, confirming supported configure options and a decoder with no Pulse
+link dependency. This is not Android execution proof. Official component-split
+instructions: https://raw.githubusercontent.com/libsdl-org/mpg123/main/INSTALL .
+Full graph verification PASS3,269recipes/6,957aliases/onearch exclusion/zero cycles;
+CI now rejects a cyclic source graph. Full pipeline36Linux tests PASS7.749s,
+including real Debian output counting, incomplete archive exclusion, cached
+control checks, current recipe/tail, failure codes/tail bounds, explicit selected
+root scope and credential-free report upload contract. Workflow syntax passes.
+
+New runs:
+- Live telemetry pilot hello:40008819921.
+- Android mpg123-pulse source closure:40008824612.
+- Cycle-free full catalog with live telemetry:40008937527.
+
+Each source run creates a public prerelease named `progress-RUN_ID-ATTEMPT`.
+Its body is updated approximately every60seconds, with these downloadable assets:
+`progress.json`, `progress.md`, `failures.log`, `current.log`. Completed parent
+recipes/requested roots and readable candidate `.deb` file counts are separate;
+none means release approval. Full mode reports all catalog recipes; selected
+mode explicitly counts requested roots while Debian output includes their built
+dependencies. Counts include failures/interrupted/dependency blockers/exclusions,
+current recipe, halt reason, observation time and build exit status. Failure
+logs expose the last8192bytes per failed recipe, max100recipes/report; complete
+build logs remain in retained builder/checkpoint, not silently called full logs.
+Current compiler tail is also bounded. Records are source-build diagnostics only.
+
+GitHub token remains in the outer publisher; Docker exec reads bounded progress
+without a token or host mount. The compiler receives no GitHub credentials.
+No paid cache/artifacts/larger runners/Workers services were added. Progress
+uses ordinary public GitHub Release assets and existing contents:write permission.
+Updates failing do not kill a running compiler, but cause an explicit workflow
+warning/non-success after it finishes. No fake percentages, seeded builds or
+claimed packages are used. `.deb` means readable candidate control archive,
+not a runtime/source/license approval. Changed output files are reinspected.
+
+Existing runs40003577527 and40003582122 stay untouched; old workflows cannot
+retroactively acquire this telemetry or new source input identity. Their outputs
+and diagnostics remain separate. New source inputs invalidate their checkpoint
+identity intentionally. The original63package local server/app sources remain
+unchanged. Workers are still deferred and the phone is unavailable.
