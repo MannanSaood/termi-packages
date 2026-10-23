@@ -98,13 +98,14 @@ multiple accounts to evade quotas or silently rent a VM/larger runner.
 The pinned graph accounts for3,268parentrecipes and6,955provided package aliases,
 including upstream's virtual static aliases; one recipe is architecture-excluded.
 This is not a count of already built debs. The bounded source-dependency analysis
-found three strongly connected groups:
+initially found three groups before honoring upstream runtime-only anti-build
+annotations. Those annotations remove the two .NET metapackage cycles from the
+compile order without removing their runtime dependencies. One genuine source
+cycle remains:
 
-- `dotnet-host` ↔ `dotnet10.0`;
-- `dotnet9.0` ↔ `netstandard-targeting-pack-2.1`;
 - `libmp3lame`, `libmpg123`, `libsndfile`, `pulseaudio`.
 
-These require verified source-built bootstrap stages. They cannot be resolved by
+This requires verified source-built bootstrap stages. It cannot be resolved by
 the forbidden stock Termux binary/cycle fallback. The ledger records cycle
 members, failed builds and dependency blockers, while allowing independent
 recipes to build. It preserves completed recipes across retries and rejects

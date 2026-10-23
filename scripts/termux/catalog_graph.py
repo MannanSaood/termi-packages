@@ -83,6 +83,9 @@ def create_plan(root, lock, source, patches):
             dependencies = set(package.deps)
             for sub in package.subpkgs:
                 dependencies.update(sub.deps)
+            # Upstream explicitly removes runtime-only metapackage edges from
+            # source-build order. Keep them in Debian metadata for APT instead.
+            dependencies.difference_update(package.antideps)
             parent_dependencies[name] = {packages[dep].name for dep in dependencies if packages[dep].name != name}
         ordered_names, cycles = order_and_cycles(parent_dependencies)
         cycle_names = {name for group in cycles for name in group}

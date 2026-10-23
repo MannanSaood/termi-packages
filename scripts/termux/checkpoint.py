@@ -108,6 +108,7 @@ def restore(repository, tag, identity, manifest_sha256, image):
         process = subprocess.Popen(["docker", "import", *changes, "--change", "LABEL org.termi.build-input-identity=" + identity,
                                     "--change", "USER builder", "--change", "WORKDIR /home/builder/termux-packages", "-", image], stdin=subprocess.PIPE)
         decoder = __import__("zlib").decompressobj(31)
+        expanded = 0
         try:
             for index, record in enumerate(manifest["parts"]):
                 if record["file"] != f"checkpoint-{index:04d}.gz.part" or not 0 < record["bytes"] <= 1024**3:
@@ -121,12 +122,16 @@ def restore(repository, tag, identity, manifest_sha256, image):
                 with part.open("rb") as stream:
                     while block := stream.read(1024**2):
                         while block:
-                            process.stdin.write(decoder.decompress(block, 1024**2))
+                            decoded = decoder.decompress(block, 1024**2)
+                            expanded += len(decoded)
+                            if expanded > 512 * 1024**3 or shutil.disk_usage(directory).free < 2 * 1024**3:
+                                raise ValueError("Checkpoint exceeds expanded-size or free-disk budget")
+                            process.stdin.write(decoded)
                             block = decoder.unconsumed_tail
                 part.unlink()
             process.stdin.write(decoder.flush())
-            if not decoder.eof:
-                raise ValueError("Truncated compressed checkpoint")
+            if not decoder.eof or decoder.unused_data:
+                raise ValueError("Truncated or trailing compressed checkpoint")
             process.stdin.close()
             if process.wait() != 0:
                 raise ValueError("Isolated Docker restore failed")
