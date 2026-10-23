@@ -17,13 +17,16 @@ import time
 def markdown(value):
     counts = value.get("counts", {})
     current = ", ".join(value.get("current", [])) or "none"
+    known = value.get("total_recipes") is not None
+    completion = f"**{counts.get('built', 0)} / {value['total_recipes']}**" if known else "awaiting builder"
+    binaries = str(value["deb_files"]) if value.get("deb_files") is not None else "unknown during preparation"
     result = ("## Termi source-build progress\n\nUnsigned candidates; not a production catalog.\n\n"
               f"Last observation: {value['updated']}\n\nStatus: **{value.get('status', 'preparing')}**\n\n"
               f"Current: `{current}`\n\n"
-              f"Completed {value.get('scope', 'recipes')}: **{counts.get('built', 0)} / {value.get('total_recipes', 0)}**\n\n"
-              f"Readable candidate Debian files: **{value.get('deb_files', 0)}**\n\n"
+              f"Completed {value.get('scope', 'recipes')}: {completion}\n\n"
+              f"Readable candidate Debian files: **{binaries}**\n\n"
               "| State | Count |\n|---|---:|\n" +
-              "".join(f"| {name} | {counts.get(name, 0)} |\n" for name in
+              "".join(f"| {name} | {counts.get(name, 0) if known else 'unknown'} |\n" for name in
                       ["running", "failed", "interrupted", "blocked-dependency", "blocked-cycle", "pending", "excluded-architecture"]))
     if value.get("halt"):
         result += "\nBatch halt: `" + str(value["halt"]) + "`\n"
@@ -86,7 +89,7 @@ def main():
     gh(args.repository, "create", args.tag, "--title", "Live build " + args.tag, "--notes", "Preparing source build; counts follow.", "--prerelease", "--latest=false")
     print("Live progress: https://github.com/" + args.repository + "/releases/tag/" + args.tag, flush=True)
     value = dict(schema=1, updated=datetime.datetime.now(datetime.timezone.utc).isoformat(), status="preparing",
-                 counts={}, total_recipes=0, deb_files=0, current=[], failures=[], approved=False)
+                 counts={}, total_recipes=None, deb_files=None, current=[], failures=[], approved=False)
     directory = args.build_dir.parent / "live-progress"
     process = subprocess.Popen(command)
     next_update, failures = 0, 0

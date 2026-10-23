@@ -12,6 +12,12 @@ import publish_progress
 
 
 class ProgressTests(unittest.TestCase):
+    def test_preparation_does_not_invent_zero_totals(self):
+        page = publish_progress.markdown(dict(updated="now", total_recipes=None, deb_files=None, counts={}))
+        self.assertIn("awaiting builder", page)
+        self.assertIn("unknown during preparation", page)
+        self.assertNotIn("0 / 0", page)
+
     @unittest.skipUnless(shutil.which("dpkg-deb"), "Actual Debian archive inspection")
     def test_counts_valid_outputs_and_records_failure_tails_without_claiming_approval(self):
         with tempfile.TemporaryDirectory() as folder:
