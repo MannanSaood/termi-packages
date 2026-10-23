@@ -12,6 +12,15 @@ import publish_progress
 
 
 class ProgressTests(unittest.TestCase):
+    def test_rate_limit_waits_for_reset_instead_of_retrying_each_minute(self):
+        result = subprocess.CompletedProcess(["gh"], 1, stderr=b"API rate limit exceeded")
+        with patch.object(publish_progress.subprocess, "run", return_value=result), \
+                patch.object(publish_progress.subprocess, "check_output", return_value=b"2000\n"), \
+                patch.object(publish_progress.time, "time", return_value=1000):
+            with self.assertRaises(publish_progress.RateLimited) as error:
+                publish_progress.gh("owner/repo", "edit", "progress-1-1")
+            self.assertEqual(1005, error.exception.retry_seconds)
+
     def test_preparation_does_not_invent_zero_totals(self):
         page = publish_progress.markdown(dict(updated="now", total_recipes=None, deb_files=None, counts={}))
         self.assertIn("awaiting builder", page)
@@ -74,6 +83,10 @@ class ProgressTests(unittest.TestCase):
             self.assertEqual(2, gh.call_count)
             self.assertIn("real failure tail", (Path(folder) / "failures.log").read_text())
             self.assertNotIn("GH_TOKEN", (Path(folder) / "progress.json").read_text())
+            gh.reset_mock()
+            publish_progress.publish("owner/public-packages", "progress-1-1", Path(folder), value, assets=False)
+            self.assertEqual(1, gh.call_count)
+            self.assertEqual("edit", gh.call_args.args[1])
 
 
 if __name__ == "__main__":

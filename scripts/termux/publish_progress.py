@@ -34,23 +34,46 @@ def markdown(value):
         result += "\n### Failures\n\nFull bounded tails are in `failures.log` and `progress.json`.\n\n"
         for failure in value["failures"][-20:]:
             result += f"- `{failure['recipe']}`: {failure['status']}, exit {failure.get('exit_code')}\n"
-    result += "\nDownload `current.log` for the current compiler tail. Updates occur approximately every60seconds.\n"
+        for failure in value["failures"][-3:]:
+            result += "\nCompiler tail for `" + failure["recipe"] + "`:\n\n```text\n" + failure.get("tail", "")[-1500:].replace("```", "~~~") + "\n```\n"
+    if value.get("current_log_tail"):
+        result += "\n### Current compiler tail\n\n```text\n" + value["current_log_tail"][-2000:].replace("```", "~~~") + "\n```\n"
+    result += "\nPage updates approximately every60seconds. Downloadable JSON/log snapshots update every5minutes and at completion to conserve GitHub API limits.\n"
     return result
 
 
+class RateLimited(RuntimeError):
+    def __init__(self, retry_seconds):
+        self.retry_seconds = retry_seconds
+
+
 def gh(repository, *arguments):
-    return subprocess.run(["gh", "release", *arguments, "--repo", repository], check=True,
-                          stdout=subprocess.DEVNULL, timeout=60)
+    result = subprocess.run(["gh", "release", *arguments, "--repo", repository],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=60)
+    if result.returncode:
+        if b"rate limit" in result.stderr.lower() or b"429" in result.stderr:
+            # Never hammer a shared free-repo budget. Use the authenticated reset
+            # if available; otherwise back off a full hour while compilation runs.
+            wait = 3600
+            try:
+                reset = subprocess.check_output(["gh", "api", "rate_limit", "--jq", ".resources.core.reset"], timeout=15)
+                wait = max(60, int(reset) - int(time.time()) + 5)
+            except (OSError, ValueError, subprocess.SubprocessError):
+                pass
+            raise RateLimited(wait)
+        raise subprocess.CalledProcessError(result.returncode, result.args)
+    return result
 
 
-def publish(repository, tag, directory, value):
+def publish(repository, tag, directory, value, assets=True):
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "progress.json").write_text(json.dumps(value, indent=2) + "\n")
     (directory / "progress.md").write_text(markdown(value))
     failures = "\n\n".join(f"RECIPE {f['recipe']} STATUS {f['status']} EXIT {f.get('exit_code')}\n{f.get('tail','')}" for f in value.get("failures", []))
     (directory / "failures.log").write_text(failures or "No failed/interrupted recipes recorded at this update.\n")
     (directory / "current.log").write_text(value.get("current_log_tail", "") or "No current compiler log available.\n")
-    gh(repository, "upload", tag, *[str(directory / name) for name in ["progress.json", "progress.md", "failures.log", "current.log"]], "--clobber")
+    if assets:
+        gh(repository, "upload", tag, *[str(directory / name) for name in ["progress.json", "progress.md", "failures.log", "current.log"]], "--clobber")
     gh(repository, "edit", tag, "--notes-file", str(directory / "progress.md"))
 
 
@@ -92,10 +115,11 @@ def main():
                  counts={}, total_recipes=None, deb_files=None, current=[], failures=[], approved=False)
     directory = args.build_dir.parent / "live-progress"
     process = subprocess.Popen(command)
-    next_update, failures = 0, 0
+    next_update, next_assets, failures = 0, 0, 0
     try:
         while True:
             if time.monotonic() >= next_update or process.poll() is not None:
+                retry_delay = args.interval
                 try:
                     current = capture(args.build_dir)
                     if current:
@@ -104,12 +128,16 @@ def main():
                     if process.poll() is not None:
                         value["status"] = "completed" if process.returncode == 0 else "stopped-with-errors-or-pending-work"
                         value["build_exit_code"] = process.returncode
-                    publish(args.repository, args.tag, directory, value)
+                    asset_due = time.monotonic() >= next_assets or process.poll() is not None
+                    publish(args.repository, args.tag, directory, value, assets=asset_due)
+                    if asset_due:
+                        next_assets = time.monotonic() + 300
                     print("TERMI_LIVE " + json.dumps({k: v for k, v in value.items() if k not in ("failures", "current_log_tail")}), flush=True)
-                except (OSError, ValueError, subprocess.SubprocessError) as error:
+                except (OSError, ValueError, subprocess.SubprocessError, RateLimited) as error:
                     failures += 1
-                    print("::warning::Live progress update failed: " + type(error).__name__, flush=True)
-                next_update = time.monotonic() + args.interval
+                    retry_delay = error.retry_seconds if isinstance(error, RateLimited) else min(900, args.interval * 2 ** min(failures - 1, 4))
+                    print("::warning::Live progress update failed: " + type(error).__name__ + f"; next retry in{retry_delay}s", flush=True)
+                next_update = time.monotonic() + retry_delay
             if process.poll() is not None:
                 break
             try:
