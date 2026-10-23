@@ -36,7 +36,8 @@ def next_status(recipe, states, retry_failed):
     return "blocked-dependency" if missing else "ready"
 
 
-def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400, retry_failed=False, resume_compile=None):
+def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400, retry_failed=False, resume_compile=None,
+          budget_seconds=None):
     import fcntl
     state_dir.mkdir(parents=True, exist_ok=True)
     with (state_dir / "builder.lock").open("w") as lock_file:
@@ -64,6 +65,7 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
         save(state_dir / "plan.json", plan)
         save(ledger_path, ledger)
         (state_dir / "logs").mkdir(exist_ok=True)
+        deadline = time.monotonic() + budget_seconds if budget_seconds is not None else None
         for name, recipe in sorted(plan["recipes"].items(), key=lambda item: (item[1]["rank"] is None, item[1]["rank"] or 0)):
             entry = ledger["recipes"][name]
             status = next_status({**recipe, "name": name}, ledger["recipes"], retry_failed)
@@ -71,6 +73,11 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                 if status == "blocked-dependency":
                     entry.update(status=status, blockers=[n for n in recipe["dependencies"] if ledger["recipes"][n]["status"] != "built"])
                 continue
+            remaining = deadline - time.monotonic() if deadline is not None else timeout
+            if remaining < 1:
+                ledger["halt"] = "batch-time-budget"
+                save(ledger_path, ledger)
+                return 75
             if shutil.disk_usage(root).free < minimum_free_gib * 1024**3:
                 ledger["halt"] = "insufficient-builder-disk"
                 save(ledger_path, ledger)
@@ -86,7 +93,7 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
             with (state_dir / "logs" / f"{name}-{entry['attempts']}.log").open("wb") as log:
                 process = subprocess.Popen(command, cwd=root, env=environment, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
                 try:
-                    code = process.wait(timeout=timeout)
+                    code = process.wait(timeout=min(timeout, remaining))
                 except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
                     os.killpg(process.pid, signal.SIGTERM)
                     try:
@@ -98,6 +105,10 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                     save(ledger_path, ledger)
                     if isinstance(error, KeyboardInterrupt):
                         raise
+                    if deadline is not None and time.monotonic() >= deadline:
+                        ledger["halt"] = "batch-time-budget"
+                        save(ledger_path, ledger)
+                        return 75
                     continue
             entry.update(status="built" if code == 0 else "failed", exit_code=code, ended=time.time())
             save(ledger_path, ledger)
@@ -118,11 +129,12 @@ def main():
     parser.add_argument("--recipe-timeout", type=int, default=86400)
     parser.add_argument("--retry-failed", action="store_true")
     parser.add_argument("--resume-compile")
+    parser.add_argument("--budget-seconds", type=int, help="Stop and checkpoint within a hosted-job time budget")
     args = parser.parse_args()
-    if args.minimum_free_gib < 8 or args.recipe_timeout < 60:
+    if args.minimum_free_gib < 8 or args.recipe_timeout < 60 or (args.budget_seconds is not None and args.budget_seconds < 60):
         parser.error("Keep at least8GiB builder headroom and a60second recipe deadline")
     raise SystemExit(build(args.root.resolve(), args.metadata.resolve(), args.state.resolve(), args.jobs,
-                           args.minimum_free_gib, args.recipe_timeout, args.retry_failed, args.resume_compile))
+                           args.minimum_free_gib, args.recipe_timeout, args.retry_failed, args.resume_compile, args.budget_seconds))
 
 
 if __name__ == "__main__":

@@ -37,9 +37,16 @@ def main():
     parser.add_argument("--cache-image", help="Explicit locally restored, manifest-pinned Termi checkpoint image")
     parser.add_argument("--continue-recipe", help="Explicitly resume a recipe already stopped during make or later")
     parser.add_argument("--full-recipes", action="store_true", help="Retain all recipe features for an individual catalog batch")
+    parser.add_argument("--catalog-budget-seconds", type=int, default=12600)
+    parser.add_argument("--catalog-minimum-free-gib", type=int, default=16)
+    parser.add_argument("--catalog-retry-failed", action="store_true", help="Explicitly retry failed/interrupted catalog recipes")
     args = parser.parse_args()
     if not 60 <= args.timeout_seconds <= 604800:
         parser.error("Build deadline must be between one minute and seven days")
+    if not 60 <= args.catalog_budget_seconds <= 604800 or args.catalog_minimum_free_gib < 8:
+        parser.error("Catalog batches require at least60seconds and8GiB disk headroom")
+    if args.mode == "full-catalog" and args.catalog_budget_seconds + 600 > args.timeout_seconds:
+        parser.error("Reserve at least600seconds after the catalog batch for artifact export")
     if args.mode == "packages":
         if not args.packages or len(args.packages) > 128 or any(not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", name) for name in args.packages):
             parser.error("packages mode requires 1–128 valid recipe names per build batch")
@@ -47,8 +54,13 @@ def main():
         parser.error("--packages requires --mode packages")
     if args.cache_image and not re.fullmatch(r"termi-checkpoint:[a-z0-9_.-]+", args.cache_image):
         parser.error("Only an explicitly restored local Termi checkpoint image is accepted")
-    if args.continue_recipe and (not args.cache_image or args.mode != "packages" or args.continue_recipe not in args.packages):
-        parser.error("Compile continuation requires a restored cache and one requested recipe")
+    if args.catalog_retry_failed and args.mode != "full-catalog":
+        parser.error("Catalog retries require full-catalog mode")
+    if args.continue_recipe and (not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", args.continue_recipe)
+            or not args.cache_image
+            or not ((args.mode == "packages" and args.continue_recipe in args.packages)
+                    or (args.mode == "full-catalog" and args.catalog_retry_failed))):
+        parser.error("Compile continuation requires a restored cache and an explicit requested recipe or catalog retry")
     # Report unavailable engine before creating build state or downloading images.
     run(["docker", "info", "--format", "{{.OSType}}"])
     lock = read_lock(ROOT / "packages/termux/upstream.lock.json")
@@ -82,6 +94,9 @@ def main():
         "docker", "create", "--cpus", str(args.jobs), "--memory", f"{args.memory_gib}g", "--pids-limit", "2048",
         "--env", f"TERMI_BUILD_JOBS={args.jobs}",
         "--env", f"TERMI_CONTINUE_RECIPE={args.continue_recipe or ''}",
+        "--env", f"TERMI_CATALOG_BUDGET={args.catalog_budget_seconds}",
+        "--env", f"TERMI_CATALOG_MINIMUM_FREE_GIB={args.catalog_minimum_free_gib}",
+        "--env", f"TERMI_CATALOG_RETRY_FAILED={int(args.catalog_retry_failed)}",
         "--security-opt", "no-new-privileges", tag, args.mode, *(args.packages or [])], text=True).strip()
     (output / "container-id.txt").write_text(container + "\n")
     result = None
@@ -95,7 +110,7 @@ def main():
         (output / "container-state.json").write_text(json.dumps(state, indent=2) + "\n")
         copied = subprocess.run(["docker", "cp", container + ":/home/builder/artifacts/.", str(artifacts)]).returncode
         # Preserve a failed container for diagnosis; remove only after evidence copy.
-        if copied == 0 and result == 0 and state["ExitCode"] == 0:
+        if copied == 0 and result == 0 and state["ExitCode"] == 0 and args.mode != "full-catalog":
             run(["docker", "rm", container])
     if result != 0 or state["ExitCode"] != 0 or copied != 0:
         raise SystemExit("Candidate build failed; inspect retained log/container-state.json")

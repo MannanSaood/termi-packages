@@ -63,7 +63,7 @@ def save(container, repository, tag, identity):
         raise ValueError("Only stopped mount-free unprivileged package builders can be checkpointed")
     if info["Config"].get("User") != "builder":
         raise ValueError("Checkpoint requires the dedicated package-builder identity")
-    if any(re.search(r"TOKEN|PASSWORD|SECRET|CREDENTIAL", entry.split("=", 1)[0], re.I) for entry in info["Config"].get("Env", [])):
+    if any(re.search(r"TOKEN|PASSWORD|SECRET|CREDENTIAL", entry.split("=", 1)[0], re.I) for entry in (info["Config"].get("Env") or [])):
         raise ValueError("Do not publish a builder containing secret environment variables")
     gh(repository, "create", tag, "--title", "Build checkpoint " + tag, "--notes", "Build cache only; not installable packages or an approved release.", "--prerelease", "--latest=false")
     with tempfile.TemporaryDirectory(prefix="termi-checkpoint-") as directory:
@@ -82,7 +82,7 @@ def save(container, repository, tag, identity):
             if process.poll() is None:
                 process.terminate(); process.wait()
         manifest = directory / "checkpoint.json"
-        manifest.write_text(json.dumps(dict(schema=1, input_identity=identity, parts=parts.records, environment=info["Config"].get("Env", []),
+        manifest.write_text(json.dumps(dict(schema=1, input_identity=identity, parts=parts.records, environment=info["Config"].get("Env") or [],
                                             user="builder", workdir="/home/builder/termux-packages"), indent=2) + "\n")
         # Manifest last: incomplete uploads never have a usable checkpoint.
         gh(repository, "upload", tag, str(manifest))

@@ -5,9 +5,13 @@ import unittest
 from unittest.mock import patch
 
 import build
+from select_catalog import selected_versions
 
 
 class PackageRequests(unittest.TestCase):
+    def test_apt_version_selection_preserves_epochs_and_ignores_retained_old_versions(self):
+        text = "Inst nodejs (26.4.0-1 Termi:stable [aarch64])\nInst example:aarch64 [1.0] (1:2.0 Termi:stable [aarch64])\nConf example (1:2.0 Termi:stable [aarch64])\n"
+        self.assertEqual({"nodejs": "26.4.0-1", "example": "1:2.0"}, selected_versions(text))
     def invoke(self, *arguments):
         return patch.object(sys, "argv", ["build.py", "--upstream", "unused", "--output", "unused", *arguments])
 

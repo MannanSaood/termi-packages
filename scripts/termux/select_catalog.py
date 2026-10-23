@@ -12,6 +12,15 @@ from catalog_policy import PROFILES, policy_for
 ROOTS = ["apt", "bash", "termux-exec", "termux-tools", "hello", "git", "gh"]
 
 
+def selected_versions(resolution):
+    selected = {}
+    for name, version in re.findall(r"^Inst ([a-z0-9+.-]+)(?::aarch64)?(?: \[[^\]]+\])? \(([^ )]+) ", resolution, re.M):
+        if name in selected and selected[name] != version:
+            raise ValueError("APT selected conflicting versions")
+        selected[name] = version
+    return selected
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--debs", type=Path, required=True)
@@ -53,7 +62,8 @@ def main():
     subprocess.run(command + ["update"], env=env, check=True)
     resolution = subprocess.check_output(command + ["--simulate", "--no-install-recommends", "install", *roots], env=env, text=True)
     (args.output / "runtime-resolution.txt").write_text(resolution)
-    names = set(re.findall(r"^Inst ([a-z0-9+.-]+)(?::aarch64)? ", resolution, re.M))
+    versions = selected_versions(resolution)
+    names = set(versions)
     if not set(roots) <= names or not 7 <= len(names) <= policy.records:
         raise ValueError("Incomplete or excessive runtime closure")
     pool = args.output / "pool"
@@ -62,7 +72,7 @@ def main():
     for package in packages:
         fields = subprocess.check_output(["dpkg-deb", "-f", str(package), "Package", "Version", "Architecture"], text=True)
         control = dict(line.split(": ", 1) for line in fields.strip().splitlines())
-        if control["Package"] not in names:
+        if control["Package"] not in names or control["Version"] != versions[control["Package"]]:
             continue
         filename = package.name.replace(":", "%3A")
         if any(r["name"] == control["Package"] for r in records):

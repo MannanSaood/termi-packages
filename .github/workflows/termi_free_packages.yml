@@ -5,7 +5,7 @@ on:
       mode:
         description: Plan and test only, or source-build a bounded recipe batch
         type: choice
-        options: [plan, packages]
+        options: [plan, packages, full-catalog]
         default: plan
       recipes:
         description: Space-separated parent recipe names
@@ -19,10 +19,14 @@ on:
       continue_recipe:
         description: Optional recipe confirmed interrupted during make or later
         default: ''
+      retry_failed:
+        description: Explicitly retry failed/interrupted recipes in full-catalog mode
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
-  group: free-package-builder
+  group: free-package-builder-${{ inputs.mode }}
   cancel-in-progress: false
 jobs:
   candidate:
@@ -69,7 +73,7 @@ jobs:
             --mount "type=bind,source=$PWD/build,target=/results" \
             "$image" bash -lc 'set -eu; mkdir /tmp/source; tar -xf /inputs/source.tar -C /tmp/source; cp -a /inputs/overlay/. /tmp/source/; python3 /work/catalog_graph.py --root /tmp/source --metadata /inputs --output /results/catalog-plan.json'
       - name: Restore explicit verified checkpoint
-        if: inputs.mode == 'packages' && inputs.checkpoint_tag != ''
+        if: inputs.mode != 'plan' && inputs.checkpoint_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           CHECKPOINT_TAG: ${{ inputs.checkpoint_tag }}
@@ -79,23 +83,26 @@ jobs:
             --tag "$CHECKPOINT_TAG" --input-identity "$(cat build/input-identity.txt)" \
             --manifest-sha256 "$MANIFEST_SHA256" --image termi-checkpoint:restored
       - name: Compile bounded source batch with time left for checkpoint export
-        if: inputs.mode == 'packages'
+        if: inputs.mode != 'plan'
         env:
           RECIPES: ${{ inputs.recipes }}
           CHECKPOINT_TAG: ${{ inputs.checkpoint_tag }}
           CONTINUE_RECIPE: ${{ inputs.continue_recipe }}
+          BUILD_MODE: ${{ inputs.mode }}
+          RETRY_FAILED: ${{ inputs.retry_failed }}
         run: |
           python3 - <<'PY'
           import os, subprocess
           args = ['python3','scripts/termux/build.py','--upstream','build/upstream','--output','build/candidate',
-                  '--mode','packages','--full-recipes','--jobs','4','--memory-gib','10','--timeout-seconds','14400',
-                  '--packages',*os.environ['RECIPES'].split()]
+                  '--mode',os.environ['BUILD_MODE'],'--full-recipes','--jobs','4','--memory-gib','10','--timeout-seconds','14400']
+          if os.environ['BUILD_MODE'] == 'packages': args += ['--packages',*os.environ['RECIPES'].split()]
+          if os.environ['RETRY_FAILED'] == 'true': args += ['--catalog-retry-failed']
           if os.environ['CHECKPOINT_TAG']: args += ['--cache-image','termi-checkpoint:restored']
           if os.environ['CONTINUE_RECIPE']: args += ['--continue-recipe',os.environ['CONTINUE_RECIPE']]
           subprocess.run(args,check=True)
           PY
-      - name: Preserve interrupted build as streamed release checkpoint
-        if: failure() && inputs.mode == 'packages'
+      - name: Preserve catalog or interrupted build as streamed release checkpoint
+        if: always() && (inputs.mode == 'full-catalog' || (failure() && inputs.mode == 'packages'))
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

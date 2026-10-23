@@ -59,6 +59,26 @@ class LedgerTests(unittest.TestCase):
                 process.assert_not_called()
                 self.assertEqual("insufficient-builder-disk", json.loads((root / "state/ledger.json").read_text())["halt"])
 
+    def test_hosted_budget_checkpoints_remaining_work_and_next_run_keeps_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ["upstream.lock.json", "source.json", "patches.json"]:
+                (root / name).write_text("{}")
+            (root / "build-package.sh").write_text('#!/bin/bash\nprintf "%s\\n" "${@: -1}" >> executed\n')
+            plan = dict(identity="pin", configuration={}, recipes={
+                name: dict(path="packages/" + name, dependencies=[], rank=rank, initial_status="pending")
+                for rank, name in enumerate(["a", "b"])})
+            state = root / "state"
+            with patch.object(builder, "create_plan", return_value=plan):
+                with patch.object(builder.time, "monotonic", side_effect=[0, 1, 61]):
+                    self.assertEqual(75, builder.build(root, root, state, minimum_free_gib=0, budget_seconds=60))
+                ledger = json.loads((state / "ledger.json").read_text())
+                self.assertEqual("batch-time-budget", ledger["halt"])
+                self.assertEqual("built", ledger["recipes"]["a"]["status"])
+                self.assertEqual("pending", ledger["recipes"]["b"]["status"])
+                self.assertEqual(0, builder.build(root, root, state, minimum_free_gib=0))
+                self.assertEqual(["packages/a", "packages/b"], (root / "executed").read_text().splitlines())
+
 
 if __name__ == "__main__":
     unittest.main()

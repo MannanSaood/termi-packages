@@ -36,8 +36,13 @@ if [ "$mode" = full-catalog ]; then
     # The graph comes from pinned upstream recipe parsing. Cycles/failures stay
     # explicit; independent recipes can continue, never with stock binary deps.
     result=0
+    retry=()
+    if [ "${TERMI_CATALOG_RETRY_FAILED:-0}" = 1 ]; then retry+=(--retry-failed); fi
+    if [ -n "${TERMI_CONTINUE_RECIPE:-}" ]; then retry+=(--resume-compile "$TERMI_CONTINUE_RECIPE"); fi
     python3 /home/builder/catalog_build.py --root "$PWD" --metadata /home/builder \
-        --state /home/builder/catalog-state --jobs "$jobs" --retry-failed || result=$?
+        --state /home/builder/catalog-state --jobs "$jobs" \
+        --budget-seconds "${TERMI_CATALOG_BUDGET:-12600}" \
+        --minimum-free-gib "${TERMI_CATALOG_MINIMUM_FREE_GIB:-16}" "${retry[@]}" || result=$?
     cp /home/builder/catalog-state/plan.json /home/builder/artifacts/catalog-plan.json
     cp /home/builder/catalog-state/ledger.json /home/builder/artifacts/catalog-ledger.json
     if compgen -G 'output/*.deb' >/dev/null; then
