@@ -1,0 +1,129 @@
+name: Termi free package builder
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Plan and test only, or source-build a bounded recipe batch
+        type: choice
+        options: [plan, packages]
+        default: plan
+      recipes:
+        description: Space-separated parent recipe names
+        default: hello
+      checkpoint_tag:
+        description: Optional previous checkpoint release tag
+        default: ''
+      checkpoint_sha256:
+        description: Required manifest SHA256 for checkpoint restore
+        default: ''
+      continue_recipe:
+        description: Optional recipe confirmed interrupted during make or later
+        default: ''
+permissions:
+  contents: write
+concurrency:
+  group: free-package-builder
+  cancel-in-progress: false
+jobs:
+  candidate:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify contracts and edge redirector
+        run: |
+          mkdir -p build
+          python3 -m unittest discover -s scripts/termux -p 'test_*.py' -v >build/tests.log 2>&1
+          node --test scripts/termux/edge/worker.test.mjs >build/worker-tests.log
+      - name: Measure disk and reclaim unused tools on disposable GitHub VM only
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$RUNNER_OS" = Linux
+          df -h / | tee build/disk-before.log
+          for directory in /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL; do
+            if [ -d "$directory" ]; then
+              test "$(readlink -f "$directory")" = "$directory"
+              sudo rm -rf -- "$directory"
+            fi
+          done
+          df -h / | tee build/disk-after.log
+      - name: Fetch and prepare pinned full-feature recipes
+        run: |
+          revision=$(python3 -c 'import json; print(json.load(open("packages/termux/upstream.lock.json"))["commit"])')
+          git init build/upstream
+          git -C build/upstream remote add origin https://github.com/termux/termux-packages.git
+          git -C build/upstream fetch --depth 1 origin "$revision"
+          git -C build/upstream checkout --detach FETCH_HEAD
+          python3 scripts/termux/prepare.py --upstream build/upstream --output build/context --full-catalog
+          PYTHONPATH=scripts/termux python3 -c 'from pathlib import Path; from build import input_identity; print(input_identity(Path("build/context")))' >build/input-identity.txt
+      - name: Verify full graph without compiling packages
+        run: |
+          image=$(python3 -c 'import json; print(json.load(open("packages/termux/upstream.lock.json"))["builder_image"])')
+          docker run --rm --network none --cpus 2 --memory 1g --pids-limit 128 \
+            --security-opt no-new-privileges \
+            --mount "type=bind,source=$PWD/scripts/termux,target=/work,readonly" \
+            --mount "type=bind,source=$PWD/build/context,target=/inputs,readonly" \
+            --mount "type=bind,source=$PWD/build,target=/results" \
+            "$image" bash -lc 'set -eu; mkdir /tmp/source; tar -xf /inputs/source.tar -C /tmp/source; cp -a /inputs/overlay/. /tmp/source/; python3 /work/catalog_graph.py --root /tmp/source --metadata /inputs --output /results/catalog-plan.json'
+      - name: Restore explicit verified checkpoint
+        if: inputs.mode == 'packages' && inputs.checkpoint_tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKPOINT_TAG: ${{ inputs.checkpoint_tag }}
+          MANIFEST_SHA256: ${{ inputs.checkpoint_sha256 }}
+        run: |
+          python3 scripts/termux/checkpoint.py restore --repository "$GITHUB_REPOSITORY" \
+            --tag "$CHECKPOINT_TAG" --input-identity "$(cat build/input-identity.txt)" \
+            --manifest-sha256 "$MANIFEST_SHA256" --image termi-checkpoint:restored
+      - name: Compile bounded source batch with time left for checkpoint export
+        if: inputs.mode == 'packages'
+        env:
+          RECIPES: ${{ inputs.recipes }}
+          CHECKPOINT_TAG: ${{ inputs.checkpoint_tag }}
+          CONTINUE_RECIPE: ${{ inputs.continue_recipe }}
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          args = ['python3','scripts/termux/build.py','--upstream','build/upstream','--output','build/candidate',
+                  '--mode','packages','--full-recipes','--jobs','4','--memory-gib','10','--timeout-seconds','14400',
+                  '--packages',*os.environ['RECIPES'].split()]
+          if os.environ['CHECKPOINT_TAG']: args += ['--cache-image','termi-checkpoint:restored']
+          if os.environ['CONTINUE_RECIPE']: args += ['--continue-recipe',os.environ['CONTINUE_RECIPE']]
+          subprocess.run(args,check=True)
+          PY
+      - name: Preserve interrupted build as streamed release checkpoint
+        if: failure() && inputs.mode == 'packages'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f build/candidate/container-id.txt ]; then
+            python3 scripts/termux/checkpoint.py save --container "$(cat build/candidate/container-id.txt)" \
+              --repository "$GITHUB_REPOSITORY" --tag "checkpoint-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+              --input-identity "$(cat build/candidate/build-input-identity.txt)" | tee build/checkpoint-result.log
+          fi
+      - name: Publish candidate evidence to Releases, never the live APT repo
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, subprocess, shutil
+          paths=list(pathlib.Path('build').glob('*.log'))+list(pathlib.Path('build').glob('*.json'))
+          artifacts=pathlib.Path('build/candidate/artifacts')
+          if artifacts.exists(): paths += [p for p in artifacts.iterdir() if p.suffix in ('.deb','.json','.log')]
+          upload=pathlib.Path('build/release-upload'); upload.mkdir(exist_ok=True)
+          unique=[]
+          for index,path in enumerate(paths):
+            target=upload/f'{index:04d}-{path.name}'
+            shutil.copyfile(path,target); unique.append(target)
+          paths=unique
+          # All assets are from this isolated package build, never app data or keys.
+          for offset in range(0,len(paths),850):
+            tag=f'candidate-{os.environ["GITHUB_RUN_ID"]}-{os.environ["GITHUB_RUN_ATTEMPT"]}-{offset//850}'
+            subprocess.run(['gh','release','create',tag,*map(str,paths[offset:offset+850]),'--repo',os.environ['GITHUB_REPOSITORY'],
+              '--title',tag,'--notes','Unsigned source-build candidates and diagnostics. Not an approved app or APT release.',
+              '--prerelease','--latest=false'],check=True)
+          PY
