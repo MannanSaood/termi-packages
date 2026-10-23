@@ -269,3 +269,30 @@ retroactively acquire this telemetry or new source input identity. Their outputs
 and diagnostics remain separate. New source inputs invalidate their checkpoint
 identity intentionally. The original63package local server/app sources remain
 unchanged. Workers are still deferred and the phone is unavailable.
+
+### Rate-budget validation and replacement runs
+
+Final tests38PASS8.660s. Live hello pilot40008819921 completed SUCCESS with one
+requested root/four readable Debian files. The initial instrumented full run
+showed four built recipes/one running(aerc)/four `.deb` files across3269recipes;
+audio showed13dependency `.deb` files with mpg123-pulse's closure still compiling.
+These were actual in-flight reads, not seeded counters. The first publishing
+version replaced four assets everyminute; official API limits exposed a risk
+of exhausting the shared1000requests/hour repo quota or secondary mutation
+budget. Fixed commit1155c4b: page updates everyminute, assets every5minutes/final,
+bounded failure/current tails inline in the page, exponential error backoff and
+rate-reset-aware pause. No source compiler receives an API token. Recommended
+at most two long-running instrumented batches to leave API headroom for final
+asset/checkpoint publication. Limits return stale observation timestamps and
+warnings, not paid fallback or fabricated fresh counts.
+
+Only new telemetry verification runs40008937527/40008824612 were cancelled and
+replaced with rate-safe full40010088115 and audio40010092102. Original full
+40003577527 and Node40003582122 remain untouched. Cancelled verification-run
+snapshots are historical; do not use them as active progress. New active progress
+pages use progress-40010088115-1 and progress-40010092102-1 after preparation.
+The publisher changes do not alter package source inputs; 35patches/zero-cycle
+graph and the native exact-source verification remain valid. Android module
+compilation and phone runtime approval remain pending. Workers remain deferred.
+
+API source: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api .
