@@ -1,5 +1,14 @@
 # Zero-cost package pipeline — 2026-10-23
 
+**Hosting selection,2026-10-24:** owner selected local hosting for now and
+deferred Workers. Tested server code is in [the main Termi repo's local folder](https://github.com/MannanSaood/termi/tree/main/local),
+commit `11cbf77`. The Windows LAN server currently serves the existing63reviewed
+packages at `http://192.168.1.5:8765/apt/main/`; full catalog builds continue on
+GitHub. No Cloudflare account/action is needed at this stage. The Worker setup
+below remains a future option, not a current hosting prerequisite. The app's
+source settings have not been changed, and physical phone reachability remains
+untested. See `local/README.md` in the app repo for start/stop and limitations.
+
 Owner constraint: no paid services, paid runners, paid cache expansion, domain
 purchase or R2 charges. Separate public repository authorized and created:
 https://github.com/MannanSaood/termi-packages . This supersedes the earlier paid
