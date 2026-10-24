@@ -50,6 +50,24 @@ class SeedCompatibility(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix", "Linux builder cache policy")
 class ScratchTests(unittest.TestCase):
+    def test_readonly_go_module_directories_are_removed_without_chmodding_aliases(self):
+        with tempfile.TemporaryDirectory() as folder:
+            top = Path(folder)
+            cache = top / "example/build/go/pkg/mod/module@v1/nested"
+            cache.mkdir(parents=True)
+            (cache / "source.go").write_text("fixture")
+            outside = top / "source-cache"
+            outside.mkdir()
+            (outside / "untouched").write_text("preserve")
+            (cache / "external").symlink_to(outside,target_is_directory=True)
+            mode = outside.stat().st_mode
+            for directory in [cache,cache.parent,cache.parent.parent]:
+                directory.chmod(0o555)
+            self.assertIn("example/build",build_scratch.clean(top,"example"))
+            self.assertFalse((top / "example/build").exists())
+            self.assertEqual(mode,outside.stat().st_mode)
+            self.assertEqual("preserve",(outside / "untouched").read_text())
+
     def test_only_disposable_compile_products_are_removed_and_sources_are_kept(self):
         with tempfile.TemporaryDirectory() as folder:
             top = Path(folder)

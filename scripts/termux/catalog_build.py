@@ -138,7 +138,13 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                 print("TERMI_FAILURE " + json.dumps(dict(recipe=name, exit_code=code,
                       tail=tail(state_dir / "logs" / f"{name}-{entry['attempts']}.log"))), flush=True)
             from build_scratch import clean
-            cleaned = clean(Path.home() / ".termux-build", name)
+            try:
+                cleaned = clean(Path.home() / ".termux-build", name)
+            except OSError as error:
+                entry["scratch_warning"] = str(error)
+                print("TERMI_SCRATCH_WARNING " + str(error), flush=True)
+                cleaned = []
+                save(ledger_path, ledger)
             if cleaned:
                 entry["discarded_scratch"] = cleaned
                 entry["compile_resume_available"] = False

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 
 
 def clean(top, name):
@@ -30,6 +31,18 @@ def clean(top, name):
         if not resolved.is_relative_to(recipe.resolve()) or resolved == recipe.resolve():
             raise ValueError("Scratch target escaped its recipe directory")
         if path.is_dir():
+            # Go module-cache directories are deliberately read-only. Only
+            # unlock directories inside this already validated scratch tree;
+            # never follow or chmod aliases to source/cache/host-tool paths.
+            path.chmod(path.stat().st_mode | stat.S_IRWXU)
+            for current, directories, _ in os.walk(path, followlinks=False):
+                for name in directories:
+                    child = Path(current) / name
+                    if child.is_symlink():
+                        continue
+                    if not child.resolve().is_relative_to(resolved):
+                        raise ValueError("Scratch child escaped its validated directory")
+                    child.chmod(child.stat().st_mode | stat.S_IRWXU)
             shutil.rmtree(path)
             removed.append(path.relative_to(top).as_posix())
     return removed
@@ -42,4 +55,9 @@ if __name__ == "__main__":
     parser.add_argument("--top", type=Path, required=True)
     parser.add_argument("--recipe", required=True)
     args = parser.parse_args()
-    print("TERMI_DISCARDED_SCRATCH " + json.dumps(clean(args.top, args.recipe)), flush=True)
+    try:
+        print("TERMI_DISCARDED_SCRATCH " + json.dumps(clean(args.top, args.recipe)), flush=True)
+    except OSError as error:
+        # Packaging has already succeeded. Keep cleanup visible without
+        # reporting its archive as a failed compilation; disk guards still run.
+        print("TERMI_SCRATCH_WARNING " + str(error), flush=True)
