@@ -1,0 +1,48 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "candidates": [
+    {
+      "tag": "candidate-40077675224-1-0",
+      "inventory_sha256": "9f2618e7bfac741a6ec3ef1e9e723d4ea5a3e68a5ea5b78fc7c129c506b8e2c3",
+      "plan_sha256": "fbd31857ba630dff602ff20b31a795da8a16f80872dd938db3b7bb9bab03d852",
+      "ledger_sha256": "7d3b1baf355d509df76dfd8ff240a9fc6831364111027209c49033109fb9af06"
+    },
+    {
+      "tag": "candidate-40077677670-1-0",
+      "inventory_sha256": "1caade4aa302638d3e652b06fc6005702f74e75f2f40f2b27278ea38b2185254",
+      "plan_sha256": "fbd31857ba630dff602ff20b31a795da8a16f80872dd938db3b7bb9bab03d852",
+      "ledger_sha256": "47b421a2c42a835dc8c3651055e529f3636131ff11b61bc2a8e7600e69fcbdf6"
+    },
+    {
+      "tag": "candidate-40077679803-1-0",
+      "inventory_sha256": "dc80342538a7f18ce9df817e4f23b4aaf1f01256fcb0a4c0858aa273b32b5110",
+      "plan_sha256": "fbd31857ba630dff602ff20b31a795da8a16f80872dd938db3b7bb9bab03d852",
+      "ledger_sha256": "ff803d796df5109022cd1dddca39ea743b33c5302845ccff1b85cef0b900fc58"
+    },
+    {
+      "tag": "candidate-40077681910-1-0",
+      "inventory_sha256": "52fb7fb0f9958841975a2edc673c3f37abdc02f9a9a8052932848f7c786d93b5",
+      "plan_sha256": "fbd31857ba630dff602ff20b31a795da8a16f80872dd938db3b7bb9bab03d852",
+      "ledger_sha256": "afd49bbc477981afa6d56e1d39054457fb44c452e2ee06c014da09ae619004eb"
+    },
+    {
+      "tag": "candidate-40077684257-1-0",
+      "inventory_sha256": "ef7fb65511841e0e04ae7bde66924a696d74b476ee16f38549873038656f43f1",
+      "plan_sha256": "0bcbc1e999695103e2cda0f271ffcf01a6f0f9de5865bef87a4317e2928492f2",
+      "selected_success": true
+    },
+    {
+      "tag": "candidate-40071625921-1-0",
+      "inventory_sha256": "336a92dc11a64bb8ce4a170a45adfa7c7c8f0c65f156e0c83bc0867201fc0f0d",
+      "plan_sha256": "560f98c3ccd5b321efbe46b74a178fa525a5c976a5fe9c95e0b982719db26b6f",
+      "selected_success": true
+    },
+    {
+      "tag": "candidate-40075636176-1-0",
+      "inventory_sha256": "c3d749baaf4e52e69ecc96e1e42c7d4edf9fd98a6ca7b046c546440d7ae8571a",
+      "plan_sha256": "bc0de3013c137dd6dc941057f996e03d0ee316707fc87c78dcca4b120e00cd1e",
+      "ledger_sha256": "30ab90462ee705fb60d55353e57b4e0b14b42bb480094106d3c81a39f48df04c"
+    }
+  ]
+}

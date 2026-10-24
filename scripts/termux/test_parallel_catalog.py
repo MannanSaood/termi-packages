@@ -73,6 +73,16 @@ class MergeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 merge([first],root/"union")
 
+    def test_explicit_compatible_parent_preference_retains_alternate_hashes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            first=self.candidate(root/"lane0","a",b"first own-source build")
+            second=self.candidate(root/"lane1","a",b"independent own-source build")
+            _,inventory=merge([first,second],root/"union",prefer_first_compatible=True)
+            self.assertEqual(1,len(inventory["packages"]))
+            self.assertEqual(1,len(inventory["alternate_builds"]))
+            self.assertEqual(b"first own-source build",(root/"union/a_1_all.deb").read_bytes())
+
 
 if __name__=="__main__":
     unittest.main()

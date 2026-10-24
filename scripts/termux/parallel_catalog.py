@@ -14,7 +14,7 @@ import subprocess
 from seed import compatibility, digest, pinned, expand_bundles
 
 
-def merge(inputs, output):
+def merge(inputs, output, prefer_first_compatible=False):
     if output.exists():
         raise ValueError("Merge destination must be new")
     sources = []
@@ -27,7 +27,7 @@ def merge(inputs, output):
     if not sources:
         raise ValueError("At least one pinned candidate required")
     target = sources[0][3]
-    records, paths, built, origins = {}, {}, set(), []
+    records, paths, built, origins, variants = {}, {}, set(), [], []
     for directory, inventory, ledger, plan, pins in sources:
         allowed, _ = compatibility(plan,target,ledger)
         present = set()
@@ -39,7 +39,16 @@ def merge(inputs, output):
                 raise ValueError("Unsafe merged archive name")
             path = pinned(directory,name,record["sha256"])
             if name in records and records[name] != record:
-                raise ValueError("Conflicting candidate outputs; review required: " + name)
+                first = records[name]
+                if not prefer_first_compatible or any(first.get(k) != record.get(k) for k in ["control","recipe","channel","original_file"]):
+                    raise ValueError("Conflicting candidate outputs; review required: " + name)
+                # Explicit policy chooses one entire compatible parent build,
+                # never treats independently rebuilt bytes as identical.
+                variants.append(dict(file=name,chosen_sha256=first["sha256"],alternate_sha256=record["sha256"],source=pins))
+                present.add(record["recipe"])
+                continue
+            if record["recipe"] in built and name not in records:
+                raise ValueError("Compatible parent output set differs across candidates")
             records[name],paths[name] = record,path
             present.add(record["recipe"])
         if allowed != present:
@@ -53,7 +62,8 @@ def merge(inputs, output):
                   recipes={name:dict(status="built" if name in built else recipe["initial_status"],attempts=0)
                            for name,recipe in target["recipes"].items()}, source_candidates=origins)
     inventory = dict(status="candidate-not-signed-not-device-verified",packages=[records[n] for n in sorted(records)],
-                     source_candidates=origins)
+                     source_candidates=origins,alternate_builds=variants,
+                     duplicate_policy="prefer-first-compatible-parent" if prefer_first_compatible else "identical-only")
     for name,value in [("catalog-plan.json",target),("catalog-ledger.json",merged),("inventory.json",inventory)]:
         (output/name).write_text(json.dumps(value,indent=2)+"\n")
     pins = {name:digest(output/name) for name in ["inventory.json","catalog-ledger.json","catalog-plan.json"]}

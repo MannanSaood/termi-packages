@@ -1,0 +1,34 @@
+name: Merge verified Termi catalog candidates
+run-name: Merge completed Termi source candidates
+on:
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: Committed pinned source candidate manifest
+        required: true
+        default: packages/termux/batch-20261024.json
+permissions:
+  contents: write
+concurrency:
+  group: termi-candidate-merge
+  cancel-in-progress: false
+jobs:
+  merge:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check merge contracts
+        run: python3 -m unittest discover -s scripts/termux -p 'test_parallel_catalog.py' -v
+      - name: Merge pinned own-source candidates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          case "$MANIFEST" in packages/termux/batch-[0-9]*.json) ;; *) exit 2;; esac
+          mkdir -p build
+          python3 scripts/termux/merge_releases.py --manifest "$MANIFEST" --output build/merged \
+            --tag "candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-0" | tee build/merge.log
