@@ -533,3 +533,43 @@ no extra sequential duplicate launched. Original data/APK/signing keys/local
 63-package reviewed server unchanged. Standard free public Actions/Release
 storage only, no paid runner/cache/R2/Worker. Owner olderAPI/highzoom deferrals
 remain untested; app release/full catalog gate remains BLOCKED.
+
+### 2026-10-24 fortune source restored and live status check
+
+Two documented Freetz source-cache mirrors were actually downloaded successfully:
+https://freetz.magenbrot.net/fortune-1.2.tar.bz2 and
+https://freetz.wirsind.info/fortune-1.2.tar.bz2 . Both5224byte source archives match
+the original cbb246a500366db39ce035632eb4954e09f1e03b28f2c4688864bfa8661b236a.
+Found via independent Freetz fortune recipe and documented freetz_download mirror
+list. No replacement implementation or compiled binaries; original file pin kept.
+Recipe now uses the first mirror. Its separate fortune-mod1.99.1 SOURCE DATA
+archive also verified via https://deb.debian.org/debian/pool/main/f/fortune-mod/fortune-mod_1.99.1.orig.tar.gz
+(and archive.debian.org),1812089bytes, original hash
+fc51aee1f73c936c885f4e0f8b6b48f4f68103e3896eaddc6a45d2b71e14eace retained.
+Old http.debian.net URL replaced with working HTTPS endpoint.
+
+Published ffce7ff; focused native Android-target verification:
+https://github.com/MannanSaood/termi-packages/actions/runs/40098113770 .
+This selected root has no declared dependencies, so starts without copying the
+868-recipe seed. No old catalog run cancelled/restarted; existing containers
+cannot acquire changed source URLs retroactively. Fortune compilation approval
+awaits this real job; mirror availability/hash check is already proven.
+
+Live snapshot cross-checks confirm at least871 unique completed parents:
+868 saved plus etsh/hunspell-en-us/hunspell-ru. Lane0 869 (US dictionary), lane1
+868/currentfortune, lane2 870(US+Russian), lane3 869(etsh)/currentgforth. Simply
+summing new counts would double-count US dictionary. As current reporters omit
+completed-name sets, the three names were reconstructed from deterministic lane
+dependency order before current rank and cross-checked exactly against each
+published built/failed/blocked counter. Evidence live-unique-frontier.json records
+method and per-lane validity; this is a live lower bound, not a new merged ledger
+or APK approval. All four snapshots building/no reported failures at observation;
+overall jobs cannot be called passed while still running. Last saved union868.
+
+Future reporters now emit completed_recipes IDs in bounded progress.json for
+exact deduplicated live counts. IDs are excluded from repetitive console heartbeat
+lines (as are owned_roots); no change to compiler/session contracts. Existing
+active reporters cannot gain this retrospectively. Added failed/pending/running
+exclusion test. Host52tests28PASS/24POSIXskips; actual GitHub checks follow. No
+phone/APK/app-data/signing/local reviewed repository changes. Full catalog remains
+incomplete; older-version/font-scale owner deferrals remain untested.

@@ -53,3 +53,11 @@ Restarted lanes with first-wave recipe repairs:
 [lane3](https://github.com/MannanSaood/termi-packages/actions/runs/40097215014).
 Ecj/audio source builds passed. New repairs await actual compiler results;
 fortune source-host availability remains unresolved. Nothing is runtime-approved.
+
+Fortune's source outage is resolved by an exact-checksum Freetz source mirror;
+the separate Debian source-data URL is also repaired with its original checksum.
+[Focused fortune verification](https://github.com/MannanSaood/termi-packages/actions/runs/40098113770)
+is running; no Android runtime approval implied. Latest live lower bound871
+unique completed recipes (868 saved plus etsh/hunspell-en-us/hunspell-ru);
+shared dictionary completions are counted once. See pipeline notes for snapshot
+method and timing. Existing catalog lanes continue without cancellation.
