@@ -31,3 +31,13 @@ or approve packages. Public package binaries live in Releases; Pages contains
 metadata only. The optional Cloudflare Worker uses the Free plan, without R2.
 
 
+
+Parallel source builds are now active: [lane0](https://github.com/MannanSaood/termi-packages/actions/runs/40077675224),
+[lane1](https://github.com/MannanSaood/termi-packages/actions/runs/40077677670),
+[lane2](https://github.com/MannanSaood/termi-packages/actions/runs/40077679803),
+[lane3](https://github.com/MannanSaood/termi-packages/actions/runs/40077681910).
+[Ecj API26 verification](https://github.com/MannanSaood/termi-packages/actions/runs/40077684257) is pending.
+Each lane uses its own installed prefix and includes its dependencies. Counts
+across lanes overlap: use the pinned candidate merge tool for unique totals.
+Lane pages update every5minutes; downloadable snapshots every25minutes/final.
+The original sequential run remains active to preserve in-flight compilation.

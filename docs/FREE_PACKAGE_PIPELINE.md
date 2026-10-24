@@ -386,3 +386,70 @@ Progress page after preparation:
 https://github.com/MannanSaood/termi-packages/releases/tag/progress-40075636176-1 .
 No app data/APK/local approved repository changes. Full catalog is incomplete;
 source build success is separate from phone runtime approval.
+
+### 2026-10-24 free parallel catalog lanes and ecj repair
+
+Commit77cac53 adds isolated catalog lanes via full-catalog mode recipes input
+lane-0-of-4 through lane-3-of-4, without expanding dispatch beyond10 inputs.
+SHA256(name) modulo lane count gives each parent one owner; each lane includes
+its transitive dependency closure. Real graph covers3269 recipes exactly once by
+ownership, zero cycles: owned797/837/820/815, closure1615/1568/1570/1694. Shared
+dependencies may compile in multiple lanes. Each run has its own container,
+installed prefix, ledger, progress/candidate/checkpoint releases. Checkpoint lane
+mismatches are rejected. Non-owned/nondependency pending recipes are explicitly
+deferred-shard, never falsely built or dropped from the graph. All lanes still
+compile sources for the Termi prefix; no stock Termux Android binaries are used.
+
+Progress pages update every300s, assets1500s/final for lanes, with observation
+and publication timestamps. Counts overlap across lanes and MUST NOT be summed.
+Lane Debian output uses512MiB target-size tar bundles, reducing hundreds of
+concurrent API asset mutations to a handful. Future seed download accepts tar
+bundles, reads only regular inventory-listed .deb members, validates namespace,
+size ceilings and SHA256 before reuse; never tar.extract or package execution.
+
+parallel_catalog.py dispatch checks public visibility and starts2–4 independent
+workflow runs. merge consumes explicit inventory/ledger/plan hash pins for each
+completed candidate directory, checks recipe compatibility, unions only built
+parents, requires outputs, verifies package hashes, deduplicates identical files
+and rejects conflicting same-name bytes. It retains source-candidate pins and
+emits unique counts/new explicit hashes. No automatic signing or approval. This
+is a bounded parallel batch, not a claim that the entire catalog is completed or
+that all subsequent checkpoints/merge rounds run unattended. Download all lane
+candidate assets then use merge --input DIRECTORY INVENTORY_SHA LEDGER_SHA
+PLAN_SHA (repeat per lane) --output NEW_DIRECTORY; choose latest recipe graph
+first when combining older compatible candidates. Publish merged output only as
+an unsigned candidate and use its new hashes for the next dispatch. Never count
+duplicates as new packages. Full merged phone/runtime validation remains pending.
+
+Ecj original failure: D8 could not find official SDK platforms/android-26/android.jar
+in pinned builder (ships24/28/35). Revision6 installs the official platform26 via
+existing SDK manager if absent, requires nonempty jar, generates matching ecj-26
+launcher from ecj-24 and installs it from temporary directory. Android API level
+stays26. Upstream ecj recipe transforms official Eclipse JDT jar into Android DEX;
+it does not compile Eclipse compiler Java sources from scratch and is not a stock
+Termux binary. Ecj actual GitHub verification is pending, not reported passed.
+
+Verification:50 Linux tests PASS17.538s (parallel-tests.log), actual full graph
+ownership/dependency closure/cycles and recipe bash parsing PASS(parallel-graph.log),
+workflow YAML/all bash blocks PASS, Python compileall PASS. Tests cover actual
+lane-only fixture execution, cross-lane checkpoint rejection, merge dedup/conflict/
+metadata pins, safe/tampered bundle extraction and existing package tests. No
+local full Android build or app data access. No paid runner/artifact/cache service.
+GitHub standard runners in public repositories remain free:
+https://docs.github.com/en/actions/concepts/billing-and-usage
+Free standard runner concurrency up to20 (account-wide limits/availability apply):
+https://docs.github.com/en/enterprise-cloud@latest/actions/reference/limits
+
+Started at77cac53 using existing119recipe/127archive candidate and its explicit
+pins recorded above:
+lane0 https://github.com/MannanSaood/termi-packages/actions/runs/40077675224
+lane1 https://github.com/MannanSaood/termi-packages/actions/runs/40077677670
+lane2 https://github.com/MannanSaood/termi-packages/actions/runs/40077679803
+lane3 https://github.com/MannanSaood/termi-packages/actions/runs/40077681910
+ecj https://github.com/MannanSaood/termi-packages/actions/runs/40077684257
+Progress pages use progress-RUN_ID-1 after preparation. Original sequential
+40075636176 remains active deliberately to preserve in-flight work; its old ecj
+failure stays historical and cannot acquire revision6 retroactively. Latest API
+check: all six runs IN_PROGRESS. Four lanes plus focused ecj explain five NEW jobs;
+original is sixth, not an accidentally duplicated lane. Do not claim4x throughput;
+shared dependency work/preparation/checkpoint transfers reduce practical gains.
