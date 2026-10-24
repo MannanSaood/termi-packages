@@ -174,14 +174,21 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                         from build_scratch import clean
                         entry.update(reason=str(error), compile_resume_available=False, exit_code=75)
                         try:
-                            entry["discarded_scratch"] = clean(Path.home() / ".termux-build", name)
+                            entry["discarded_scratch"] = clean(Path.home() / ".termux-build", name,
+                                discard_sources=os.environ.get("TERMI_RECLAIM_RECIPE_CACHE") == "1")
                         except OSError as cleanup_error:
                             entry["scratch_warning"] = str(cleanup_error)
-                        ledger["halt"] = "insufficient-builder-disk-during-recipe"
+                        ledger.setdefault("resource_interruptions", []).append(name)
                     save(ledger_path, ledger)
                     announce(ledger, "recipe-interrupted", name)
                     if isinstance(error, DiskPressure):
-                        return 75
+                        if shutil.disk_usage(root).free < minimum_free_gib * 1024**3:
+                            ledger["halt"] = "insufficient-builder-disk-during-recipe"
+                            save(ledger_path, ledger)
+                            return 75
+                        # A large recipe must not starve independent roots.
+                        # It stays interrupted and is retried on a fresh runner.
+                        continue
                     if isinstance(error, KeyboardInterrupt):
                         raise
                     if deadline is not None and time.monotonic() >= deadline:
@@ -194,12 +201,13 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
             save(ledger_path, ledger)
             announce(ledger, "recipe-complete", name)
             if code:
-                from catalog_progress import tail
+                from catalog_progress import failure_excerpt
                 print("TERMI_FAILURE " + json.dumps(dict(recipe=name, exit_code=code,
-                      tail=tail(state_dir / "logs" / f"{name}-{entry['attempts']}.log"))), flush=True)
+                      tail=failure_excerpt(state_dir / "logs" / f"{name}-{entry['attempts']}.log"))), flush=True)
             from build_scratch import clean
             try:
-                cleaned = clean(Path.home() / ".termux-build", name)
+                cleaned = clean(Path.home() / ".termux-build", name,
+                    discard_sources=os.environ.get("TERMI_RECLAIM_RECIPE_CACHE") == "1")
             except OSError as error:
                 entry["scratch_warning"] = str(error)
                 print("TERMI_SCRATCH_WARNING " + str(error), flush=True)

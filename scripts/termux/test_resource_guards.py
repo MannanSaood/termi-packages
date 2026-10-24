@@ -14,6 +14,30 @@ import catalog_build
 
 class ResourceGuards(unittest.TestCase):
     @unittest.skipUnless(os.name == 'posix', 'Linux compiler process groups')
+    def test_large_recipe_does_not_starve_independent_roots_after_reclamation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            for name in ['upstream.lock.json','source.json','patches.json']:
+                (root/name).write_text('{}')
+            (root/'build-package.sh').write_text('#!/bin/bash\nif [ "${@: -1}" = packages/resource-fixture ]; then sleep 60; fi\n')
+            plan=dict(identity='continue-fixture',configuration={},recipes={
+                name:dict(path='packages/'+name,dependencies=[],rank=rank,initial_status='pending')
+                for rank,name in enumerate(['resource-fixture','independent-fixture'])})
+            calls=[]
+            def wait(process,*args):
+                calls.append(process)
+                if len(calls)==1:raise DiskPressure('fixture')
+                return process.wait(timeout=5)
+            with patch.object(catalog_build,'create_plan',return_value=plan), patch(
+                    'catalog_build.shutil.disk_usage',return_value=SimpleNamespace(free=20*1024**3)), patch(
+                    'catalog_build.guarded_wait',side_effect=wait):
+                self.assertEqual(1,catalog_build.build(root,root,root/'state',minimum_free_gib=16))
+            ledger=json.loads((root/'state/ledger.json').read_text())
+            self.assertNotIn('halt',ledger)
+            self.assertEqual('interrupted',ledger['recipes']['resource-fixture']['status'])
+            self.assertEqual('built',ledger['recipes']['independent-fixture']['status'])
+
+    @unittest.skipUnless(os.name == 'posix', 'Linux compiler process groups')
     def test_disk_halt_kills_recipe_and_persists_recoverable_ledger(self):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)
@@ -24,7 +48,8 @@ class ResourceGuards(unittest.TestCase):
                 'resource-fixture':dict(path='packages/resource-fixture',dependencies=[],rank=0,initial_status='pending')})
             with patch.object(catalog_build,'create_plan',return_value=plan), patch(
                     'catalog_build.shutil.disk_usage',side_effect=[
-                        SimpleNamespace(free=20*1024**3),SimpleNamespace(free=7*1024**3)]):
+                        SimpleNamespace(free=20*1024**3),SimpleNamespace(free=7*1024**3),
+                        SimpleNamespace(free=7*1024**3)]):
                 self.assertEqual(75,catalog_build.build(root,root,root/'state',minimum_free_gib=16))
             ledger=json.loads((root/'state/ledger.json').read_text())
             self.assertEqual('insufficient-builder-disk-during-recipe',ledger['halt'])

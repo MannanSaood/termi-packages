@@ -5,6 +5,7 @@ from collections import Counter
 import datetime
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 
@@ -15,6 +16,25 @@ def tail(path, limit=8192):
     with path.open("rb") as stream:
         stream.seek(max(0, path.stat().st_size - limit))
         return stream.read(limit).decode("utf-8", errors="replace")
+
+
+def failure_excerpt(path):
+    if not path.is_file() or path.is_symlink():
+        return ""
+    first = []
+    size = 0
+    with path.open("rb") as stream:
+        for line in stream:
+            size += len(line)
+            if size > 32*1024**2:
+                break
+            if re.search(rb"error:|fatal error|Wrong checksum|FAILED:|Killed", line, re.I):
+                first.append(line[:512])
+                if len(first) == 8:
+                    break
+    if not first:
+        return tail(path)
+    return "First diagnostics (bounded):\n" + b"".join(first).decode("utf-8", errors="replace")[:3500] + "\nLast output:\n" + tail(path,4096)
 
 
 def snapshot(root, state):
@@ -31,7 +51,7 @@ def snapshot(root, state):
             continue
         log = state / "logs" / f"{name}-{entry.get('attempts', 1)}.log"
         failures.append(dict(recipe=name, status=entry["status"], exit_code=entry.get("exit_code"),
-                             log=log.name, tail=tail(log)))
+                             log=log.name, tail=failure_excerpt(log)))
     # Count binary outputs with readable Debian control archives. This is a
     # candidate-file count, distinct from completed parent recipes or approval.
     cache_path = state / "deb-count-cache.json"

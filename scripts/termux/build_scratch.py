@@ -1,7 +1,9 @@
 """Remove only disposable per-recipe compilation products inside Linux builders.
 
-Source archives, source checkouts, host tools, installed prefix, built markers,
-logs and Debian outputs are preserved. Never use this on phone/app data.
+By default source archives and checkouts are preserved. Explicit disposable
+hosted mode also drops per-recipe sources/cache after packaging or interruption.
+Host tools, shared toolchains, installed prefix, markers, logs and Debian outputs
+are always preserved. Never use this on phone/app data.
 """
 import os
 from pathlib import Path
@@ -10,7 +12,7 @@ import shutil
 import stat
 
 
-def clean(top, name):
+def clean(top, name, discard_sources=False):
     if os.name != "posix" or not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", name):
         raise ValueError("Scratch cleanup requires a Linux builder recipe")
     top = top.resolve()
@@ -18,6 +20,10 @@ def clean(top, name):
     if recipe.is_symlink() or not recipe.is_dir():
         return []
     targets = [recipe / part for part in ["build", "multilib-build", "massage", "tmp", "package"]]
+    if discard_sources:
+        # Hosted builds restart from verified package outputs, not stale source
+        # trees. Host tools, shared toolchains and every package archive remain.
+        targets += [recipe / part for part in ["src", "cache"]]
     cargo = recipe / "src/target"
     marker = cargo / "CACHEDIR.TAG"
     if ((recipe / "src/Cargo.toml").is_file() and not cargo.is_symlink()
@@ -54,9 +60,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--top", type=Path, required=True)
     parser.add_argument("--recipe", required=True)
+    parser.add_argument("--discard-sources", action="store_true")
     args = parser.parse_args()
     try:
-        print("TERMI_DISCARDED_SCRATCH " + json.dumps(clean(args.top, args.recipe)), flush=True)
+        print("TERMI_DISCARDED_SCRATCH " + json.dumps(clean(args.top, args.recipe,
+              args.discard_sources or os.environ.get("TERMI_RECLAIM_RECIPE_CACHE") == "1")), flush=True)
     except OSError as error:
         # Packaging has already succeeded. Keep cleanup visible without
         # reporting its archive as a failed compilation; disk guards still run.

@@ -58,6 +58,7 @@ if [ "$mode" = full-catalog ]; then
     fi
     if [ "$result" -ne 0 ]; then exit "$result"; fi
 elif [ "$mode" = packages ]; then
+    batch_result=0
     if python3 -c 'import json,sys; sys.exit(json.load(open("/home/builder/source.json")).get("catalog_scope") != "full-catalog")'; then
         if [ ! -f /home/builder/artifacts/catalog-plan.json ]; then
             python3 /home/builder/catalog_graph.py --root "$PWD" --metadata /home/builder \
@@ -85,7 +86,12 @@ elif [ "$mode" = packages ]; then
         python3 /home/builder/catalog_progress.py --root "$PWD" --state /home/builder/catalog-state \
             --selected "$@" --recipe "$root" --status "$status" --exit-code "$result" \
             --output /home/builder/artifacts/progress.json
-        if [ "$result" -ne 0 ]; then exit "$result"; fi
+        if [ "$result" -ne 0 ]; then
+            batch_result=1
+            # Keep checking independent requested roots and preserve successful
+            # outputs even when a later requested root fails.
+            python3 /home/builder/build_scratch.py --top "$HOME/.termux-build" --recipe "$root"
+        fi
     done
 elif [ "$mode" = catalog ]; then
     # Explicit owner-approved expansion; dependencies are source-built and the
@@ -117,4 +123,5 @@ fi
 cd /home/builder/artifacts
 sha256sum ./*.deb ./*.json > SHA256SUMS
 if [ "$mode" = bootstrap ]; then sha256sum bootstrap/* >> SHA256SUMS; fi
+if [ "${batch_result:-0}" -ne 0 ]; then exit "$batch_result"; fi
 printf 'TERMI_BUILD_CANDIDATE_COMPLETE; no installation or release approval\n'

@@ -613,3 +613,59 @@ on Windows, so Linux57test/Android compiler verification follows on GitHub;
 these five repairs are not yet claimed as successful package builds.
 No phone/APK/signing/app-data or local reviewed63package repository mutation.
 Full catalog/app release Gate: BLOCKED until actual build/runtime requirements.
+
+
+### 2026-10-24 restart all lanes from preserved outputs
+
+Recovery merge40114592088 actually SUCCESS; candidate-40114592088-1-0 preserves
+913unique completed parents/1230Debian archives. Each source/archive hash was
+checked by the merge job; prior releases/checkpoints remain intact. Source pins:
+inventory858a95925cb94a4096249301ad6c1b8dbb07e5a33f69c909fecc64f313635c30,
+ledgerc44f30df69c88ddcdecb82b322700bc76eae4ea782979d0923f4bd5ec24626b5,
+pland516d69015edd9e59764f9b755b7b08041847297f064cd2534ccaab6aa6dddf3.
+This includes the successfully built AOSP package; keep its recipe unchanged so
+all lanes reuse it instead of another expensive checkout. A shallow AOSP draft
+was removed before publication because it needlessly invalidated this success.
+
+Disk changes: explicit disposable hosted mode reclaims per-recipe src/cache as
+well as compile scratch after packaging/failure. Preserves host-build tools,
+shared toolchains, installed prefix, built markers, output archives, logs and
+published copies. After a during-recipe8GiB interruption, independent work can
+continue if cleanup restores16GiB headroom; interrupted root remains explicit,
+never called built. Otherwise halt75 and publish candidates before checkpoint.
+Selected batches now continue independent requested roots after failure and
+collect successes before returning nonzero; fixes previous lost export of the
+three successful roots preceding FCL. All changes affect builder workspaces,
+never phone data. Disk safeguards are not proof all heavy builds fit one free VM.
+
+Root floating-header failure reproduced with local official NDK30 ARM64/API26:
+prefix libc++/float.h include_next enters a second identical NDK wrapper; shared
+include guard hides compiler definitions. -nostdinc++ removes implicit duplicate
+while retaining explicit prefix C++ headers. Actual failing probe now passes.
+Scope flag to FCL,gnucap,alembic,polyml,quick-lint-js,RocksDB,Pluto,Oils; do not
+invalidate all saved packages via global toolchain change. FCL CMake subtree
+C++11 flags also corrected to17. Hugo host-manpage CGO flags cleared and native
+compiler/pkg-config explicit. gcal/recutils now declare/link real libandroid-spawn
+and expose its actual header rather than mixing old gnulib's no-header fallback
+with a present provider. Pluto compiler concurrency bounded to2 in both PHP
+launchers; initialize link flags. Oils serial compile/verbose diagnostics.
+
+PARI Debian original SOURCE archive5508075bytes matches original upstream pin
+f317b9722eb5d9094a60303774f066f3a83e3ec1f170be8546c44d7583f30b6d.
+Changed dte/diff-so-fancy/inxi archive checksums resolved by publisher tag APIs,
+frozen immutable commits and per-file equality checks between commit/tag source
+archives. See packages/termux/source-repairs-20261024.json; no skipped checksums.
+ARPACK drops the prebuilt Android Flang runtime helper: official LLVM21.1.8 HOST
+compiler with matching original source pins from the pinned flang recipe; rebuild
+Fortran runtime with PIC for Termi ARM64/API26, retain LLVM license. No Termux
+Android package/runtime binaries used by this new ARPACK recipe. Actual build
+verification follows; source/configuration changes alone are not package PASS.
+
+Failure progress includes bounded FIRST diagnostics plus last output so parallel
+compile chatter cannot hide the root error.60hosttests32PASS/28POSIX/tools skips;
+Node3PASS. All patched recipe scripts bash-nPASS. Full graph3269recipes,0cycles;
+all913saved parents compatible,20non-completed recipe/dependent nodesinvalidated.
+Local Docker absent; actual Linux tests/Android compilation run on public free
+Ubuntu24.04 runners with2CPU/13GiB containers, no paid runner/cache/services.
+No APK/app/UI/signing/app-data/local reviewed63package server mutation. Catalog
+and app release gate remainBLOCKED pending actual build and runtime completion.

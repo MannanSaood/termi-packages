@@ -63,9 +63,14 @@ def apply(patch, original):
         change(package,lambda t:hook(t,"termux_step_pre_configure",'\tCFLAGS+=" -Wno-error=deprecated-declarations"'))
     # Current Eigen headers require C++14 or later; preserve FCL functionality.
     change("libfcl",lambda t:hook(t,"termux_step_pre_configure",'''\tsed -i -E 's/-std=(gnu|c)\\+\\+11/-std=c++17/g; s/CXX_STANDARD 11/CXX_STANDARD 17/g' "$TERMUX_PKG_SRCDIR/CMakeLists.txt"
+\tfind "$TERMUX_PKG_SRCDIR" -name CMakeLists.txt -exec sed -i -E 's/-std=(gnu|c)\\+\\+11/-std=c++17/g' {} +
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_STANDARD=17"
-\tCXXFLAGS+=" -std=c++17 -include float.h"'''))
-    change("gnucap",lambda t:hook(t,"termux_step_pre_configure",'\tCXXFLAGS+=" -include float.h"'))
+\tCXXFLAGS+=" -std=c++17 -nostdinc++"'''))
+    # Two copies of libc++/float.h share an include guard. include_next hits
+    # the second wrapper and never reaches Clang's actual floating constants.
+    # Retain the prefix's explicit libc++ include, suppress its implicit twin.
+    for package in ["gnucap", "alembic", "polyml", "quick-lint-js"]:
+        change(package,lambda t:hook(t,"termux_step_pre_configure",'\tCXXFLAGS+=" -nostdinc++"'))
     # libnl .la references a private convenience archive in its discarded build
     # tree. Rebuild that exact tiny source locally for this consumer, no cache
     # path dependency and no installed-prefix mutation.
@@ -79,7 +84,76 @@ def apply(patch, original):
         'TERMUX_PKG_BUILD_IN_SRC=true\nTERMUX_PKG_DEPENDS="libmd"').replace(
         '\t\tCPPFLAGS="$CPPFLAGS"', '\t\tCFLAGS="$CFLAGS $CPPFLAGS -I$TERMUX_PREFIX/include" \\\n\t\tCPPFLAGS="$CPPFLAGS"'),"termux_step_configure",'\tLDFLAGS+=" -lmd"'))
     change("librocksdb",lambda t:hook(t,"termux_step_pre_configure",
-        '\tsed -i \'1i#include <sys/vfs.h>\' "$TERMUX_PKG_SRCDIR/env/io_posix.cc"'))
+        '\tCXXFLAGS+=" -nostdinc++"\n\tsed -i \'1i#include <sys/vfs.h>\' "$TERMUX_PKG_SRCDIR/env/io_posix.cc"'))
+    change("hugo",lambda t:t.replace('unset GOOS GOARCH CGO_LDFLAGS',
+        'unset GOOS GOARCH CGO_LDFLAGS CGO_CFLAGS CGO_CPPFLAGS CGO_CXXFLAGS').replace(
+        'unset CC CXX CFLAGS CXXFLAGS LDFLAGS',
+        'unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS\n\texport CC=gcc CXX=g++ PKG_CONFIG=/usr/bin/pkg-config'))
+    # Source-build a PIC runtime with its matching official LLVM HOST compiler.
+    # Never link the old non-PIC Android archives from the Termux toolchain.
+    change("arpack-ng",lambda t:t.replace('TERMUX_PKG_LICENSE="BSD"','TERMUX_PKG_LICENSE="BSD, Apache-2.0"').replace(
+        '\ttermux_setup_flang', '''\ttermux_setup_cmake
+\ttermux_setup_ninja
+\tlocal version=21.1.8
+\tlocal work="$TERMUX_PKG_TMPDIR/termi-fortran"
+\tmkdir -p "$work"
+\ttermux_download "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/llvm-project-$version.src.tar.xz" "$work/source.tar.xz" 4633a23617fa31a3ea51242586ea7fb1da7140e426bd62fc164261fe036aa142
+\ttermux_download "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-Linux-X64.tar.xz" "$work/host.tar.xz" b3b7f2801d15d50736acea3c73982994d025b01c2f035b91ae3b49d1b575732b
+\ttar -xf "$work/source.tar.xz" -C "$work"
+\ttar -xf "$work/host.tar.xz" -C "$work"
+\tlocal host="$work/LLVM-$version-Linux-X64"
+\tlocal source="$work/llvm-project-$version.src"
+\t# Official NDK compiler builtins supply the Android target, while the
+\t# matching official LLVM archive supplies only the Linux-host frontend.
+\tcp -a "$TERMUX_STANDALONE_TOOLCHAIN/lib/clang/21/lib/." "$host/lib/clang/21/lib/"
+\tlocal wrapper="$work/termi-flang"
+\tprintf '#!/bin/sh\\nexec "%s/bin/flang-new" --target=%s%s --sysroot="%s/sysroot" "$@"\\n' "$host" "$TERMUX_HOST_PLATFORM" "$TERMUX_PKG_API_LEVEL" "$TERMUX_STANDALONE_TOOLCHAIN" > "$wrapper"
+\tchmod 755 "$wrapper"
+\texport FC="$wrapper" FCFLAGS="--target=${TERMUX_HOST_PLATFORM}${TERMUX_PKG_API_LEVEL} -fPIC"
+\t(
+\t\tTERMUX_PKG_SRCDIR="$source/runtimes"
+\t\tTERMUX_PKG_BUILDDIR="$work/runtime-build"
+\t\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS="-DLLVM_ENABLE_RUNTIMES=flang-rt -DFLANG_RT_INCLUDE_TESTS=OFF -DCMAKE_Fortran_COMPILER=$wrapper -DCMAKE_Fortran_COMPILER_WORKS=yes -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DLLVM_DEFAULT_TARGET_TRIPLE=${TERMUX_HOST_PLATFORM/-/-unknown-}${TERMUX_PKG_API_LEVEL} -DLLVM_RUNTIMES_TARGET=${TERMUX_HOST_PLATFORM/-/-unknown-}${TERMUX_PKG_API_LEVEL}"
+\t\tCXXFLAGS+=" -nostdinc++"
+\t\tmkdir -p "$TERMUX_PKG_BUILDDIR"
+\t\tcd "$TERMUX_PKG_BUILDDIR"
+\t\ttermux_step_configure_cmake
+\t\tcmake --build . --parallel "$TERMUX_PKG_MAKE_PROCESSES"
+\t)
+\ttest -f "$work/runtime-build/flang-rt/lib/libflang_rt.runtime.a"
+\tLDFLAGS+=" -L$work/runtime-build/flang-rt/lib"
+\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_Fortran_COMPILER=$wrapper -DCMAKE_Fortran_FLAGS=-fPIC -DCMAKE_POSITION_INDEPENDENT_CODE=ON"
+\tinstall -Dm600 "$source/LICENSE.TXT" "$TERMUX_PREFIX/share/doc/arpack-ng/llvm-runtime-LICENSE.TXT"
+'''))
+    for package in ["gcal", "recutils"]:
+        change(package,lambda t:hook(t.replace('ac_cv_header_spawn_h=no','ac_cv_header_spawn_h=yes'),
+            "termux_step_pre_configure",'''\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" ac_cv_func_posix_spawn=yes ac_cv_func_posix_spawnp=yes"
+\tLDFLAGS+=" -landroid-spawn"''').replace('TERMUX_PKG_DEPENDS="ncurses"',
+            'TERMUX_PKG_DEPENDS="ncurses, libandroid-spawn"') +
+            ('\nTERMUX_PKG_DEPENDS="libandroid-spawn"\n' if 'TERMUX_PKG_DEPENDS=' not in t else ''))
+    # Pluto's PHP launcher ignores failed compiler exits and otherwise spawns
+    # one process per visible host CPU, despite the container's two-CPU quota.
+    change("libpluto",lambda t:hook(t,"termux_step_pre_configure",'''\tCXXFLAGS+=" -nostdinc++"
+\tsed -i 's/$nthreads = 8;/$nthreads = 2;/; s/$nthreads = (int)substr_count(file_get_contents("\\/proc\\/cpuinfo"), "processor");/$nthreads = max(1, (int)getenv("TERMUX_PKG_MAKE_PROCESSES"));/' "$TERMUX_PKG_SRCDIR/scripts/common.php" "$TERMUX_PKG_SRCDIR/src/vendor/Soup/build_common.php"
+\tsed -i 's/$flags .= " -L$srcdir/$flags = " -L$srcdir/' "$TERMUX_PKG_SRCDIR/scripts/common.php"'''))
+    change("oils-for-unix",lambda t:hook(t,"termux_step_pre_configure",'''\tCXXFLAGS+=" -nostdinc++"
+\texport OILS_PARALLEL_BUILD=0 OILS_CXX_VERBOSE=1'''))
+    # Debian mirrors the original upstream tarball byte-for-byte; pin unchanged.
+    change("pari",lambda t:t.replace('https://pari.math.u-bordeaux.fr/pub/pari/unix/pari-${TERMUX_PKG_VERSION}.tar.gz',
+        'https://deb.debian.org/debian/pool/main/p/pari/pari_${TERMUX_PKG_VERSION}.orig.tar.gz'))
+    # Publisher tag APIs and full per-file archive comparisons verified these
+    # immutable commits. Freeze commits instead of accepting mutable tarballs.
+    for package,old_url,new_url,old_hash,new_hash in [
+        ("dte",'https://gitlab.com/craigbarnes/dte/-/archive/v${TERMUX_PKG_VERSION}/dte-v${TERMUX_PKG_VERSION}.tar.gz',
+         'https://gitlab.com/craigbarnes/dte/-/archive/892aade3b33fce047b89d5daaff3c5775b50452f/dte-892aade3b33fce047b89d5daaff3c5775b50452f.tar.gz',
+         '68c25bc4e8792da33529626e23102cd5fb34186479049f5480fd9f3e9ffb1171','3bc99da4bf55733bd09abae1ad4a4940d70d73f9ee0e366872f1643e38900aab'),
+        ("diff-so-fancy",'https://github.com/so-fancy/diff-so-fancy/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz',
+         'https://github.com/so-fancy/diff-so-fancy/archive/7dca929b2468ccb296a08c92e7e39b7754d63a8e.tar.gz',
+         '7ebdaaac4aade23a9b5296f560484e42a864331903febe92314b530380a34734','238637ca27824b1a83e0c408cc75de639af548c25f75096ff3cd304931c57742'),
+        ("inxi",'https://codeberg.org/smxi/inxi/archive/${TERMUX_PKG_VERSION}.tar.gz',
+         'https://codeberg.org/smxi/inxi/archive/d9941a4ed84fdc20737cc44e987a92d4cd0d8d5c.tar.gz',
+         '2f3b16d099fde1b250a4bf6500b0c8e32b13d77469625c5cfc7a5d195a0c8585','e08d92550a0f10890e722cc7db1e6d6cbde7e9fb47e61a8c6cec51f54a0b63d8')]:
+        change(package,lambda t,u=old_url,v=new_url,h=old_hash,k=new_hash:t.replace(u,v).replace(h,k))
     # Upstream's native compiler probes call exit() without stdlib.h. GCC15
     # rejects that in its default dialect; scope the legacy dialect to HOST CC.
     change("libgf2x",lambda t:hook(t,"termux_step_pre_configure",'''\texport CC_FOR_BUILD="gcc -std=gnu89"

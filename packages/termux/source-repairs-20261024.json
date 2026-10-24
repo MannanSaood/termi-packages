@@ -1,0 +1,31 @@
+{
+  "verification": "Publisher tag APIs; immutable archive regular-file contents equal current release tag archives",
+  "sources": [
+    {
+      "name": "diff-so-fancy",
+      "url": "https://github.com/so-fancy/diff-so-fancy/archive/7dca929b2468ccb296a08c92e7e39b7754d63a8e.tar.gz",
+      "commit": "7dca929b2468ccb296a08c92e7e39b7754d63a8e",
+      "sha256": "238637ca27824b1a83e0c408cc75de639af548c25f75096ff3cd304931c57742",
+      "matches_current_tag_files": true
+    },
+    {
+      "name": "dte",
+      "url": "https://gitlab.com/craigbarnes/dte/-/archive/892aade3b33fce047b89d5daaff3c5775b50452f/dte-892aade3b33fce047b89d5daaff3c5775b50452f.tar.gz",
+      "commit": "892aade3b33fce047b89d5daaff3c5775b50452f",
+      "sha256": "3bc99da4bf55733bd09abae1ad4a4940d70d73f9ee0e366872f1643e38900aab",
+      "matches_current_tag_files": true
+    },
+    {
+      "name": "inxi",
+      "url": "https://codeberg.org/smxi/inxi/archive/d9941a4ed84fdc20737cc44e987a92d4cd0d8d5c.tar.gz",
+      "commit": "d9941a4ed84fdc20737cc44e987a92d4cd0d8d5c",
+      "sha256": "e08d92550a0f10890e722cc7db1e6d6cbde7e9fb47e61a8c6cec51f54a0b63d8",
+      "matches_current_tag_files": true
+    }
+  ],
+  "pari": {
+    "url": "https://deb.debian.org/debian/pool/main/p/pari/pari_2.19.0.orig.tar.gz",
+    "sha256": "f317b9722eb5d9094a60303774f066f3a83e3ec1f170be8546c44d7583f30b6d",
+    "verification": "Original upstream SHA256 retained; downloaded 5508075 bytes"
+  }
+}

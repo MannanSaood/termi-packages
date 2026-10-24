@@ -12,6 +12,15 @@ import publish_progress
 
 
 class ProgressTests(unittest.TestCase):
+    def test_first_error_is_retained_when_parallel_output_pushes_it_out_of_tail(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'compile.log'
+            path.write_text('source.cpp:7: error: actual cause\n'+'unrelated output\n'*10000+'make: stopped\n')
+            excerpt=catalog_progress.failure_excerpt(path)
+            self.assertIn('error: actual cause',excerpt)
+            self.assertIn('make: stopped',excerpt)
+            self.assertLess(len(excerpt),8192)
+
     def test_rate_limit_waits_for_reset_instead_of_retrying_each_minute(self):
         result = subprocess.CompletedProcess(["gh"], 1, stderr=b"API rate limit exceeded")
         with patch.object(publish_progress.subprocess, "run", return_value=result), \

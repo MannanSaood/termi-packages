@@ -152,6 +152,7 @@ def main():
         "--env", f"TERMI_CATALOG_MINIMUM_FREE_GIB={args.catalog_minimum_free_gib}",
         "--env", f"TERMI_CATALOG_RETRY_FAILED={int(args.catalog_retry_failed)}",
         "--env", f"TERMI_CATALOG_LANE={args.catalog_lane or ''}",
+        "--env", f"TERMI_RECLAIM_RECIPE_CACHE={int(args.reclaim_workflow_inputs)}",
         "--security-opt", "no-new-privileges", tag, args.mode, *(args.packages or [])], text=True).strip()
     (output / "container-id.txt").write_text(container + "\n")
     result = None

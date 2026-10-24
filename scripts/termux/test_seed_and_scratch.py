@@ -53,6 +53,18 @@ class SeedCompatibility(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix", "Linux builder cache policy")
 class ScratchTests(unittest.TestCase):
+    def test_hosted_source_reclamation_keeps_host_tools_and_output_pool(self):
+        with tempfile.TemporaryDirectory() as folder:
+            top=Path(folder)
+            for part in ['example/src','example/cache','example/host-build','_cache/toolchain','output']:
+                (top/part).mkdir(parents=True)
+                (top/part/'fixture').write_text(part)
+            removed=build_scratch.clean(top,'example',discard_sources=True)
+            self.assertIn('example/src',removed)
+            self.assertIn('example/cache',removed)
+            for part in ['example/host-build','_cache/toolchain','output']:
+                self.assertTrue((top/part/'fixture').exists())
+
     def test_readonly_go_module_directories_are_removed_without_chmodding_aliases(self):
         with tempfile.TemporaryDirectory() as folder:
             top = Path(folder)
