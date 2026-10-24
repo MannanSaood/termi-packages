@@ -347,3 +347,42 @@ Both use candidate-40010088115-1-0 with explicit pins:
 Do not add reused archives twice or call queued/preparing counts newly built.
 No signing authority, app data, APK or local63-package reviewed repository changed.
 Workers/R2 and paid runners remain deferred.
+
+### 2026-10-24 read-only Go cache regression and audio success
+
+Audio source run40071625921 SUCCESS: requested mpg123-pulse root1/1 and232
+readable candidate Debian files (includes the103 reused files; not232 newly
+compiled packages). Confirmed mpg123-pulse_1.33.7-1_aarch64.deb SHA256:
+97d1392d103e6b97c69b6725d30a999e83608cbba8988ceb67032604938ed123 .
+Control dependencies: libmpg123 (=1.33.7-1), pulseaudio. Android playback has not
+been tested while the phone is unavailable.
+
+Full run40071623946 reached119 completed recipes/128 candidate files, then
+FAILED. Biome2 now built successfully. docker-cli itself compiled and packaged,
+but the post-package cleanup hook failed deleting a deliberately read-only Go
+module-cache directory. The subsequent full-catalog cleanup raised the same
+PermissionError and aborted traversal. This was our cleanup regression, not a
+docker-cli compiler defect. Its ledger status remains failed and its candidate
+archive is excluded from reuse, rather than silently relabelled successful.
+
+Fix3ea2310 makes only directories within validated disposable scratch owner-
+accessible before deletion, without following/chmodding aliases to preserved
+source/cache/host-tool paths. OSError in operational cleanup is now visible as
+TERMI_SCRATCH_WARNING (and ledger scratch_warning), without falsely failing an
+already successful compilation. Unsafe-target ValueError still fails closed;
+normal disk headroom checks remain active.44 Linux tests PASS7.441s, including
+an actual non-root read-only nested Go cache with an external symlink whose
+contents and permissions remain unchanged.
+
+Continuation https://github.com/MannanSaood/termi-packages/actions/runs/40075636176
+uses source candidate candidate-40071623946-1-0. Metadata compatibility verified:
+119 reusable recipes/127 archives/zero changed recipes; docker-cli is rebuilt.
+Explicit pins:
+- inventory64d8e5107e029dbe60a526b4f4cfb6d350e46e37d4175bdc3d06fbfd06686007
+- ledger b5cddfd718c1bdc445b8e9102a5ef20899608f9de7fc7c81e3b018d99b04faab
+- plan96088b46c76f9e3c9b2097e9229540641549044506fc7750e2c843ceabf9599c
+
+Progress page after preparation:
+https://github.com/MannanSaood/termi-packages/releases/tag/progress-40075636176-1 .
+No app data/APK/local approved repository changes. Full catalog is incomplete;
+source build success is separate from phone runtime approval.
