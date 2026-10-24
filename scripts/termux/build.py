@@ -40,12 +40,18 @@ def main():
     parser.add_argument("--catalog-budget-seconds", type=int, default=12600)
     parser.add_argument("--catalog-minimum-free-gib", type=int, default=16)
     parser.add_argument("--catalog-retry-failed", action="store_true", help="Explicitly retry failed/interrupted catalog recipes")
+    parser.add_argument("--catalog-lane")
     parser.add_argument("--seed-dir", type=Path, help="Prior Termi source-build candidate assets, never stock binaries")
     parser.add_argument("--seed-graph", type=Path)
     parser.add_argument("--seed-inventory-sha256")
     parser.add_argument("--seed-ledger-sha256")
     parser.add_argument("--seed-plan-sha256")
     args = parser.parse_args()
+    if args.catalog_lane:
+        from catalog_build import lane_scope
+        lane_scope({}, args.catalog_lane)
+        if args.mode != "full-catalog":
+            parser.error("Lanes require full-catalog mode")
     if not 60 <= args.timeout_seconds <= 604800:
         parser.error("Build deadline must be between one minute and seven days")
     if args.seed_dir and (not args.seed_graph or any(not re.fullmatch(r"[0-9a-f]{64}", pin or "") for pin in
@@ -109,6 +115,7 @@ def main():
         "--env", f"TERMI_CATALOG_BUDGET={args.catalog_budget_seconds}",
         "--env", f"TERMI_CATALOG_MINIMUM_FREE_GIB={args.catalog_minimum_free_gib}",
         "--env", f"TERMI_CATALOG_RETRY_FAILED={int(args.catalog_retry_failed)}",
+        "--env", f"TERMI_CATALOG_LANE={args.catalog_lane or ''}",
         "--security-opt", "no-new-privileges", tag, args.mode, *(args.packages or [])], text=True).strip()
     (output / "container-id.txt").write_text(container + "\n")
     result = None

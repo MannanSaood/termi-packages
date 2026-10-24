@@ -71,11 +71,45 @@ def compatibility(old, new, ledger):
     return allowed, invalid
 
 
+def expand_bundles(raw, inventory):
+    """Unpack only inventory-pinned regular Debian members; never tar.extract."""
+    expected = {r["file"]:r["sha256"] for r in inventory["packages"]}
+    total = 0
+    for bundle in sorted(raw.glob("*.tar")):
+        if bundle.is_symlink():
+            raise ValueError("Aliased package bundle")
+        with tarfile.open(bundle,mode="r|") as archive:
+            for member in archive:
+                name = member.name
+                if not member.isfile() or not re.fullmatch(r"[A-Za-z0-9%+._~-]+\.deb",name) or name not in expected:
+                    raise ValueError("Unlisted/unsafe package bundle member")
+                total += member.size
+                if member.size > 2 * 1024**3 or total > 16 * 1024**3:
+                    raise ValueError("Package bundle exceeds bounded source-cache budget")
+                target = raw / name
+                if target.exists() or target.is_symlink():
+                    if target.is_symlink() or digest(target) != expected[name]:
+                        raise ValueError("Existing bundled package differs")
+                    continue
+                temporary = raw / (name + ".seed-partial")
+                if temporary.exists() or temporary.is_symlink():
+                    raise ValueError("Unexpected partial source-cache member")
+                try:
+                    with archive.extractfile(member) as source, temporary.open("xb") as destination:
+                        shutil.copyfileobj(source,destination,1024*1024)
+                    if digest(temporary) != expected[name]:
+                        raise ValueError("Bundled package hash differs from pinned inventory")
+                    temporary.replace(target)
+                finally:
+                    temporary.unlink(missing_ok=True)
+
+
 def prepare(raw, context, new_graph, output, inventory_hash, ledger_hash, graph_hash):
     inventory_path = pinned(raw, "inventory.json", inventory_hash)
     ledger_path = pinned(raw, "catalog-ledger.json", ledger_hash)
     graph_path = pinned(raw, "catalog-plan.json", graph_hash)
     inventory, ledger, old = [json.loads(p.read_text()) for p in [inventory_path, ledger_path, graph_path]]
+    expand_bundles(raw,inventory)
     new = json.loads(new_graph.read_text())
     for name, key in [("upstream.lock.json", "lock"), ("source.json", "source"), ("patches.json", "patches")]:
         if json.loads((context / name).read_text()) != new["configuration"][key]:

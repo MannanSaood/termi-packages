@@ -6,6 +6,8 @@ Persistent builder only. Never downloads stock dependencies, signs or publishes.
 import argparse
 from collections import Counter
 import json
+import hashlib
+import re
 import os
 from pathlib import Path
 import shutil
@@ -42,8 +44,26 @@ def announce(ledger, event, recipe=None):
           total_recipes=len(ledger["recipes"]), halt=ledger.get("halt"))), flush=True)
 
 
+def lane_scope(recipes, lane):
+    if not lane:
+        return set(recipes), set(recipes)
+    match = re.fullmatch(r"lane-([0-9]+)-of-([2-4])", lane)
+    if not match or int(match[1]) >= int(match[2]):
+        raise ValueError("Require lane-INDEX-of-COUNT with COUNT2–4")
+    index, count = map(int, match.groups())
+    owned = {name for name in recipes if int.from_bytes(hashlib.sha256(name.encode()).digest()[:8], "big") % count == index}
+    selected = set(owned)
+    pending = list(owned)
+    while pending:
+        for dependency in recipes[pending.pop()]["dependencies"]:
+            if dependency not in selected:
+                selected.add(dependency)
+                pending.append(dependency)
+    return owned, selected
+
+
 def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400, retry_failed=False, resume_compile=None,
-          budget_seconds=None):
+          budget_seconds=None, lane=None):
     import fcntl
     state_dir.mkdir(parents=True, exist_ok=True)
     with (state_dir / "builder.lock").open("w") as lock_file:
@@ -51,11 +71,14 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
         def load(name):
             return json.loads((metadata / name).read_text())
         plan = create_plan(root, load("upstream.lock.json"), load("source.json"), load("patches.json"))
+        owned, selected = lane_scope(plan["recipes"], lane)
         plan["configuration"]["runner_sha256"] = digest(Path(__file__))
         identity = (plan["identity"], plan["configuration"]["runner_sha256"])
         ledger_path = state_dir / "ledger.json"
         if ledger_path.exists():
             ledger = json.loads(ledger_path.read_text())
+            if ledger.get("lane") != lane:
+                raise ValueError("Checkpoint lane differs; never mix installed prefixes")
             if tuple(ledger["identity"]) != identity:
                 raise ValueError("Build inputs changed; use a new cache/state directory")
         else:
@@ -68,6 +91,10 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                     raise ValueError("Source-build seed does not match this graph")
                 for name in seed["recipes"]:
                     ledger["recipes"][name].update(status="built", origin="verified-termi-source-build", seed_inventory=seed["inventory_sha256"])
+            ledger.update(lane=lane, owned_roots=sorted(owned), selected_recipes=sorted(selected))
+            for name, entry in ledger["recipes"].items():
+                if name not in selected and entry["status"] == "pending":
+                    entry["status"] = "deferred-shard"
         for entry in ledger["recipes"].values():
             if entry["status"] == "running":
                 entry.update(status="interrupted", reason="Previous process ended without a completion record")
@@ -82,6 +109,8 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
         (state_dir / "logs").mkdir(exist_ok=True)
         deadline = time.monotonic() + budget_seconds if budget_seconds is not None else None
         for name, recipe in sorted(plan["recipes"].items(), key=lambda item: (item[1]["rank"] is None, item[1]["rank"] or 0)):
+            if name not in selected:
+                continue
             entry = ledger["recipes"][name]
             status = next_status({**recipe, "name": name}, ledger["recipes"], retry_failed)
             if status != "ready":
@@ -153,7 +182,7 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
         summary = dict(Counter(entry["status"] for entry in ledger["recipes"].values()))
         save(state_dir / "summary.json", summary)
         announce(ledger, "batch-complete")
-        return 0 if all(e["status"] in ("built", "excluded-architecture") for e in ledger["recipes"].values()) else 1
+        return 0 if all(ledger["recipes"][name]["status"] in ("built", "excluded-architecture") for name in selected) else 1
 
 
 def main():
@@ -167,11 +196,12 @@ def main():
     parser.add_argument("--retry-failed", action="store_true")
     parser.add_argument("--resume-compile")
     parser.add_argument("--budget-seconds", type=int, help="Stop and checkpoint within a hosted-job time budget")
+    parser.add_argument("--lane")
     args = parser.parse_args()
     if args.minimum_free_gib < 8 or args.recipe_timeout < 60 or (args.budget_seconds is not None and args.budget_seconds < 60):
         parser.error("Keep at least8GiB builder headroom and a60second recipe deadline")
     raise SystemExit(build(args.root.resolve(), args.metadata.resolve(), args.state.resolve(), args.jobs,
-                           args.minimum_free_gib, args.recipe_timeout, args.retry_failed, args.resume_compile, args.budget_seconds))
+                           args.minimum_free_gib, args.recipe_timeout, args.retry_failed, args.resume_compile, args.budget_seconds, args.lane))
 
 
 if __name__ == "__main__":

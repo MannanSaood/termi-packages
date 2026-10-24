@@ -126,6 +126,21 @@ def prepare(upstream, output, lock, full_catalog=False):
 
     patch("scripts/properties.sh", 'TERMUX_APP__PACKAGE_NAME="com.termux"',
           'TERMUX_APP__PACKAGE_NAME="com.terminal.nextgen"')
+    # The pinned builder includes API24/28/35, while Termi targets API26.
+    # Install the official SDK platform on demand and supply its matching
+    # launcher; never substitute a different Android API jar silently.
+    patch("packages/ecj/build.sh", 'TERMUX_PKG_REVISION=5', 'TERMUX_PKG_REVISION=6')
+    patch("packages/ecj/build.sh", 'termux_step_make() {', '''termux_step_make() {
+	if [ ! -f "$ANDROID_HOME/platforms/android-$TERMUX_PKG_API_LEVEL/android.jar" ]; then
+		local sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+		if [ ! -x "$sdkmanager" ]; then sdkmanager="$ANDROID_HOME/cmdline-tools/bin/sdkmanager"; fi
+		"$sdkmanager" --sdk_root="$ANDROID_HOME" "platforms;android-$TERMUX_PKG_API_LEVEL"
+	fi
+	test -s "$ANDROID_HOME/platforms/android-$TERMUX_PKG_API_LEVEL/android.jar"
+	sed "s/android-24.jar/android-$TERMUX_PKG_API_LEVEL.jar/g" "$TERMUX_PKG_BUILDER_DIR/ecj-24" > "$TERMUX_PKG_TMPDIR/ecj-$TERMUX_PKG_API_LEVEL"
+''')
+    patch("packages/ecj/build.sh", 'install $TERMUX_PKG_BUILDER_DIR/ecj-$TERMUX_PKG_API_LEVEL',
+          'install $TERMUX_PKG_TMPDIR/ecj-$TERMUX_PKG_API_LEVEL')
     # mpg123 upstream explicitly supports splitting libraries/programs from
     # output modules to break the PulseAudio -> libsndfile -> decoder cycle.
     # Keep the player feature through an exact-version runtime dependency;

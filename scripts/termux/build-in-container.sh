@@ -42,6 +42,7 @@ if [ "$mode" = full-catalog ]; then
     result=0
     retry=()
     if [ "${TERMI_CATALOG_RETRY_FAILED:-0}" = 1 ]; then retry+=(--retry-failed); fi
+      if [ -n "${TERMI_CATALOG_LANE:-}" ]; then retry+=(--lane "$TERMI_CATALOG_LANE"); fi
     if [ -n "${TERMI_CONTINUE_RECIPE:-}" ]; then retry+=(--resume-compile "$TERMI_CONTINUE_RECIPE"); fi
     python3 /home/builder/catalog_build.py --root "$PWD" --metadata /home/builder \
         --state /home/builder/catalog-state --jobs "$jobs" \

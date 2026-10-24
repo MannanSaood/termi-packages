@@ -9,7 +9,7 @@ on:
         options: [plan, packages, full-catalog]
         default: plan
       recipes:
-        description: Space-separated parent recipe names
+        description: Parent recipes, or lane-0-of-4 through lane-3-of-4 for parallel full-catalog
         default: hello
       checkpoint_tag:
         description: Optional previous checkpoint release tag
@@ -102,7 +102,7 @@ jobs:
           for name in ['SEED_INVENTORY','SEED_LEDGER','SEED_PLAN']: assert re.fullmatch(r'[0-9a-f]{64}',os.environ[name])
           pathlib.Path('build/seed-raw').mkdir()
           subprocess.run(['gh','release','download',tag,'--repo',os.environ['GITHUB_REPOSITORY'],
-                          '--pattern','*.json','--pattern','*.deb','--dir','build/seed-raw'],check=True)
+                          '--pattern','*.json','--pattern','*.deb','--pattern','*.tar','--dir','build/seed-raw'],check=True)
           sys.path.insert(0,'scripts/termux')
           from seed import prepare
           prepare(pathlib.Path('build/seed-raw'),pathlib.Path('build/context'),pathlib.Path('build/catalog-plan.json'),
@@ -139,6 +139,8 @@ jobs:
           args = ['python3','scripts/termux/build.py','--upstream','build/upstream','--output','build/candidate',
                   '--mode',os.environ['BUILD_MODE'],'--full-recipes','--jobs','2','--memory-gib','13','--timeout-seconds','14400']
           if os.environ['BUILD_MODE'] == 'packages': args += ['--packages',*os.environ['RECIPES'].split()]
+          lane = os.environ['RECIPES'] if os.environ['BUILD_MODE'] == 'full-catalog' and os.environ['RECIPES'].startswith('lane-') else ''
+          if lane: args += ['--catalog-lane',lane]
           if os.environ['RETRY_FAILED'] == 'true': args += ['--catalog-retry-failed']
           if os.environ['CHECKPOINT_TAG']: args += ['--cache-image','termi-checkpoint:restored']
           if os.environ['CONTINUE_RECIPE']: args += ['--continue-recipe',os.environ['CONTINUE_RECIPE']]
@@ -147,7 +149,7 @@ jobs:
                   '--seed-plan-sha256',os.environ['SEED_PLAN']]
           subprocess.run(['python3','scripts/termux/publish_progress.py','--repository',os.environ['GITHUB_REPOSITORY'],
                           '--tag',f'progress-{os.environ["GITHUB_RUN_ID"]}-{os.environ["GITHUB_RUN_ATTEMPT"]}',
-                          '--build-dir','build/candidate','--',*args],check=True)
+                          '--build-dir','build/candidate','--interval','300' if lane else '60','--',*args],check=True)
           PY
       - name: Preserve catalog or interrupted build as streamed release checkpoint
         if: always() && (inputs.mode == 'full-catalog' || (failure() && inputs.mode == 'packages'))
@@ -163,12 +165,29 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
+          LANE_LABEL: ${{ inputs.recipes }}
         run: |
           python3 - <<'PY'
-          import os, pathlib, subprocess, shutil
+          import os, pathlib, subprocess, shutil, tarfile
           paths=list(pathlib.Path('build').glob('*.log'))+list(pathlib.Path('build').glob('*.json'))
           artifacts=pathlib.Path('build/candidate/artifacts')
           if artifacts.exists(): paths += [p for p in artifacts.iterdir() if p.suffix in ('.deb','.json','.log')]
+          if os.environ['LANE_LABEL'].startswith('lane-'):
+            # Bundle Debian files to keep four simultaneous candidate uploads
+            # within the shared free API mutation budget. Inventory hashes remain
+            # the authority; bundles are never directly installed or executed.
+            debs=[p for p in paths if p.suffix == '.deb']
+            paths=[p for p in paths if p.suffix != '.deb']
+            bundle=None; size=0; number=0
+            try:
+              for path in debs:
+                if bundle is None or size+path.stat().st_size > 512*1024**2:
+                  if bundle: bundle.close()
+                  target=pathlib.Path('build')/f'packages-{number:04d}.tar'; number+=1
+                  bundle=tarfile.open(target,'w'); paths.append(target); size=0
+                bundle.add(path,arcname=path.name,recursive=False); size+=path.stat().st_size
+            finally:
+              if bundle: bundle.close()
           upload=pathlib.Path('build/release-upload'); upload.mkdir(exist_ok=True)
           unique=[]
           for index,path in enumerate(paths):

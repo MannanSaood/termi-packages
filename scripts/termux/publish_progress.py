@@ -28,7 +28,9 @@ def markdown(value):
               f"Verified prior Termi source recipes reused: **{value.get('reused_recipes', 0)}**\n\n"
               "| State | Count |\n|---|---:|\n" +
               "".join(f"| {name} | {counts.get(name, 0) if known else 'unknown'} |\n" for name in
-                      ["running", "failed", "interrupted", "blocked-dependency", "blocked-cycle", "pending", "excluded-architecture"]))
+                      ["running", "failed", "interrupted", "blocked-dependency", "blocked-cycle", "pending", "excluded-architecture", "deferred-shard"]))
+    if value.get("lane"):
+        result += f"\nLane: `{value['lane']}`; owned roots: {len(value.get('owned_roots', []))}. Other roots are deferred; shared dependencies and reused files overlap across lanes. Do not sum lane counts.\n"
     if value.get("halt"):
         result += "\nBatch halt: `" + str(value["halt"]) + "`\n"
     if value.get("failures"):
@@ -39,7 +41,7 @@ def markdown(value):
             result += "\nCompiler tail for `" + failure["recipe"] + "`:\n\n```text\n" + failure.get("tail", "")[-1500:].replace("```", "~~~") + "\n```\n"
     if value.get("current_log_tail"):
         result += "\n### Current compiler tail\n\n```text\n" + value["current_log_tail"][-2000:].replace("```", "~~~") + "\n```\n"
-    result += "\nPage updates approximately every60seconds. Downloadable JSON/log snapshots update every5minutes and at completion to conserve GitHub API limits.\n"
+    result += f"\nPage interval: {value.get('publication_interval_seconds', 60)}seconds. Downloadable snapshot interval: {value.get('asset_interval_seconds', 300)}seconds, plus completion. Shared repository API limits apply.\n"
     return result
 
 
@@ -126,13 +128,15 @@ def main():
                     if current:
                         value = current
                     value["published_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    value["publication_interval_seconds"] = args.interval
+                    value["asset_interval_seconds"] = max(300, args.interval * 5)
                     if process.poll() is not None:
                         value["status"] = "completed" if process.returncode == 0 else "stopped-with-errors-or-pending-work"
                         value["build_exit_code"] = process.returncode
                     asset_due = time.monotonic() >= next_assets or process.poll() is not None
                     publish(args.repository, args.tag, directory, value, assets=asset_due)
                     if asset_due:
-                        next_assets = time.monotonic() + 300
+                        next_assets = time.monotonic() + max(300, args.interval * 5)
                     print("TERMI_LIVE " + json.dumps({k: v for k, v in value.items() if k not in ("failures", "current_log_tail")}), flush=True)
                 except (OSError, ValueError, subprocess.SubprocessError, RateLimited) as error:
                     failures += 1
