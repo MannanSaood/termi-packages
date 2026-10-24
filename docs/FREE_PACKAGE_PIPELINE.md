@@ -296,3 +296,54 @@ graph and the native exact-source verification remain valid. Android module
 compilation and phone runtime approval remain pending. Workers remain deferred.
 
 API source: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api .
+
+### 2026-10-24 resource and audio repair
+
+The completed run40010088115 produced95 completed parent recipes and103 readable
+candidate Debian archives, then stopped at the16GiB free-disk guard. Biome2 had
+failed with Rust compiler SIGKILL; it is not counted as built. Audio run40010092102
+produced68 dependency archives but mpg123-pulse did not pass: libx11 could not
+find sys/shm.h. These are separate run counts, not a combined unique catalog.
+Node/npm source run40003582122 completed successfully; phone installation,
+execution and removal remain untested while the phone is unavailable.
+
+Commit04a290f adds libandroid-shmem source dependency/linking to libx11, revision1;
+biome2 revision1 builds Cargo with one worker, LTO off,16 codegen units and no
+release debug information. Standard free Actions containers use2 workers/13GiB.
+After packaging, only per-recipe build/massage/tmp/package/multilib-build and
+Cargo-marked src/target scratch are discarded. Source, download cache, host tools,
+installed prefix, Debian archives, markers and logs remain. Failed compile
+scratch is discarded too, so -c continuation is explicitly unavailable for it.
+
+A changed-recipe/reverse-dependency check and explicit inventory/ledger/graph
+SHA256 pins permit reuse of compatible prior Termi source outputs. No foreign
+app prefix/toolchain/resolver or changed global compiler patch is accepted.
+The sole operational global-patch exception is the post-packaging cleanup hook.
+The95 previously completed recipes remain compatible;1493 changed or reverse-
+dependent recipes are invalidated (none were among those95). All103 archives
+were hash/control-verified and imported in a disposable Linux builder, data-only:
+no maintainer scripts or Android programs executed. New live reports label reused
+recipes separately. GitHub's percent-to-dot asset filename normalization is
+handled only for hash-pinned input lookup. Optional future Worker epoch-file
+redirects need the same normalization verified before public deployment; local
+hosting remains unchanged.
+
+Validation:43 Linux tests PASS; actual3269-recipe/6957-alias source graph has
+zero cycles and one architecture exclusion; workflow bash syntax checked.
+Real103-archive seed import PASS with95 recipes. These checks do not certify
+Android audio execution, full catalog completion or a release APK.
+
+Restarted source jobs:
+- Full catalog: https://github.com/MannanSaood/termi-packages/actions/runs/40071623946
+- Full progress (created after preparation): https://github.com/MannanSaood/termi-packages/releases/tag/progress-40071623946-1
+- Audio: https://github.com/MannanSaood/termi-packages/actions/runs/40071625921
+- Audio progress: https://github.com/MannanSaood/termi-packages/releases/tag/progress-40071625921-1
+
+Both use candidate-40010088115-1-0 with explicit pins:
+- inventory: d2fd3c15c05443d66dbb49ad1ca96c1ea241c14a920f97a4893f1e9633306d77
+- ledger: abd54d88d23e051aa5087e0f8b798adc2599d2da74fe490c2ceca74b2c2d40a8
+- plan: f5b1e7bf329ffbf85442a9dd2fb8d8cf64cf13ebb25c68707398159f90ed5f94
+
+Do not add reused archives twice or call queued/preparing counts newly built.
+No signing authority, app data, APK or local63-package reviewed repository changed.
+Workers/R2 and paid runners remain deferred.

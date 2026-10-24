@@ -9,11 +9,13 @@ See [pipeline and limits](docs/FREE_PACKAGE_PIPELINE.md). Manual workflow modes:
 plan/test, selected recipes, or a resumable full-catalog batch. Candidates and
 checkpoints are prereleases. No Android app data or signing secrets are included.
 
-- [Cycle-free full-catalog run](https://github.com/MannanSaood/termi-packages/actions/runs/40010088115)
-- [Live full-catalog progress](https://github.com/MannanSaood/termi-packages/releases/tag/progress-40010088115-1)
-- [PulseAudio module source verification](https://github.com/MannanSaood/termi-packages/actions/runs/40010092102)
+- [Cycle-free full-catalog run](https://github.com/MannanSaood/termi-packages/actions/runs/40071623946)
+- [Live full-catalog progress](https://github.com/MannanSaood/termi-packages/releases/tag/progress-40071623946-1)
+- [PulseAudio module source verification](https://github.com/MannanSaood/termi-packages/actions/runs/40071625921)
 - [Node/npm run](https://github.com/MannanSaood/termi-packages/actions/runs/40003582122)
 - [Successful hello source build](https://github.com/MannanSaood/termi-packages/actions/runs/40001467035)
+
+Latest completed full batch: **95 completed recipes / 103 candidate Debian files**. Audio has not passed; its missing Android shared-memory dependency is fixed and being rebuilt. Node/npm source build succeeded; phone runtime checks remain pending.
 
 New source runs publish a `progress-RUN_ID-ATTEMPT` prerelease while compilation
 is running (created after preparation). Refresh that page for counts and download
@@ -27,3 +29,4 @@ Already signed metadata has a separate, manually dispatched Pages deployment
 workflow. It verifies existing Termi signatures and expiration and cannot sign
 or approve packages. Public package binaries live in Releases; Pages contains
 metadata only. The optional Cloudflare Worker uses the Free plan, without R2.
+
