@@ -29,8 +29,11 @@ def pinned(directory, name, expected):
     aliases = {name, name.replace("%", ".")}
     paths = [p for p in directory.iterdir() if any(p.name == alias or re.fullmatch(r"[0-9]{4}-" + re.escape(alias), p.name) for alias in aliases)]
     matches = [p for p in paths if p.is_file() and not p.is_symlink() and digest(p) == expected]
-    if len(matches) != 1:
+    if not matches:
         raise ValueError("Missing/ambiguous hash-pinned seed metadata: " + name)
+    # Workflow evidence may contain graph-only and runtime copies with exactly
+    # the same bytes. Multiple SHA256-identical copies are not conflicting input.
+    matches.sort(key=lambda p:p.name)
     if name.endswith(".json") and matches[0].stat().st_size > 32 * 1024**2:
         raise ValueError("Oversized seed metadata")
     return matches[0]

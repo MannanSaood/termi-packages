@@ -40,6 +40,9 @@ class SeedCompatibility(unittest.TestCase):
             (root / "0001-inventory.json").write_text("{}")
             pin = seed.digest(root / "0001-inventory.json")
             self.assertEqual("0001-inventory.json",seed.pinned(root,"inventory.json",pin).name)
+            (root / "0002-inventory.json").write_text("{}")
+            self.assertEqual("0001-inventory.json",seed.pinned(root,"inventory.json",pin).name)
+            (root / "0002-inventory.json").unlink()
             (root / "0001-inventory.json").write_text('{"changed":true}')
             with self.assertRaises(ValueError):
                 seed.pinned(root,"inventory.json",pin)

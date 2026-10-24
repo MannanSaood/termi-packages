@@ -28,7 +28,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MANIFEST: ${{ inputs.manifest }}
         run: |
+          set -euo pipefail
           case "$MANIFEST" in packages/termux/batch-[0-9]*.json) ;; *) exit 2;; esac
           mkdir -p build
           python3 scripts/termux/merge_releases.py --manifest "$MANIFEST" --output build/merged \
             --tag "candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-0" | tee build/merge.log
+          gh release view "candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-0" --repo "$GITHUB_REPOSITORY" >/dev/null
