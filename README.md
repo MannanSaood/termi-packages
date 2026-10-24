@@ -41,3 +41,15 @@ Each lane uses its own installed prefix and includes its dependencies. Counts
 across lanes overlap: use the pinned candidate merge tool for unique totals.
 Lane pages update every5minutes; downloadable snapshots every25minutes/final.
 The original sequential run remains active to preserve in-flight compilation.
+
+Latest verified union: **868 completed recipes / 1175 candidate Debian files**;
+2400 eligible recipes remain, plus one architecture exclusion. Candidate
+[candidate-40096038350-1-0](https://github.com/MannanSaood/termi-packages/releases/tag/candidate-40096038350-1-0)
+preserves explicit source pins and independently rebuilt archive variants.
+Restarted lanes with first-wave recipe repairs:
+[lane0](https://github.com/MannanSaood/termi-packages/actions/runs/40097207575),
+[lane1](https://github.com/MannanSaood/termi-packages/actions/runs/40097209962),
+[lane2](https://github.com/MannanSaood/termi-packages/actions/runs/40097212869),
+[lane3](https://github.com/MannanSaood/termi-packages/actions/runs/40097215014).
+Ecj/audio source builds passed. New repairs await actual compiler results;
+fortune source-host availability remains unresolved. Nothing is runtime-approved.

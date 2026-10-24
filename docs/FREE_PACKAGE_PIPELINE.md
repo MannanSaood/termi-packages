@@ -453,3 +453,83 @@ failure stays historical and cannot acquire revision6 retroactively. Latest API
 check: all six runs IN_PROGRESS. Four lanes plus focused ecj explain five NEW jobs;
 original is sixth, not an accidentally duplicated lane. Do not claim4x throughput;
 shared dependency work/preparation/checkpoint transfers reduce practical gains.
+
+### 2026-10-24 completed batch union and repaired restart
+
+Verified union: **868 unique completed parent recipes, 1175 candidate Debian files**.
+**2400 eligible recipes remain**, plus one architecture exclusion (3269 listed).
+This is source-build completion, not app availability or runtime approval.
+
+Merge workflow40096038350 succeeded and published candidate-40096038350-1-0:
+- inventory cf19285b3f0b57dda460cbfd5296c6c2cb89795514355e2a347242f219b7e10a
+- ledger03c7024112c8bf714837962637e32ec210343d34a3014934f1349152e95172e2
+- plan fbd31857ba630dff602ff20b31a795da8a16f80872dd938db3b7bb9bab03d852
+
+All seven source runs are explicitly pinned in packages/termux/batch-20261024.json.
+For successful selected audio/ecj runs, the merger verifies GitHub completed/
+success state and derives completed parents from their pinned source inventory.
+Full-lane/old sequential successes come only from their pinned built ledgers.
+The union includes220 alternate independently built archive variants. Explicit
+prefer-first-compatible-parent policy chooses compatible parent outputs in the
+committed manifest order and records chosen/alternate SHA256 and source pins;
+never calls differing bytes identical. Control/recipe/channel/original filename
+conflicts still fail. Default merge policy remains strict identical-only. All
+chosen bytes are verified; this is a compiler seed, not publication approval.
+
+Initial merge40095837282 falsely appeared green because a tee pipeline masked a
+metadata-pin error: duplicate byte-identical graph copies were rejected. Fixed:
+set -euo pipefail, require actual release existence, and accept multiple metadata
+copies only when each matches the explicitly required SHA256. The corrected run
+40096038350 is the actual successful publication, not the first green badge.
+
+Recipe repairs b94ea6c (recipe_repairs.py,74 checked preparation records):
+- Exact-hash source mirrors: etsh new author domain, renameutils official release
+  endpoint, all four failing hunspell dictionaries via immutable LibreOffice
+  commits (original file hashes retained).
+- lzop official gzip release; libgfshare original-source gzip checked against
+  Debian .dsc SHA256; Ceres official2.2.0 source tag; luv source archive checksum
+  matched against publisher GitHub release digest. Verification stays enabled.
+- distcc/liblo retain warnings but avoid treating new NDK strtok deprecation
+  annotations as compilation errors; all other error diagnostics retained.
+- libfcl uses C++17 for current Eigen; RocksDB includes Android statfs header.
+- libgf2x explicitly separates native compiler flags; cccc/gforth host generators
+  use suitable legacy C dialects; libforestdb/mdbook-cat-prep preserve Android26
+  compiler target identity despite old build code overriding the triple.
+- lowdown declares/links libmd; net-snmp declares libnl/OpenSSL and source-builds
+  its tiny private getsubopt compatibility archive in its own scratch rather
+  than linking a deleted libnl build-tree path.
+- Proton pins official Bun1.4.2 Linux HOST tool/digest as its script requires,
+  without relaxing its check or copying Android binaries; Termi build label.
+- lrzsz vanished development commit replaced with maintained official0.13.1
+  stable release (author archive SHA256112f91059fbd118e016d800c1a5c5a1702e965d8b9bfbda6015e44e20bfb93c9).
+  Five obsolete old-commit patches removed explicitly in disposable Docker
+  source tree, removal audit recorded. Symbolic install aliases retained. This
+  is a source-version upgrade, not a claim the old commit became reachable.
+- Fortune HTTP URL corrected to HTTPS, original hash retained, but source host
+  remains unavailable from probes. This external source blocker is NOT resolved.
+
+24 recipe repair attempts, with actual compiler results pending. Three other
+interrupted roots (aosp-libs/gnucap/hugo) simply need continuation/rebuild; don't
+invent source fixes from a time-budget interruption. Do not call all errors fixed
+before new Android-target builds finish.
+
+Validation: actual3269 recipe graph acyclic,190 changed/reverse-dependent nodes
+invalidated but **all868 completed nodes remain compatible** (repairs-graph.log).
+All repaired shell scripts passed elevated Git Bash -n; Python compileall passes.
+Host Python51 tests:27PASS/24POSIX skips; Docker has disappeared from this host,
+so a new full Linux result is delegated to actual GitHub checks. Earlier default
+Windows Temp/MSYS permission failures are historical failed checks, not passes.
+Source-probe results and hashes retained under ignored android/build evidence.
+Prior Linux50PASS remains historical; merger five tests PASS on actual GitHub.
+
+Four restarted free Ubuntu catalog lanes at1e5f634, with the above union pins:
+- lane0 https://github.com/MannanSaood/termi-packages/actions/runs/40097207575
+- lane1 https://github.com/MannanSaood/termi-packages/actions/runs/40097209962
+- lane2 https://github.com/MannanSaood/termi-packages/actions/runs/40097212869
+- lane3 https://github.com/MannanSaood/termi-packages/actions/runs/40097215014
+
+Run names now include lane labels. No old completed run restarted unnecessarily;
+no extra sequential duplicate launched. Original data/APK/signing keys/local
+63-package reviewed server unchanged. Standard free public Actions/Release
+storage only, no paid runner/cache/R2/Worker. Owner olderAPI/highzoom deferrals
+remain untested; app release/full catalog gate remains BLOCKED.
