@@ -141,6 +141,16 @@ def prepare(upstream, output, lock, full_catalog=False):
 ''')
     patch("packages/ecj/build.sh", 'install $TERMUX_PKG_BUILDER_DIR/ecj-$TERMUX_PKG_API_LEVEL',
           'install $TERMUX_PKG_TMPDIR/ecj-$TERMUX_PKG_API_LEVEL')
+    from recipe_repairs import apply as apply_recipe_repairs
+    apply_recipe_repairs(patch, original)
+    # lrzsz0.13.1 incorporates the old K&R/gettext/syslog fixes. These patches
+    # target the vanished development commit and must not be applied to stable.
+    obsolete_lrzsz = ["configure.ac.patch", "lib-long-options.c.patch", "locale.patch", "log.patch", "src-Makefile.am.patch"]
+    for name in obsolete_lrzsz:
+        relative = "packages/lrzsz/" + name
+        patches.append(dict(path=relative, before_sha256=hashlib.sha256(original(relative).encode()).hexdigest(),
+                            after_sha256=hashlib.sha256(b"").hexdigest(), action="remove",
+                            reason="Superseded by official lrzsz0.13.1; symlink install retained in recipe"))
     # mpg123 upstream explicitly supports splitting libraries/programs from
     # output modules to break the PulseAudio -> libsndfile -> decoder cycle.
     # Keep the player feature through an exact-version runtime dependency;
@@ -349,6 +359,7 @@ PY
         'USER root\n'
         'ADD --chown=builder:builder source.tar /home/builder/termux-packages/\n'
         'COPY --chown=builder:builder overlay/ /home/builder/termux-packages/\n'
+          'RUN rm -- ' + ' '.join('/home/builder/termux-packages/packages/lrzsz/' + n for n in obsolete_lrzsz) + '\n'
         'COPY --chown=builder:builder build-in-container.sh collect_artifacts.py assemble_bootstrap.py patch_go_exec.py catalog_graph.py catalog_build.py catalog_progress.py seed.py build_scratch.py upstream.lock.json patches.json source.json /home/builder/\n'
         'COPY --chown=builder:builder seed/ /home/builder/seed/\n'
         # Windows checkout permissions are not executable-bit authority.
