@@ -64,6 +64,7 @@ def snapshot(root, state):
     active_log = state / "logs" / f"{current[0]}-{recipes[current[0]].get('attempts', 1)}.log" if current else selected_log
     return dict(schema=1, updated=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 total_recipes=len(recipes), counts=counts, current=current,
+                reused_recipes=sum(e.get("origin") == "verified-termi-source-build" for e in recipes.values()),
                 current_log_tail=tail(active_log), deb_files=len(debs),
                 failures=failures[-100:], omitted_failure_logs=max(0, len(failures) - 100),
                 halt=value.get("halt"), scope="requested-roots" if ledger.name == "selected-ledger.json" else "catalog-recipes",

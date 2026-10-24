@@ -163,6 +163,29 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
     module_path.write_text(module_recipe, encoding="utf-8", newline="\n")
     patches.append(dict(path="packages/mpg123-pulse/build.sh", action="add",
                         before_sha256=None, after_sha256=hashlib.sha256(module_path.read_bytes()).hexdigest()))
+    # Xlib's shared-font paths include SysV SHM interfaces absent from bionic.
+    # Build/link the Android implementation rather than using host headers.
+    patch("packages/libx11/build.sh", 'TERMUX_PKG_VERSION="1.8.14"',
+          'TERMUX_PKG_VERSION="1.8.14"\nTERMUX_PKG_REVISION=1')
+    patch("packages/libx11/build.sh", 'TERMUX_PKG_DEPENDS="libandroid-support, libxcb, xorgproto"',
+          'TERMUX_PKG_DEPENDS="libandroid-support, libandroid-shmem, libxcb, xorgproto"')
+    patch("packages/libx11/build.sh", 'termux_step_post_massage() {',
+          'termux_step_pre_configure() {\n\tLDFLAGS+=" -landroid-shmem"\n}\n\ntermux_step_post_massage() {')
+    # A single Biome release compiler/link step plus parallel workers exceeded
+    # the free runner's memory limit. Keep release functionality, bound Cargo
+    # concurrency and disable memory-heavy LTO; new bytes get a new revision.
+    patch("packages/biome2/build.sh", 'TERMUX_PKG_VERSION="2.5.15"',
+          'TERMUX_PKG_VERSION="2.5.15"\nTERMUX_PKG_REVISION=1')
+    patch("packages/biome2/build.sh", '\ttermux_setup_rust\n',
+          '\ttermux_setup_rust\n'
+          '\texport CARGO_PROFILE_RELEASE_LTO=off\n'
+          '\texport CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16\n'
+          '\texport CARGO_PROFILE_RELEASE_DEBUG=0\n')
+    patch("packages/biome2/build.sh", '--jobs "$TERMUX_PKG_MAKE_PROCESSES"', '--jobs 1')
+    patch("scripts/build/termux_step_finish_build.sh", '\texit 0\n',
+          '\t# The Debian archives, prefix, source/cache and markers already exist.\n'
+          '\tpython3 /home/builder/build_scratch.py --top "$TERMUX_TOPDIR" --recipe "$TERMUX_PKG_NAME"\n'
+          '\texit 0\n')
     # Even without -i, upstream may download an old binary to break a build cycle.
     # Such binaries belong to com.termux, not this prefix. Fail instead.
     for name, relative in (
@@ -303,14 +326,16 @@ PY
     (output / "collect_artifacts.py").write_bytes((ROOT / "scripts/termux/collect_artifacts.py").read_bytes())
     (output / "assemble_bootstrap.py").write_bytes((ROOT / "scripts/termux/assemble_bootstrap.py").read_bytes())
     (output / "patch_go_exec.py").write_bytes((ROOT / "scripts/termux/patch_go_exec.py").read_bytes())
-    for name in ["catalog_graph.py", "catalog_build.py", "catalog_progress.py"]:
+    (output / "seed").mkdir()
+    for name in ["catalog_graph.py", "catalog_build.py", "catalog_progress.py", "seed.py", "build_scratch.py"]:
         (output / name).write_bytes((ROOT / "scripts/termux" / name).read_bytes())
     (output / "Dockerfile").write_text(
         f'FROM {lock["builder_image"]}\n'
         'USER root\n'
         'ADD --chown=builder:builder source.tar /home/builder/termux-packages/\n'
         'COPY --chown=builder:builder overlay/ /home/builder/termux-packages/\n'
-        'COPY --chown=builder:builder build-in-container.sh collect_artifacts.py assemble_bootstrap.py patch_go_exec.py catalog_graph.py catalog_build.py catalog_progress.py upstream.lock.json patches.json source.json /home/builder/\n'
+        'COPY --chown=builder:builder build-in-container.sh collect_artifacts.py assemble_bootstrap.py patch_go_exec.py catalog_graph.py catalog_build.py catalog_progress.py seed.py build_scratch.py upstream.lock.json patches.json source.json /home/builder/\n'
+        'COPY --chown=builder:builder seed/ /home/builder/seed/\n'
         # Windows checkout permissions are not executable-bit authority.
         'RUN find /home/builder/termux-packages -name "*.sh" -exec chmod u+x {} +\n'
         'USER builder\nWORKDIR /home/builder/termux-packages\n'

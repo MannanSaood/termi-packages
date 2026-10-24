@@ -61,12 +61,20 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
         else:
             ledger = dict(schema=1, identity=identity, recipes={name: dict(status=r["initial_status"], attempts=0)
                           for name, r in plan["recipes"].items()})
+            receipt = state_dir.parent / "artifacts/seed-provenance.json"
+            if receipt.exists():
+                seed = json.loads(receipt.read_text())
+                if seed["new_graph_identity"] != plan["identity"]:
+                    raise ValueError("Source-build seed does not match this graph")
+                for name in seed["recipes"]:
+                    ledger["recipes"][name].update(status="built", origin="verified-termi-source-build", seed_inventory=seed["inventory_sha256"])
         for entry in ledger["recipes"].values():
             if entry["status"] == "running":
                 entry.update(status="interrupted", reason="Previous process ended without a completion record")
         ledger.pop("halt", None)
         if resume_compile and (not retry_failed or resume_compile not in ledger["recipes"]
-                or ledger["recipes"][resume_compile]["status"] not in ("failed", "running", "interrupted")):
+                or ledger["recipes"][resume_compile]["status"] not in ("failed", "running", "interrupted")
+                or ledger["recipes"][resume_compile].get("compile_resume_available") is False):
             raise ValueError("Explicit compile resume requires one previously failed/interrupted recipe and --retry-failed")
         save(state_dir / "plan.json", plan)
         save(ledger_path, ledger)
@@ -129,6 +137,12 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                 from catalog_progress import tail
                 print("TERMI_FAILURE " + json.dumps(dict(recipe=name, exit_code=code,
                       tail=tail(state_dir / "logs" / f"{name}-{entry['attempts']}.log"))), flush=True)
+            from build_scratch import clean
+            cleaned = clean(Path.home() / ".termux-build", name)
+            if cleaned:
+                entry["discarded_scratch"] = cleaned
+                entry["compile_resume_available"] = False
+                save(ledger_path, ledger)
         save(ledger_path, ledger)
         summary = dict(Counter(entry["status"] for entry in ledger["recipes"].values()))
         save(state_dir / "summary.json", summary)

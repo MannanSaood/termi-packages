@@ -32,6 +32,10 @@ mkdir -p /home/builder/artifacts
 cp /home/builder/upstream.lock.json /home/builder/patches.json /home/builder/source.json /home/builder/artifacts/
 exec > >(tee /home/builder/artifacts/build.log) 2>&1
 printf 'TERMI_BUILD_START mode=%s prefix=%s arch=aarch64 api=26\n' "$mode" "$TERMUX_PREFIX"
+if [ -f /home/builder/seed/seed.json ]; then
+    python3 /home/builder/seed.py --seed /home/builder/seed --root "$PWD" --metadata /home/builder \
+        --artifacts /home/builder/artifacts
+fi
 if [ "$mode" = full-catalog ]; then
     # The graph comes from pinned upstream recipe parsing. Cycles/failures stay
     # explicit; independent recipes can continue, never with stock binary deps.

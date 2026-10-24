@@ -25,6 +25,7 @@ def markdown(value):
               f"Current: `{current}`\n\n"
               f"Completed {value.get('scope', 'recipes')}: {completion}\n\n"
               f"Readable candidate Debian files: **{binaries}**\n\n"
+              f"Verified prior Termi source recipes reused: **{value.get('reused_recipes', 0)}**\n\n"
               "| State | Count |\n|---|---:|\n" +
               "".join(f"| {name} | {counts.get(name, 0) if known else 'unknown'} |\n" for name in
                       ["running", "failed", "interrupted", "blocked-dependency", "blocked-cycle", "pending", "excluded-architecture"]))

@@ -40,9 +40,17 @@ def main():
     parser.add_argument("--catalog-budget-seconds", type=int, default=12600)
     parser.add_argument("--catalog-minimum-free-gib", type=int, default=16)
     parser.add_argument("--catalog-retry-failed", action="store_true", help="Explicitly retry failed/interrupted catalog recipes")
+    parser.add_argument("--seed-dir", type=Path, help="Prior Termi source-build candidate assets, never stock binaries")
+    parser.add_argument("--seed-graph", type=Path)
+    parser.add_argument("--seed-inventory-sha256")
+    parser.add_argument("--seed-ledger-sha256")
+    parser.add_argument("--seed-plan-sha256")
     args = parser.parse_args()
     if not 60 <= args.timeout_seconds <= 604800:
         parser.error("Build deadline must be between one minute and seven days")
+    if args.seed_dir and (not args.seed_graph or any(not re.fullmatch(r"[0-9a-f]{64}", pin or "") for pin in
+            [args.seed_inventory_sha256, args.seed_ledger_sha256, args.seed_plan_sha256])):
+        parser.error("Seed adoption requires the new graph and explicit inventory/ledger/plan hashes")
     if not 60 <= args.catalog_budget_seconds <= 604800 or args.catalog_minimum_free_gib < 8:
         parser.error("Catalog batches require at least60seconds and8GiB disk headroom")
     if args.mode == "full-catalog" and args.catalog_budget_seconds + 600 > args.timeout_seconds:
@@ -68,6 +76,10 @@ def main():
     if output.exists():
         raise SystemExit("Output already exists; use a new build directory")
     prepare(args.upstream.resolve(), output / "context", lock, full_catalog=args.mode == "full-catalog" or args.full_recipes)
+    if args.seed_dir:
+        from seed import prepare as prepare_seed
+        prepare_seed(args.seed_dir.resolve(), output / "context", args.seed_graph.resolve(), output / "context/seed",
+                     args.seed_inventory_sha256, args.seed_ledger_sha256, args.seed_plan_sha256)
     identity = input_identity(output / "context")
     (output / "build-input-identity.txt").write_text(identity + "\n")
     if args.cache_image:
