@@ -573,3 +573,43 @@ active reporters cannot gain this retrospectively. Added failed/pending/running
 exclusion test. Host52tests28PASS/24POSIXskips; actual GitHub checks follow. No
 phone/APK/app-data/signing/local reviewed repository changes. Full catalog remains
 incomplete; older-version/font-scale owner deferrals remain untested.
+
+### 2026-10-24 resource-failure recovery (verification in progress)
+
+Confirmed lane1 40097209962 died when the GitHub runner filesystem filled:
+check-run120881856116 annotations report System.IO.IOException / No space left
+on device in the runner's own diagnostic log. Consequently no final candidate
+or checkpoint step ran. Its live896 completion count is not saved-package proof.
+Lane0/3 stopped at the between-recipe disk guard and are exporting checkpoints;
+lane2 remains active. Existing exports have not been cancelled. Fortune's focused
+40098113770 job actually succeeded and published its source-built candidate.
+
+Changes: check free disk every5seconds DURING each full-catalog recipe; below8GiB
+terminate its process group, mark it interrupted with resource halt75, discard
+only validated compile scratch, retain completed outputs/ledger. Between-recipe
+16GiB guard remains. Disposable GitHub workflow removes the duplicate initial
+context after graph/checkpoint validation. After docker build copies the verified
+seed, explicit --reclaim-workflow-inputs removes duplicate .deb/.tar inputs under
+GITHUB_WORKSPACE/build only (refuses aliases/outside paths; metadata retained).
+Candidate publication now precedes large checkpoint export. Release staging uses
+hard links instead of another byte copy. No paid runner/cache/storage introduced.
+This reduces waste and prevents the observed unguarded single-recipe disk fill;
+it does not establish that every heavy recipe fits a standard free runner.
+
+Second-wave recipe attempts: GF2X HOST compiler gnu89 for its unprototyped exit()
+probe; lowdown passes actual prefix includes via CFLAGS because its Makefile
+omits CPPFLAGS; FCL/gnucap explicitly include float.h for DBL_MAX/DBL_EPSILON;
+Gforth upstream optional Emacs bytecode install is conditional on the file being
+produced, while the original equivalent gforth.el source is always installed.
+No Android feature removed, API level/prefix retained. Hook matching now accepts
+space before parentheses, avoiding duplicate functions for gnucap. PARI's
+upstream source host times out; no working mirror/checksum substitution claimed.
+Original PARI pin stays intact. Further source transport work remains pending.
+
+Host57tests:31pass,26POSIX/tool skips. Node redirector3pass. Workflow YAML and
+3inline Python blocks parse; all5generated repair Bash recipes pass bash -n.
+Full pinned source context prepared with75checked patches. Docker unavailable
+on Windows, so Linux57test/Android compiler verification follows on GitHub;
+these five repairs are not yet claimed as successful package builds.
+No phone/APK/signing/app-data or local reviewed63package repository mutation.
+Full catalog/app release Gate: BLOCKED until actual build/runtime requirements.

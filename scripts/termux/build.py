@@ -7,6 +7,7 @@ import sys
 import uuid
 import re
 import hashlib
+import os
 from pathlib import Path
 
 from prepare import ROOT, prepare, read_lock
@@ -23,6 +24,35 @@ def input_identity(context):
         with path.open("rb") as stream:
             identity.update(hashlib.file_digest(stream, "sha256").digest())
     return identity.hexdigest()
+
+
+def reclaim_workflow_archives(workspace, context, seed_dir):
+    """Drop only duplicated input archives after Docker has copied them.
+
+    Explicit disposable-runner option; never applied to arbitrary local seeds.
+    Keep metadata and SHA pins. The image and output pool retain actual packages.
+    """
+    boundary = workspace.resolve() / "build"
+    targets = [context / "seed/pool"] + ([seed_dir] if seed_dir else [])
+    archives = []
+    for target in targets:
+        if not target.resolve().is_relative_to(boundary) or target.resolve() == boundary:
+            raise ValueError("Input cleanup escaped disposable workflow build directory")
+        for path in [target, *target.parents]:
+            if path == boundary:
+                break
+            if path.is_symlink():
+                raise ValueError("Input cleanup refuses symbolic directories")
+        for path in target.rglob("*"):
+            if path.is_symlink():
+                raise ValueError("Input cleanup refuses symbolic files")
+            if path.is_file() and path.suffix in (".deb", ".tar"):
+                archives.append(path)
+    reclaimed = sum(path.stat().st_size for path in archives)
+    for path in archives:
+        path.unlink()
+    print(f"TERMI_RECLAIMED_INPUT_BYTES {reclaimed}", flush=True)
+    return reclaimed
 
 
 def main():
@@ -46,7 +76,11 @@ def main():
     parser.add_argument("--seed-inventory-sha256")
     parser.add_argument("--seed-ledger-sha256")
     parser.add_argument("--seed-plan-sha256")
+    parser.add_argument("--reclaim-workflow-inputs", action="store_true")
     args = parser.parse_args()
+    if args.reclaim_workflow_inputs and (os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"
+            or not os.environ.get("GITHUB_WORKSPACE")):
+        parser.error("Input cleanup is restricted to explicit disposable GitHub-hosted builds")
     if args.catalog_lane:
         from catalog_build import lane_scope
         lane_scope({}, args.catalog_lane)
@@ -108,6 +142,8 @@ def main():
     artifacts.mkdir()
     tag = "termi-termux-candidate:" + uuid.uuid4().hex
     run(["docker", "build", "--tag", tag, str(output / "context")])
+    if args.reclaim_workflow_inputs:
+        reclaim_workflow_archives(Path(os.environ["GITHUB_WORKSPACE"]), output / "context", args.seed_dir)
     container = subprocess.check_output([
         "docker", "create", "--cpus", str(args.jobs), "--memory", f"{args.memory_gib}g", "--pids-limit", "2048",
         "--env", f"TERMI_BUILD_JOBS={args.jobs}",

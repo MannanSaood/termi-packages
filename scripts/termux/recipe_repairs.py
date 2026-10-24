@@ -15,6 +15,9 @@ def apply(patch, original):
         patch(path,before,after)
 
     def hook(text,name,body):
+        existing = re.search(r"(?m)^"+re.escape(name)+r"\s*\(\)\s*\{", text)
+        if existing:
+            return text[:existing.end()]+"\n"+body+text[existing.end():]
         anchor=f"{name}() {{"
         if anchor in text:
             return text.replace(anchor,anchor+"\n"+body,1)
@@ -61,7 +64,8 @@ def apply(patch, original):
     # Current Eigen headers require C++14 or later; preserve FCL functionality.
     change("libfcl",lambda t:hook(t,"termux_step_pre_configure",'''\tsed -i -E 's/-std=(gnu|c)\\+\\+11/-std=c++17/g; s/CXX_STANDARD 11/CXX_STANDARD 17/g' "$TERMUX_PKG_SRCDIR/CMakeLists.txt"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_STANDARD=17"
-\tCXXFLAGS+=" -std=c++17"'''))
+\tCXXFLAGS+=" -std=c++17 -include float.h"'''))
+    change("gnucap",lambda t:hook(t,"termux_step_pre_configure",'\tCXXFLAGS+=" -include float.h"'))
     # libnl .la references a private convenience archive in its discarded build
     # tree. Rebuild that exact tiny source locally for this consumer, no cache
     # path dependency and no installed-prefix mutation.
@@ -72,14 +76,22 @@ def apply(patch, original):
 \t$AR crs "$compatibility_lib/libgetsubopt.a" "$compatibility_lib/getsubopt.o"
 \tLDFLAGS+=" -L$compatibility_lib"'''))
     change("lowdown",lambda t:hook(t.replace('TERMUX_PKG_BUILD_IN_SRC=true',
-        'TERMUX_PKG_BUILD_IN_SRC=true\nTERMUX_PKG_DEPENDS="libmd"'),"termux_step_configure",'\tLDFLAGS+=" -lmd"'))
+        'TERMUX_PKG_BUILD_IN_SRC=true\nTERMUX_PKG_DEPENDS="libmd"').replace(
+        '\t\tCPPFLAGS="$CPPFLAGS"', '\t\tCFLAGS="$CFLAGS $CPPFLAGS -I$TERMUX_PREFIX/include" \\\n\t\tCPPFLAGS="$CPPFLAGS"'),"termux_step_configure",'\tLDFLAGS+=" -lmd"'))
     change("librocksdb",lambda t:hook(t,"termux_step_pre_configure",
         '\tsed -i \'1i#include <sys/vfs.h>\' "$TERMUX_PKG_SRCDIR/env/io_posix.cc"'))
-    change("libgf2x",lambda t:hook(t,"termux_step_pre_configure",'''\texport CC_FOR_BUILD=gcc
+    # Upstream's native compiler probes call exit() without stdlib.h. GCC15
+    # rejects that in its default dialect; scope the legacy dialect to HOST CC.
+    change("libgf2x",lambda t:hook(t,"termux_step_pre_configure",'''\texport CC_FOR_BUILD="gcc -std=gnu89"
 \texport CFLAGS_FOR_BUILD="-O2" CPPFLAGS_FOR_BUILD="" LDFLAGS_FOR_BUILD=""'''))
     # Legacy host generators must use a host C dialect, not GCC15's C23 default.
     change("gforth",lambda t:t.replace('CC="gcc -m$TERMUX_ARCH_BITS"',
-        'CC="gcc -std=gnu11 -Wno-error=incompatible-pointer-types -m$TERMUX_ARCH_BITS"'))
+        'CC="gcc -std=gnu11 -Wno-error=incompatible-pointer-types -m$TERMUX_ARCH_BITS"').replace(
+        '\tlocal _PREFIX_FOR_BUILD=$TERMUX_PKG_HOSTBUILD_DIR/prefix',
+        '''\t# Upstream permits absent Emacs during byte-compilation. Install the
+\t# equivalent .el source regardless, and .elc only when actually generated.
+\tsed -i 's@$(INSTALL_DATA) gforth.elc $(DESTDIR)$(emacssitelispdir);@if test -f gforth.elc; then $(INSTALL_DATA) gforth.elc $(DESTDIR)$(emacssitelispdir); fi;@' "$TERMUX_PKG_SRCDIR/Makefile.in"
+\tlocal _PREFIX_FOR_BUILD=$TERMUX_PKG_HOSTBUILD_DIR/prefix''',1))
     change("cccc",lambda t:t.replace('export CC="gcc -m${TERMUX_ARCH_BITS}"',
         'export CC="gcc -std=gnu89 -Wno-error=incompatible-pointer-types -m${TERMUX_ARCH_BITS}"')
            .replace('export CCC="g++ -m${TERMUX_ARCH_BITS}"','export CCC="g++ -std=gnu++11 -m${TERMUX_ARCH_BITS}"'))

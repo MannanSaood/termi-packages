@@ -135,9 +135,15 @@ jobs:
           SEED_PLAN: ${{ inputs.seed_plan_sha256 }}
         run: |
           python3 - <<'PY'
-          import os, subprocess
+          import os, subprocess, pathlib, shutil
+          # Graph and restore identity have been verified. build.py recreates
+          # its own context; don't retain a second seed pool/source archive.
+          boundary=pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()/'build'
+          context=boundary/'context'
+          assert context.resolve()==context and not context.is_symlink()
+          shutil.rmtree(context)
           args = ['python3','scripts/termux/build.py','--upstream','build/upstream','--output','build/candidate',
-                  '--mode',os.environ['BUILD_MODE'],'--full-recipes','--jobs','2','--memory-gib','13','--timeout-seconds','14400']
+                  '--mode',os.environ['BUILD_MODE'],'--reclaim-workflow-inputs','--full-recipes','--jobs','2','--memory-gib','13','--timeout-seconds','14400']
           if os.environ['BUILD_MODE'] == 'packages': args += ['--packages',*os.environ['RECIPES'].split()]
           lane = os.environ['RECIPES'] if os.environ['BUILD_MODE'] == 'full-catalog' and os.environ['RECIPES'].startswith('lane-') else ''
           if lane: args += ['--catalog-lane',lane]
@@ -151,16 +157,6 @@ jobs:
                           '--tag',f'progress-{os.environ["GITHUB_RUN_ID"]}-{os.environ["GITHUB_RUN_ATTEMPT"]}',
                           '--build-dir','build/candidate','--interval','300' if lane else '60','--',*args],check=True)
           PY
-      - name: Preserve catalog or interrupted build as streamed release checkpoint
-        if: always() && (inputs.mode == 'full-catalog' || (failure() && inputs.mode == 'packages'))
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ -f build/candidate/container-id.txt ]; then
-            python3 scripts/termux/checkpoint.py save --container "$(cat build/candidate/container-id.txt)" \
-              --repository "$GITHUB_REPOSITORY" --tag "checkpoint-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
-              --input-identity "$(cat build/candidate/build-input-identity.txt)" | tee build/checkpoint-result.log
-          fi
       - name: Publish candidate evidence to Releases, never the live APT repo
         if: always()
         env:
@@ -192,7 +188,7 @@ jobs:
           unique=[]
           for index,path in enumerate(paths):
             target=upload/f'{index:04d}-{path.name}'
-            shutil.copyfile(path,target); unique.append(target)
+            os.link(path,target); unique.append(target)
           paths=unique
           # All assets are from this isolated package build, never app data or keys.
           for offset in range(0,len(paths),850):
@@ -201,3 +197,13 @@ jobs:
               '--title',tag,'--notes','Unsigned source-build candidates and diagnostics. Not an approved app or APT release.',
               '--prerelease','--latest=false'],check=True)
           PY
+      - name: Preserve catalog or interrupted build as streamed release checkpoint
+        if: always() && (inputs.mode == 'full-catalog' || (failure() && inputs.mode == 'packages'))
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f build/candidate/container-id.txt ]; then
+            python3 scripts/termux/checkpoint.py save --container "$(cat build/candidate/container-id.txt)" \
+              --repository "$GITHUB_REPOSITORY" --tag "checkpoint-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+              --input-identity "$(cat build/candidate/build-input-identity.txt)" | tee build/checkpoint-result.log
+          fi

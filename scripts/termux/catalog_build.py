@@ -18,6 +18,27 @@ import time
 from catalog_graph import create_plan, digest
 
 
+class DiskPressure(Exception):
+    """Stop before a single large recipe can fill the shared runner filesystem."""
+
+
+def guarded_wait(process, root, timeout, minimum_free_gib):
+    if not minimum_free_gib:
+        return process.wait(timeout=timeout)
+    deadline = time.monotonic() + timeout
+    floor = min(8, minimum_free_gib / 2) * 1024**3
+    while True:
+        if shutil.disk_usage(root).free < floor:
+            raise DiskPressure("Insufficient disk during recipe compilation")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(process.args, timeout)
+        try:
+            return process.wait(timeout=min(5, remaining))
+        except subprocess.TimeoutExpired:
+            continue
+
+
 def save(path, value):
     temporary = path.with_suffix(".tmp")
     with temporary.open("w", encoding="utf-8") as stream:
@@ -140,8 +161,8 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
             with (state_dir / "logs" / f"{name}-{entry['attempts']}.log").open("wb") as log:
                 process = subprocess.Popen(command, cwd=root, env=environment, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
                 try:
-                    code = process.wait(timeout=min(timeout, remaining))
-                except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
+                    code = guarded_wait(process, root, min(timeout, remaining), minimum_free_gib)
+                except (subprocess.TimeoutExpired, KeyboardInterrupt, DiskPressure) as error:
                     os.killpg(process.pid, signal.SIGTERM)
                     try:
                         process.wait(timeout=10)
@@ -149,8 +170,18 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                         os.killpg(process.pid, signal.SIGKILL)
                         process.wait()
                     entry.update(status="interrupted", exit_code=124, ended=time.time())
+                    if isinstance(error, DiskPressure):
+                        from build_scratch import clean
+                        entry.update(reason=str(error), compile_resume_available=False, exit_code=75)
+                        try:
+                            entry["discarded_scratch"] = clean(Path.home() / ".termux-build", name)
+                        except OSError as cleanup_error:
+                            entry["scratch_warning"] = str(cleanup_error)
+                        ledger["halt"] = "insufficient-builder-disk-during-recipe"
                     save(ledger_path, ledger)
                     announce(ledger, "recipe-interrupted", name)
+                    if isinstance(error, DiskPressure):
+                        return 75
                     if isinstance(error, KeyboardInterrupt):
                         raise
                     if deadline is not None and time.monotonic() >= deadline:
