@@ -21,9 +21,11 @@ def apply(patch, original):
         return text+f"\n{anchor}\n{body}\n}}\n"
 
     change("etsh",lambda t:t.replace("https://etsh.nl/src/","https://etsh.dev/src/"))
-    # Correct obsolete HTTP transport but retain the original source checksum.
-    # Source-host downtime remains visible if HTTPS is also unavailable.
-    change("fortune",lambda t:t.replace("http://dl.fefe.de/","https://dl.fefe.de/"))
+    # Freetz's source cache serves the exact original release, independently
+    # downloaded from two mirrors and checked against the existing source pin.
+    # The separate fortune-data archive also retains its original SHA256.
+    change("fortune",lambda t:t.replace("http://dl.fefe.de/","https://freetz.magenbrot.net/")
+           .replace("http://http.debian.net/debian/","https://deb.debian.org/debian/"))
     # The old development commit is no longer served by the author. Use the
     # maintained official stable release, not an unrelated fork or old binary.
     change("lrzsz",lambda t:hook(t.replace('TERMUX_PKG_VERSION=0.12.21-rc1','TERMUX_PKG_VERSION=0.13.1')

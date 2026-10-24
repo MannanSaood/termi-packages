@@ -27,6 +27,17 @@ class ProgressTests(unittest.TestCase):
         self.assertIn("unknown during preparation", page)
         self.assertNotIn("0 / 0", page)
 
+    def test_unique_count_inventory_contains_only_completed_recipe_names(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);state=root/"state";state.mkdir()
+            ledger=dict(recipes={"finished":dict(status="built"),"failed":dict(status="failed"),
+                                 "reused":dict(status="built",origin="verified-termi-source-build"),
+                                 "pending":dict(status="pending"),"running":dict(status="running")})
+            (state/"ledger.json").write_text(json.dumps(ledger))
+            value=catalog_progress.snapshot(root,state)
+            self.assertEqual(["finished","reused"],value["completed_recipes"])
+            self.assertEqual(2,value["counts"]["built"])
+
     @unittest.skipUnless(shutil.which("dpkg-deb"), "Actual Debian archive inspection")
     def test_counts_valid_outputs_and_records_failure_tails_without_claiming_approval(self):
         with tempfile.TemporaryDirectory() as folder:

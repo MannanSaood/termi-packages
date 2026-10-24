@@ -137,7 +137,7 @@ def main():
                     publish(args.repository, args.tag, directory, value, assets=asset_due)
                     if asset_due:
                         next_assets = time.monotonic() + max(300, args.interval * 5)
-                    print("TERMI_LIVE " + json.dumps({k: v for k, v in value.items() if k not in ("failures", "current_log_tail")}), flush=True)
+                    print("TERMI_LIVE " + json.dumps({k: v for k, v in value.items() if k not in ("failures", "current_log_tail", "completed_recipes", "owned_roots")}), flush=True)
                 except (OSError, ValueError, subprocess.SubprocessError, RateLimited) as error:
                     failures += 1
                     retry_delay = error.retry_seconds if isinstance(error, RateLimited) else min(900, args.interval * 2 ** min(failures - 1, 4))
