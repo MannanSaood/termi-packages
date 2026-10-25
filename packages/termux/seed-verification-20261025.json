@@ -1,0 +1,19 @@
+{
+  "verification_run": "https://github.com/MannanSaood/termi-packages/actions/runs/40173300269",
+  "source_commit": "ff860f0b949f8248c99732b254e828982943bf68",
+  "seed_tag": "candidate-40168300604-1-0",
+  "linux_python_tests": 66,
+  "node_tests": 3,
+  "verification": {
+    "status": "PASS",
+    "recipes": 1246,
+    "archives": 1630,
+    "aliases_checked": 99668,
+    "new_graph_identity": "f3eb6e24685f4ada56a628436a3a0239d9d34cd7b0fde642add3c68007b66953",
+    "inventory_sha256": "7a899d9af14fab7a105e3ba4161bec6458c99e8945b60e8041c7c486e933070a",
+    "ledger_sha256": "f6c86bf8f3bc6b9b98cffddc9e5cd66a36eaca32e058879a0aab84cbfc6d3097",
+    "plan_sha256": "efac181b27466da99811ba0a3511eddc5093981eede31e58f625cc423d5eeff2",
+    "maintainer_scripts_executed": false
+  },
+  "runtime_approval": false
+}

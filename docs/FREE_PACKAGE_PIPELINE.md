@@ -788,3 +788,33 @@ traceback truncated). Correction4f6b3b5 uses is_absolute and normalizes the root
 Replacements40171496962/40171498687/40171500537/40171502645 dispatched with same
 seed pins and5h/6hlimits, initially pending/queued behind checkpoint preservation.
 Package compilation and full import are unverified; no new completed count.
+
+2026-10-25 complete-seed verification PASS and controlled restart:
+The Vulkan alternatives reverse their .so/.so.1 link layouts. Fixff860f0 replaces
+existing leaf aliases rather than following them during writes, checks parent
+paths, refuses directory-alias traversal, and audits the complete final prefix
+for cycles/foreign paths. Old archives are unchanged; no maintainer scripts run.
+Regression fixtures cover both overlay orders and genuine forbidden aliases.
+The full source cache may overlay alternative providers for compilation; this
+does not mean mutually conflicting packages should be installed together in an
+Android runtime. Catalog archives remain separate and preserve their metadata.
+
+New workflow mode seed-check imports the exact full prepared seed and exits
+without compiling. Successful preflight:
+https://github.com/MannanSaood/termi-packages/actions/runs/40173300269
+Actual pinned builder full import PASS:1246recipes/1630archives/99668aliases.
+LinuxPython66PASS(no skips),Node3PASS. Published seed-validation.json records
+original inventory/ledger/plan hashes, graph identity and no maintainer execution.
+Compact verified report:packages/termux/seed-verification-20261025.json.
+
+Only after matching that successful report to the current reviewed source and
+seed pins were four lanes dispatched at the sameff860f0revision:
+- https://github.com/MannanSaood/termi-packages/actions/runs/40174092631 (lane0)
+- https://github.com/MannanSaood/termi-packages/actions/runs/40174094572 (lane1)
+- https://github.com/MannanSaood/termi-packages/actions/runs/40174096612 (lane2)
+- https://github.com/MannanSaood/termi-packages/actions/runs/40174098855 (lane3)
+First2inprogress/last2queued at dispatch. Each still needs setup/import before
+compiling new recipes. Preserved1246parents/1630archives; no new count claimed.
+Five-hour compile budget and six-hour job ceiling retained. No paid services,
+release/checkpoint deletion, stock Android binaries or app-data changes.
+Seed-importPASS does not approve the full catalog or Android runtime release.
