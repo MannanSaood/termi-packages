@@ -1,0 +1,30 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "candidates": [
+    {
+      "tag": "candidate-40115673221-1-0",
+      "inventory_sha256": "69ed4328d7e722053b860821218635ab30a847e3692c686a55c43c46ada012ba",
+      "ledger_sha256": "51ddbd5825a9172b18f098743a7c093e374e1cf22aadbfbbf497fe6fccf1ca47",
+      "plan_sha256": "efac181b27466da99811ba0a3511eddc5093981eede31e58f625cc423d5eeff2"
+    },
+    {
+      "tag": "candidate-40115675323-1-0",
+      "inventory_sha256": "ff5e36ea546446c7cc8cde9a8cf3b8b46ef71643e3860cc14f482fcc9ebccd3e",
+      "ledger_sha256": "695573d39a4a959cfcbb70ea362e4dab98d94dbf4d90430827be5b0af38c77f2",
+      "plan_sha256": "efac181b27466da99811ba0a3511eddc5093981eede31e58f625cc423d5eeff2"
+    },
+    {
+      "tag": "candidate-40115677590-1-0",
+      "inventory_sha256": "db27857481c5f1deaa4d82cb95f7265716e8d3c014c5a8d5c135a24f8c0be3b3",
+      "ledger_sha256": "d3ea709b74808d9aa6084bb6df30dae4d59bc6651ad2a551e8a34d81dcaff75b",
+      "plan_sha256": "efac181b27466da99811ba0a3511eddc5093981eede31e58f625cc423d5eeff2"
+    },
+    {
+      "tag": "candidate-40115679841-1-0",
+      "inventory_sha256": "c9169e49aa3c22beb41de697af5e34da9f275f421ff719c03fd248ef6805956d",
+      "ledger_sha256": "c6f924cd5b22f7f9d788478aaed6a2d3a8f1ca65b7ec651171be3f754dac6a9c",
+      "plan_sha256": "efac181b27466da99811ba0a3511eddc5093981eede31e58f625cc423d5eeff2"
+    }
+  ]
+}
