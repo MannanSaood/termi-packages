@@ -150,9 +150,12 @@ def resolve_payload_alias(path, readlink=os.readlink):
     direct platform links or relative links that eventually reach /system.
     Other links are still followed and checked against the Termi prefix.
     """
-    pending = list(PurePosixPath(str(path)).parts)
-    if not pending or pending.pop(0) != "/":
+    source = PurePosixPath(str(path))
+    if not source.is_absolute():
         raise ValueError("Source-cache alias must be absolute")
+    # POSIX preserves exactly two leading slashes as a distinct anchor, but
+    # the Android/Linux package namespace uses the same root for / and //.
+    pending = list(source.parts[1:])
     resolved = PurePosixPath("/")
     hops = 0
     while pending:

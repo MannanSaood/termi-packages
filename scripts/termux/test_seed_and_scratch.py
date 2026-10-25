@@ -47,6 +47,16 @@ class PayloadAliasResolution(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "alias cycle"):
             seed.resolve_payload_alias(self.prefix + "/a", self.resolver(links))
 
+    def test_double_slash_root_is_absolute_and_relative_input_is_rejected(self):
+        readlink = self.resolver({})
+        for root in ["/", "//", "///"]:
+            self.assertEqual(PurePosixPath(self.prefix + "/lib/real.so"),
+                             seed.resolve_payload_alias(root + self.prefix.lstrip("/") + "/lib/real.so", readlink))
+            self.assertEqual(PurePosixPath("/system/lib64/libEGL.so"),
+                             seed.resolve_payload_alias(root + "system/lib64/libEGL.so", readlink))
+        with self.assertRaisesRegex(ValueError, "must be absolute"):
+            seed.resolve_payload_alias("relative/file", readlink)
+
 
 class SeedCompatibility(unittest.TestCase):
     def plan(self):
