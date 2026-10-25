@@ -6,7 +6,7 @@ on:
       mode:
         description: Plan and test only, or source-build a bounded recipe batch
         type: choice
-        options: [plan, packages, full-catalog]
+        options: [plan, seed-check, packages, full-catalog]
         default: plan
       recipes:
         description: Parent recipes, or lane-0-of-4 through lane-3-of-4 for parallel full-catalog

@@ -59,7 +59,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--upstream", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--mode", choices=["proof", "bootstrap", "catalog", "packages", "full-catalog"], default="proof")
+    parser.add_argument("--mode", choices=["proof", "bootstrap", "catalog", "packages", "full-catalog", "seed-check"], default="proof")
     parser.add_argument("--packages", nargs="+", help="Pinned upstream recipes to source-build for Termi")
     parser.add_argument("--jobs", type=int, choices=range(1, 9), default=2, help="Bounded compiler workers / container CPU limit")
     parser.add_argument("--memory-gib", type=int, choices=range(2, 17), default=4)
@@ -170,6 +170,12 @@ def main():
             run(["docker", "rm", container])
     if result != 0 or state["ExitCode"] != 0 or copied != 0:
         raise SystemExit("Candidate build failed; inspect retained log/container-state.json")
+    if args.mode == "seed-check":
+        validation = json.loads((artifacts / "seed-validation.json").read_text())
+        if validation.get("status") != "PASS":
+            raise SystemExit("Full seed import did not pass")
+        print(json.dumps(validation), flush=True)
+        return
     if not (artifacts / "inventory.json").is_file():
         raise SystemExit("Missing package inventory; no successful candidate")
     if args.mode == "proof":

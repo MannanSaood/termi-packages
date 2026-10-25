@@ -163,6 +163,49 @@ class ScratchTests(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix" and shutil.which("dpkg-deb"), "Linux Debian payload extraction")
 class PayloadTests(unittest.TestCase):
+    def test_loader_overlay_replaces_leaf_aliases_without_transient_vulkan_loop(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            prefix = root / "prefix"
+            prefix.mkdir()
+            def package(name, generic):
+                package_root = root / name
+                control = package_root / "DEBIAN"
+                control.mkdir(parents=True)
+                (control / "control").write_text(f"Package: {name}\nVersion: 1.0\nArchitecture: all\nMaintainer: Fixture\nDescription: loader fixture\n")
+                library = package_root / prefix.relative_to("/") / "lib"
+                library.mkdir(parents=True)
+                if generic:
+                    (library / "libvulkan.so").symlink_to("libvulkan.so.1")
+                    (library / "libvulkan.so.1").write_text("generic loader")
+                else:
+                    (library / "libvulkan.so").write_text("android loader stub")
+                    (library / "libvulkan.so.1").symlink_to("libvulkan.so")
+                deb = root / (name + ".deb")
+                subprocess.run(["dpkg-deb", "--build", str(package_root), str(deb)], check=True, capture_output=True)
+                return deb
+            android = package("android-loader", False)
+            generic = package("generic-loader", True)
+            for first, second, expected in [(android, generic, "generic loader"),
+                                             (generic, android, "android loader stub")]:
+                seed.unpack(first, prefix)
+                seed.unpack(second, prefix)
+                for name in ["libvulkan.so", "libvulkan.so.1"]:
+                    self.assertEqual(expected, (prefix / "lib" / name).read_text())
+                self.assertEqual(1, seed.validate_prefix_aliases(prefix))
+
+    def test_final_alias_audit_rejects_cycles_and_foreign_paths(self):
+        with tempfile.TemporaryDirectory() as folder:
+            prefix = Path(folder)
+            (prefix / "a").symlink_to("b")
+            (prefix / "b").symlink_to("a")
+            with self.assertRaisesRegex(ValueError, "alias cycle"):
+                seed.validate_prefix_aliases(prefix)
+            (prefix / "b").unlink()
+            (prefix / "b").symlink_to("/data/data/com.termux/files/usr/lib/foreign.so")
+            with self.assertRaisesRegex(ValueError, "Unsafe final source-cache alias"):
+                seed.validate_prefix_aliases(prefix)
+
     def test_data_only_extraction_stays_in_prefix_and_never_runs_postinst(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

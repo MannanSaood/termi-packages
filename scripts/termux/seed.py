@@ -199,11 +199,18 @@ def unpack(path, prefix):
                 if name.is_absolute() or ".." in name.parts or "\\" in member.name or not (member.isfile() or member.isdir() or member.issym() or member.islnk()):
                     raise ValueError("Unsafe source-cache payload entry")
                 destination = Path("/").joinpath(*name.parts)
-                target = destination.parent.resolve() / destination.name if member.issym() else destination.resolve()
+                # Replace a leaf alias; never resolve it as the write target.
+                # Alternative loaders reverse their .so/.so.1 links. Following
+                # the old leaf can write through it or produce a transient loop.
+                target = destination.parent.resolve() / destination.name
                 if member.isdir() and (target == Path("/") or target in prefix.parents):
                     continue
                 if not target.is_relative_to(prefix):
                     raise ValueError("Seed package payload is outside the Termi prefix")
+                if target.is_symlink():
+                    if member.isdir():
+                        raise ValueError("Seed directory would traverse an existing alias")
+                    target.unlink()
                 if member.issym() or member.islnk():
                     link = PurePosixPath(member.linkname)
                     linked = (Path(str(link)) if link.is_absolute() else Path("/").joinpath(*link.parts)) if member.islnk() else (Path(str(link)) if link.is_absolute() else target.parent / str(link))
@@ -220,6 +227,22 @@ def unpack(path, prefix):
     finally:
         if process.poll() is None:
             process.terminate(); process.wait()
+
+
+def validate_prefix_aliases(prefix):
+    """Audit the final cache, after all alternative-package overlays settle."""
+    aliases = 0
+    for directory, folders, files in os.walk(prefix, followlinks=False):
+        for name in folders + files:
+            path = Path(directory) / name
+            if not path.is_symlink():
+                continue
+            linked = resolve_payload_alias(path)
+            if not (linked.is_relative_to(PurePosixPath(str(prefix))) or
+                    linked.is_relative_to(PurePosixPath("/system"))):
+                raise ValueError(f"Unsafe final source-cache alias: {path} -> {linked}")
+            aliases += 1
+    return aliases
 
 
 def install(seed, root, metadata, artifacts):
@@ -260,7 +283,10 @@ def install(seed, root, metadata, artifacts):
     (root / "output").mkdir(exist_ok=True)
     for record in expected:
         path = seed / "pool" / record["file"]
-        unpack(path, prefix)
+        try:
+            unpack(path, prefix)
+        except (ValueError, OSError, tarfile.TarError) as error:
+            raise ValueError(f"Seed import failed in {record['file']}: {error}") from error
         original = record["original_file"]
         if Path(original).name != original or "/" in original or "\\" in original:
             raise ValueError("Unsafe seed output filename")
@@ -272,6 +298,12 @@ def install(seed, root, metadata, artifacts):
     for name, values in versions.items():
         (markers / name).write_text(next(iter(values)) + "\n")
     artifacts.mkdir(exist_ok=True)
+    aliases = validate_prefix_aliases(prefix)
+    (artifacts / "seed-validation.json").write_text(json.dumps(dict(
+        status="PASS", recipes=len(allowed), archives=len(expected), aliases_checked=aliases,
+        new_graph_identity=new["identity"], inventory_sha256=receipt["inventory_sha256"],
+        ledger_sha256=receipt["ledger_sha256"], plan_sha256=receipt["graph_sha256"],
+        maintainer_scripts_executed=False), indent=2) + "\n")
     (artifacts / "seed-provenance.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(f"TERMI_SOURCE_SEED recipes={len(allowed)} archives={len(expected)}; no maintainer scripts executed", flush=True)
 

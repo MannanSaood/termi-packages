@@ -3,7 +3,7 @@
 set -euo pipefail
 cd /home/builder/termux-packages
 mode=${1:-proof}
-case "$mode" in proof|bootstrap|catalog|packages|full-catalog) ;; *) echo 'Expected proof, bootstrap, catalog, packages or full-catalog' >&2; exit 64;; esac
+case "$mode" in proof|bootstrap|catalog|packages|full-catalog|seed-check) ;; *) echo 'Unknown build mode' >&2; exit 64;; esac
 shift || true
 jobs=${TERMI_BUILD_JOBS:-2}
 [[ "$jobs" =~ ^[1-8]$ ]] || { echo 'Invalid compiler worker count' >&2; exit 64; }
@@ -35,6 +35,11 @@ printf 'TERMI_BUILD_START mode=%s prefix=%s arch=aarch64 api=26\n' "$mode" "$TER
 if [ -f /home/builder/seed/seed.json ]; then
     python3 /home/builder/seed.py --seed /home/builder/seed --root "$PWD" --metadata /home/builder \
         --artifacts /home/builder/artifacts
+fi
+if [ "$mode" = seed-check ]; then
+    test -s /home/builder/artifacts/seed-validation.json
+    printf 'TERMI_FULL_SEED_IMPORT_PASS; no recipes compiled\n'
+    exit 0
 fi
 if [ "$mode" = full-catalog ]; then
     # The graph comes from pinned upstream recipe parsing. Cycles/failures stay
