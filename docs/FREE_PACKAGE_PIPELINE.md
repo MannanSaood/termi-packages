@@ -779,3 +779,12 @@ New runs with the same five-hour budget:
 All four IN_PROGRESS at last check, disk reclamation active, no failed step.
 Full seed import and actual new package compilation are still pending; no
 additional completed packages or full-catalog PASS is claimed.
+
+2026-10-25 next status check: all four 401704... compile steps FAILED during
+seed import; workflows were saving checkpoints. Logs for lanes1/2/3 show an
+absolute-path check incorrectly rejecting POSIX '//' anchors (lane0 published
+traceback truncated). Correction4f6b3b5 uses is_absolute and normalizes the root;
+64localtests:36PASS/28platform/toolskips. Same1246parents/1630archives preserved.
+Replacements40171496962/40171498687/40171500537/40171502645 dispatched with same
+seed pins and5h/6hlimits, initially pending/queued behind checkpoint preservation.
+Package compilation and full import are unverified; no new completed count.
