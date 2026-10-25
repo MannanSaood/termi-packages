@@ -761,3 +761,21 @@ Restarted at9e5320b withfive-hourbudget andmerged1246seed:
 Latest actual snapshot: allfour IN_PROGRESS; Linuxcontract/redirectorcheckstep
 SUCCESS onallfour; fullgraphverificationstep running; no failedworkflowstep.
 Package compilation results remainpending. Do not call19repairs packagePASS yet.
+
+2026-10-25 seed-import correction (supersedes the preceding active-run snapshot):
+All four preceding runs failed before compilation. A relative eglinfo-system
+link reaches Android /system; resolving the Linux image's /system shim produced
+a false foreign-namespace rejection. Commit 76ee60a preserves that platform
+boundary while still following other links and rejecting foreign app paths,
+parent escapes and cycles. No recipe/archive changed; all 1,246 completed
+parents / 1,630 archives and explicit merged seed pins remain preserved.
+Local Python63:35PASS/28POSIX/toolskips; Node3PASS. Actual Linux contract tests
+passed on all four replacements, including data-only dpkg extraction checks.
+New runs with the same five-hour budget:
+- https://github.com/MannanSaood/termi-packages/actions/runs/40170432183 (lane0)
+- https://github.com/MannanSaood/termi-packages/actions/runs/40170433874 (lane1)
+- https://github.com/MannanSaood/termi-packages/actions/runs/40170435571 (lane2)
+- https://github.com/MannanSaood/termi-packages/actions/runs/40170437468 (lane3)
+All four IN_PROGRESS at last check, disk reclamation active, no failed step.
+Full seed import and actual new package compilation are still pending; no
+additional completed packages or full-catalog PASS is claimed.
