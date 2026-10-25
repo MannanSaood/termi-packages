@@ -6,8 +6,10 @@ small input cache. Builder: reverify, unpack data only, never run maintainer
 scripts, and retain provenance for every reused archive.
 """
 import argparse
+import errno
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import posixpath
@@ -140,6 +142,51 @@ def prepare(raw, context, new_graph, output, inventory_hash, ledger_hash, graph_
     print(json.dumps(dict(reused_recipes=len(allowed), reused_archives=len(records), invalidated_recipes=len(invalid))), flush=True)
 
 
+def resolve_payload_alias(path, readlink=os.readlink):
+    """Resolve package links without following the builder's /system shim.
+
+    Android /system is a platform namespace. The Linux image redirects it to
+    its own AOSP build tree; that host-only redirect must not affect either
+    direct platform links or relative links that eventually reach /system.
+    Other links are still followed and checked against the Termi prefix.
+    """
+    pending = list(PurePosixPath(str(path)).parts)
+    if not pending or pending.pop(0) != "/":
+        raise ValueError("Source-cache alias must be absolute")
+    resolved = PurePosixPath("/")
+    hops = 0
+    while pending:
+        part = pending.pop(0)
+        if part == "..":
+            resolved = resolved.parent
+            continue
+        candidate = resolved / part
+        if candidate == PurePosixPath("/system"):
+            normalized = PurePosixPath(posixpath.normpath(str(candidate.joinpath(*pending))))
+            if normalized.is_relative_to(PurePosixPath("/system")):
+                return normalized
+            # /system/../outside is not a platform alias.
+            pending = list(normalized.parts[1:])
+            resolved = PurePosixPath("/")
+            continue
+        try:
+            link = PurePosixPath(readlink(str(candidate)))
+        except OSError as error:
+            if error.errno not in (errno.ENOENT, errno.ENOTDIR, errno.EINVAL):
+                raise
+            resolved = candidate
+            continue
+        hops += 1
+        if hops > 40:
+            raise ValueError("Unsafe source-cache payload alias cycle")
+        if link.is_absolute():
+            resolved = PurePosixPath("/")
+            pending = list(link.parts[1:]) + pending
+        else:
+            pending = list(link.parts) + pending
+    return resolved
+
+
 def unpack(path, prefix):
     process = subprocess.Popen(["dpkg-deb", "--fsys-tarfile", str(path)], stdout=subprocess.PIPE)
     try:
@@ -157,9 +204,9 @@ def unpack(path, prefix):
                 if member.issym() or member.islnk():
                     link = PurePosixPath(member.linkname)
                     linked = (Path(str(link)) if link.is_absolute() else Path("/").joinpath(*link.parts)) if member.islnk() else (Path(str(link)) if link.is_absolute() else target.parent / str(link))
-                    platform_alias = member.issym() and Path(posixpath.normpath(str(linked))).is_relative_to(Path("/system"))
-                    linked = linked.resolve()
-                    if not linked.is_relative_to(prefix) and not platform_alias:
+                    linked = resolve_payload_alias(linked)
+                    platform_alias = member.issym() and linked.is_relative_to(PurePosixPath("/system"))
+                    if not linked.is_relative_to(PurePosixPath(str(prefix))) and not platform_alias:
                         raise ValueError(f"Unsafe source-cache payload alias: {member.name} -> {linked}")
                 # Namespace and alias destinations were checked above. The data
                 # filter rejects legitimate absolute Android-prefix symlinks;

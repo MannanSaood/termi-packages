@@ -1,7 +1,7 @@
 import copy
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import tempfile
@@ -9,6 +9,43 @@ import unittest
 
 import build_scratch
 import seed
+
+
+class PayloadAliasResolution(unittest.TestCase):
+    prefix = "/data/data/com.terminal.nextgen/files/usr"
+
+    def resolver(self, links):
+        def readlink(path):
+            if path not in links:
+                raise FileNotFoundError(2, "not a link", path)
+            return links[path]
+        return readlink
+
+    def test_relative_platform_chain_does_not_follow_builder_system_shim(self):
+        library = self.prefix + "/opt/eglinfo-system/lib"
+        links = {library + "/libEGL.so": "/system/lib64/libEGL.so",
+                 "/system": "/data/data/com.termux/aosp"}
+        self.assertEqual(PurePosixPath("/system/lib64/libEGL.so"),
+                         seed.resolve_payload_alias(library + "/libEGL.so", self.resolver(links)))
+        links[library + "/libEGL.so.1"] = "libEGL.so"
+        self.assertEqual(PurePosixPath("/system/lib64/libEGL.so"),
+                         seed.resolve_payload_alias(library + "/libEGL.so.1", self.resolver(links)))
+
+    def test_foreign_namespace_and_platform_parent_escape_are_not_platform_links(self):
+        links = {self.prefix + "/foreign": "/data/data/com.termux/aosp/lib64/libEGL.so",
+                 self.prefix + "/escape": "/system/../etc/passwd"}
+        for name in ["foreign", "escape"]:
+            resolved = seed.resolve_payload_alias(self.prefix + "/" + name, self.resolver(links))
+            self.assertFalse(resolved.is_relative_to(PurePosixPath(self.prefix)))
+            self.assertFalse(resolved.is_relative_to(PurePosixPath("/system")))
+
+    def test_prefix_alias_chain_and_cycle(self):
+        links = {self.prefix + "/a": "b", self.prefix + "/b": "lib/real.so"}
+        self.assertEqual(PurePosixPath(self.prefix + "/lib/real.so"),
+                         seed.resolve_payload_alias(self.prefix + "/a", self.resolver(links)))
+        links[self.prefix + "/b"] = "a"
+        with self.assertRaisesRegex(ValueError, "alias cycle"):
+            seed.resolve_payload_alias(self.prefix + "/a", self.resolver(links))
 
 
 class SeedCompatibility(unittest.TestCase):
@@ -131,12 +168,19 @@ class PayloadTests(unittest.TestCase):
             path.write_text("exact fixture")
             (path.parent / "absolute-link").symlink_to(prefix / "include/test.h")
             (path.parent / "platform-link").symlink_to("/system/bin/sh")
+            (path.parent / "relative-platform-link").symlink_to("platform-link")
             deb = root / "fixture.deb"
             subprocess.run(["dpkg-deb","--build",str(package),str(deb)],check=True,capture_output=True)
             seed.unpack(deb,prefix)
             self.assertEqual("exact fixture",(prefix / "include/test.h").read_text())
             self.assertEqual("exact fixture",(prefix / "include/absolute-link").read_text())
             self.assertEqual("/system/bin/sh",os.readlink(prefix / "include/platform-link"))
+            self.assertEqual("platform-link",os.readlink(prefix / "include/relative-platform-link"))
+            (path.parent / "foreign-link").symlink_to("/data/data/com.termux/aosp/lib64/libEGL.so")
+            subprocess.run(["dpkg-deb","--build",str(package),str(deb)],check=True,capture_output=True)
+            with self.assertRaisesRegex(ValueError,"Unsafe source-cache payload alias"):
+                seed.unpack(deb,prefix)
+            (path.parent / "foreign-link").unlink()
             (package / prefix.relative_to("/") / "include/unsafe-link").symlink_to("/etc/passwd")
             subprocess.run(["dpkg-deb","--build",str(package),str(deb)],check=True,capture_output=True)
             with self.assertRaisesRegex(ValueError,"Unsafe source-cache payload alias"):
