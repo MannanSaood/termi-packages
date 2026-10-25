@@ -3,8 +3,9 @@ import re
 
 
 def apply(patch, original):
-    def change(name, edit):
-        path=f"packages/{name}/build.sh"
+    prepared = {}
+    def change(name, edit, tree="packages"):
+        path=f"{tree}/{name}/build.sh"
         before=original(path)
         after=edit(before)
         revision=re.search(r"^TERMUX_PKG_REVISION=(\d+)$",after,re.M)
@@ -12,6 +13,7 @@ def apply(patch, original):
             after=after[:revision.start()]+f"TERMUX_PKG_REVISION={int(revision[1])+1}"+after[revision.end():]
         else:
             after=re.sub(r"^(TERMUX_PKG_VERSION=.*)$",r"\1\nTERMUX_PKG_REVISION=1",after,count=1,flags=re.M)
+        prepared[name] = after
         patch(path,before,after)
 
     def hook(text,name,body):
@@ -103,6 +105,9 @@ def apply(patch, original):
 \ttar -xf "$work/host.tar.xz" -C "$work"
 \tlocal host="$work/LLVM-$version-Linux-X64"
 \tlocal source="$work/llvm-project-$version.src"
+\t# NDK timespec_get is API29; the identical TIME_UTC clock is available
+\t# through clock_gettime(CLOCK_REALTIME) on our existing API26 minimum.
+\tsed -i 's/timespec_get(\\&tspec, TIME_UTC)/clock_gettime(CLOCK_REALTIME, \\&tspec)/' "$source/flang-rt/lib/runtime/time-intrinsic.cpp"
 \t# Official NDK compiler builtins supply the Android target, while the
 \t# matching official LLVM archive supplies only the Linux-host frontend.
 \tcp -a "$TERMUX_STANDALONE_TOOLCHAIN/lib/clang/21/lib/." "$host/lib/clang/21/lib/"
@@ -123,7 +128,7 @@ def apply(patch, original):
 \ttest -f "$work/runtime-build/flang-rt/lib/libflang_rt.runtime.a"
 \tLDFLAGS+=" -L$work/runtime-build/flang-rt/lib"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_Fortran_COMPILER=$wrapper -DCMAKE_Fortran_FLAGS=-fPIC -DCMAKE_POSITION_INDEPENDENT_CODE=ON"
-\tinstall -Dm600 "$source/LICENSE.TXT" "$TERMUX_PREFIX/share/doc/arpack-ng/llvm-runtime-LICENSE.TXT"
+\tinstall -Dm600 "$source/LICENSE.TXT" "$TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/llvm-runtime-LICENSE.TXT"
 '''))
     for package in ["gcal", "recutils"]:
         change(package,lambda t:hook(t.replace('ac_cv_header_spawn_h=no','ac_cv_header_spawn_h=yes'),
@@ -137,6 +142,7 @@ def apply(patch, original):
 \tsed -i 's/$nthreads = 8;/$nthreads = 2;/; s/$nthreads = (int)substr_count(file_get_contents("\\/proc\\/cpuinfo"), "processor");/$nthreads = max(1, (int)getenv("TERMUX_PKG_MAKE_PROCESSES"));/' "$TERMUX_PKG_SRCDIR/scripts/common.php" "$TERMUX_PKG_SRCDIR/src/vendor/Soup/build_common.php"
 \tsed -i 's/$flags .= " -L$srcdir/$flags = " -L$srcdir/' "$TERMUX_PKG_SRCDIR/scripts/common.php"'''))
     change("oils-for-unix",lambda t:hook(t,"termux_step_pre_configure",'''\tCXXFLAGS+=" -nostdinc++"
+\tCXXFLAGS+=" $CPPFLAGS"
 \texport OILS_PARALLEL_BUILD=0 OILS_CXX_VERBOSE=1'''))
     # Debian mirrors the original upstream tarball byte-for-byte; pin unchanged.
     change("pari",lambda t:t.replace('https://pari.math.u-bordeaux.fr/pub/pari/unix/pari-${TERMUX_PKG_VERSION}.tar.gz',
@@ -183,3 +189,6 @@ def apply(patch, original):
 \tsource "$helper"
 \tTERMUX_BUN_VERSION=1.4.2 termux_setup_bun
 ''').replace('CLI_APP_VERSION_NAME="cli-drive-termux"','CLI_APP_VERSION_NAME="cli-drive-termi"'))
+
+    from catalog_repairs import apply as apply_catalog_repairs
+    apply_catalog_repairs(change, hook, prepared)

@@ -698,3 +698,56 @@ checksPASS; existing budgetterminationtest unchanged. Applies tofuture runs;
 allfourpreviouslanesalreadyfinished, nooldseedrestarts/duplicatebuildsdispatched
 by this configuration-only change. Preserve their1246livecompletedunion and
 publishedcandidatearchives for nextmerge. Noappdata/APK/phoneoperation.
+
+
+### 2026-10-25 second four-lane recovery and five-hour restart
+
+Recovery merge40168300604 actually SUCCESS, candidate-40168300604-1-0:
+1246unique completed parents/1630Debian archives, all input/outputhashes checked.
+Original candidates/checkpoints remain untouched. New seed pins:
+inventory7a899d9af14fab7a105e3ba4161bec6458c99e8945b60e8041c7c486e933070a,
+ledgerf6c86bf8f3bc6b9b98cffddc9e5cd66a36eaca32e058879a0aab84cbfc6d3097,
+planefac181b27466da99811ba0a3511eddc5093981eede31e58f625cc423d5eeff2.
+The23distinct non-built roots comprise19failures and4time interruptions(guile,
+wasi-libc,tinygo,zig). Retry interruptions under5h; do not call them23compilerbugs.
+
+Prepared repairs are recorded in recipe_repairs.py/catalog_repairs.py:
+- Btop/NTL QEMU loader failure: recipe-local proot invocation binds our own
+  source-built AOSPopt/aosp to/system inside proot; never modifies host/system.
+- Objective-C++ flags retain explicit prefix C++ headers, suppress duplicate
+  implicit libc++ header and keep versionedAPI26 target. SuiteSparse/UPX/Yoga
+  get the proven duplicate-header fix. Oils custom compile bypasses CPPFLAGS,
+  so explicitly folds those includes intoCXXFLAGS as well as-nostdinc++.
+- Restic/SCC/TDL native documentation/completion builds clear ALL cgo and target
+  flags. Syncthing builds the native launcher in an isolated subshell, retaining
+  original targetflags for the actual Android build.
+- Own source-built LLVM Fortran runtime uses clock_gettime(CLOCK_REALTIME)
+  instead ofAPI29timespec_get fallback, equivalentTIME_UTCclock onAPI26.
+  SuiteSparse also builds that matching own PIC runtime instead of old target
+  Flang runtime archives; LLVM license retained per consumer package.
+- Stag unitprefix array inferred size retains string and terminator. Actual
+  ARM64/API26compiler rejectsold[9],accepts[] under original-Werror flags.
+- Gifsicle declares missinglibSM build dependency, keepinggifview. GUI Bash
+  helper explicitly receives versioned C/C++ compiler targets.
+- Unicode18 official UCD/Unihan republished archives downloaded, CRCverified,
+  version18finalReadMe inspected, newexplicitSHA pins. Xsettingsd publisher tag
+  resolved to immutablefd8029153ad2c9bcc0342b6c337034912093d6cf archive.
+- Libfakekey switched from brokenYoctoURL to Debian ORIGINAL0.3+git20170516source;
+  digest independently compared to .dsc. RobotFindsKitten unavailable tutorial
+  fork58155... is not silently treated as available: switch tocanonical project's
+  2.8284271.702originalsource, Debian .dsc hash checked, fullsourcebuiltforTermi.
+  Epoch1supports upgrading fromold2022dateversion. Usesnormalautotoolsinstall,
+  executableinprefix/bin, actualNKI data/manpages retained. This is an explicit
+  upstreameditionchange, not an exactmirrorclaim. No prebuiltAndroidbinary.
+  Source URLs/hashes/versionnotes:source-repairs-20261025.json.
+
+Verification:60hosttests32PASS/28POSIX/toolskips; Node3PASS.105checked source
+patches; full graph3269recipes,0cycles; all1246completed compatible,49affected
+non-completed/dependent nodesinvalidated. AllgeneratedrecipeBashsyntaxPASS.
+Actual NDK30 ARM64/API26 oldclockprobe fails, equivalentclock_gettimeprobepasses;
+actualLLVMsource substitution replayed. Local Docker unavailable: actual Linux
+suite and package builds verify these attempts on restartedpublicfree runners.
+No blanket packagePASS before those compiler results. Existing5h/6hlimits and
+source-cachecleanup remain active. No paid runner/cache/services; nooldreleases
+orcheckpointsdeleted. NoAPK/signing/phone/app-data/localreviewedrepochange.
+Full catalog/appreleaseGateBLOCKED pending actualcompiler/runtimecompletion.

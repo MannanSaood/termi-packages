@@ -1,0 +1,43 @@
+{
+  "verification": "Downloaded original source archives over HTTPS; Unicode version18 final ReadMe and ZIP CRC checked; Debian original archive digests compared with .dsc; xsettingsd tag resolved through publisher API",
+  "sources": [
+    {
+      "name": "UCD",
+      "url": "https://unicode.org/Public/18.0.0/ucd/UCD.zip",
+      "size": 5657953,
+      "sha256": "7b3e555514060b92290d154f53655c5eb0fa62b16eb04c03434ff72d1a66a0d8",
+      "readme": "# Unicode Character Database\n# \u00a9 2026 Unicode\u00ae, Inc.\n# Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.\n# For terms of use and license, see https://www.unicode.org/terms_of_use.html\n\nThis directory contains final data files for version 18.0.0 of the\nUnicode Character Database.\n\nFor documentation, see https://www.unicode.org/versions/Unicode18.0.0/\nwith links to\n- UAX #38: Unicode Han Database (Unihan)\n- UAX #42: Unicode Character Database in XML\n- UAX #44: Unicode Character Database\n- UTS #51: Unicode Emoji\n- UAX #57: Unicode Egyptian Hieroglyph Database\n- UAX #60: Data for Non Han Ideographic Scripts\n\nas well as the following in this directory:\n- NamesList.html\n"
+    },
+    {
+      "name": "Unihan",
+      "url": "https://unicode.org/Public/18.0.0/ucd/Unihan.zip",
+      "size": 8340649,
+      "sha256": "4c93ea9c1f636451729a840978f1667a53886af37ba854fdcce109721c63d43e"
+    },
+    {
+      "name": "fakekey-original",
+      "url": "https://deb.debian.org/debian/pool/main/libf/libfakekey/libfakekey_0.3+git20170516.orig.tar.xz",
+      "sha256": "ddbd308dc7f20390b2a6cb88bd077a62061a40533e209a14a94bdb36b32a0446",
+      "size": 9256
+    },
+    {
+      "name": "robot-official",
+      "url": "https://deb.debian.org/debian/pool/main/r/robotfindskitten/robotfindskitten_2.8284271.702.orig.tar.gz",
+      "sha256": "020172e4f4630f7c4f62c03b6ffe2eeeba5637b60374d3e6952ae5816a9f99af",
+      "size": 476423
+    },
+    {
+      "name": "robot-dsc",
+      "url": "https://deb.debian.org/debian/pool/main/r/robotfindskitten/robotfindskitten_2.8284271.702-2.dsc",
+      "sha256": "57562754fa3ca9511eafc670918c265c2a891a11de8a60cdfa91be2c6946df61",
+      "size": 2118
+    },
+    {
+      "name": "xsettingsd",
+      "url": "https://codeberg.org/derat/xsettingsd/archive/fd8029153ad2c9bcc0342b6c337034912093d6cf.tar.gz",
+      "commit": "fd8029153ad2c9bcc0342b6c337034912093d6cf",
+      "sha256": "3a36ce39bfadb3804c76b986c0654d211bb70ba85f900742dd3bb3403d17175f"
+    }
+  ],
+  "robot_edition_change": "Unavailable noncombatant tutorial rewrite replaced by canonical robotfindskitten.org release2.8284271.702; Debian epoch1 permits upgrading from date-based2022.05.21. No binary reused."
+}
