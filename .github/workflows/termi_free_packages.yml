@@ -45,7 +45,7 @@ jobs:
   candidate:
     if: github.event.repository.private == false
     runs-on: ubuntu-24.04
-    timeout-minutes: 350
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -143,7 +143,8 @@ jobs:
           assert context.resolve()==context and not context.is_symlink()
           shutil.rmtree(context)
           args = ['python3','scripts/termux/build.py','--upstream','build/upstream','--output','build/candidate',
-                  '--mode',os.environ['BUILD_MODE'],'--reclaim-workflow-inputs','--full-recipes','--jobs','2','--memory-gib','13','--timeout-seconds','14400']
+                  '--mode',os.environ['BUILD_MODE'],'--reclaim-workflow-inputs','--full-recipes','--jobs','2','--memory-gib','13',
+                  '--catalog-budget-seconds','18000','--timeout-seconds','18600']
           if os.environ['BUILD_MODE'] == 'packages': args += ['--packages',*os.environ['RECIPES'].split()]
           lane = os.environ['RECIPES'] if os.environ['BUILD_MODE'] == 'full-catalog' and os.environ['RECIPES'].startswith('lane-') else ''
           if lane: args += ['--catalog-lane',lane]

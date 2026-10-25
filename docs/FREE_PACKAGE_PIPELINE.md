@@ -681,3 +681,20 @@ job steps notyetexposed at snapshot. Do not report Linux/compilerPASS prematurel
 Pluto repair hook was actually executed on disposable originalpublisherPHPsource;
 both2worker limits and linkflag initializationverified. No source downloaded by
 that hook, no appoperations. Mainhandover records exactpins/evidence.
+
+
+### 2026-10-25 five-hour compilation budget
+
+Owner requested5hcompilation with1htotalheadroom beneath6hjoblimit. Changed
+catalogbudget12600to18000seconds inbuild.py andcontainerfallback; workflow passes
+18000explicitly. Dockerattachedprocess timeout14400to18600seconds (5h10m),
+retaining10minforcontainerseedinstall/artifactcollection. WholeGitHubjob350to
+360minutes. The remaininghour is total setup/publication/checkpoint overhead;
+setup consumes part of that hour. Completedcandidates stillpublish BEFORE large
+checkpoint export. Earlier3.5hwasconservativeforlargewholecontainerexports;
+currentcachecleanupandearlycandidatepublicationallowhighercompilationallocation.
+No paidrunners orhigherGitHublimit requested. YAML,inlinePython,builddriverparse
+checksPASS; existing budgetterminationtest unchanged. Applies tofuture runs;
+allfourpreviouslanesalreadyfinished, nooldseedrestarts/duplicatebuildsdispatched
+by this configuration-only change. Preserve their1246livecompletedunion and
+publishedcandidatearchives for nextmerge. Noappdata/APK/phoneoperation.

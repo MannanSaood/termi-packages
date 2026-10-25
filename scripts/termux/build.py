@@ -67,7 +67,7 @@ def main():
     parser.add_argument("--cache-image", help="Explicit locally restored, manifest-pinned Termi checkpoint image")
     parser.add_argument("--continue-recipe", help="Explicitly resume a recipe already stopped during make or later")
     parser.add_argument("--full-recipes", action="store_true", help="Retain all recipe features for an individual catalog batch")
-    parser.add_argument("--catalog-budget-seconds", type=int, default=12600)
+    parser.add_argument("--catalog-budget-seconds", type=int, default=18000)
     parser.add_argument("--catalog-minimum-free-gib", type=int, default=16)
     parser.add_argument("--catalog-retry-failed", action="store_true", help="Explicitly retry failed/interrupted catalog recipes")
     parser.add_argument("--catalog-lane")

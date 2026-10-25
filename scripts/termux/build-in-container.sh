@@ -46,7 +46,7 @@ if [ "$mode" = full-catalog ]; then
     if [ -n "${TERMI_CONTINUE_RECIPE:-}" ]; then retry+=(--resume-compile "$TERMI_CONTINUE_RECIPE"); fi
     python3 /home/builder/catalog_build.py --root "$PWD" --metadata /home/builder \
         --state /home/builder/catalog-state --jobs "$jobs" \
-        --budget-seconds "${TERMI_CATALOG_BUDGET:-12600}" \
+        --budget-seconds "${TERMI_CATALOG_BUDGET:-18000}" \
         --minimum-free-gib "${TERMI_CATALOG_MINIMUM_FREE_GIB:-16}" "${retry[@]}" || result=$?
     cp /home/builder/catalog-state/plan.json /home/builder/artifacts/catalog-plan.json
     cp /home/builder/catalog-state/ledger.json /home/builder/artifacts/catalog-ledger.json
