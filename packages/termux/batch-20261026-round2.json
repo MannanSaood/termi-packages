@@ -1,0 +1,48 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "candidates": [
+    {
+      "tag": "candidate-40259379937-1-0",
+      "inventory_sha256": "f486acf630f029362d6424186be8589e244895996e43d59ee1b5b033ef954b34",
+      "ledger_sha256": "14d940e7b4c6b360face68a26cac953dec7c96385de8f12c33d3cd3017faa0c2",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40259382096-1-0",
+      "inventory_sha256": "51d8439f6500bf4a0876e16cf6588854330cfd124e76723f7f0dab4fd1415e02",
+      "ledger_sha256": "e126bcdd0460f775809e1b7116e82c280d691dd53ea29596b0dcebbcff8eacfc",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40259384496-1-0",
+      "inventory_sha256": "a79abd23a9904b38efcf26b20066a3902a6720df068a44ee2965b5e8c52633d5",
+      "ledger_sha256": "40466399d731b4b8288de9858fca17a536cac58c3eabd2aad3cd6d26e0a5a8bf",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40259387647-1-0",
+      "inventory_sha256": "931ff9fbcb11dd05f15f737cf24e509dee3727ea5770ffd20786c3fd26f94ed7",
+      "ledger_sha256": "e61d36083709c77e8f3e1eee3280b773768024e1cbd106f5d656a4030bbca0bf",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40259390802-1-0",
+      "inventory_sha256": "092f0f84a29056a990a7d207bba77ec401bc9d9a6cdb69910d4bbb9d6d467c55",
+      "ledger_sha256": "c2a9ea99694fead789917410555a49993da4328efff2b70b5e0e170ca6a4a2b9",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40259394389-1-0",
+      "inventory_sha256": "3e5458d86ce894061f6c102504ac06fc7868d2efc61a904e60fd8bcfbebc648b",
+      "ledger_sha256": "fa5fcf906c4740d5e854a5f92626739b5c45885422b1545a6ea5009486448024",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40259397094-1-0",
+      "inventory_sha256": "b33d31bf8013742ed45c0193af21e30f1859f611c13914a8ae92aff9ad25de78",
+      "ledger_sha256": "21d5172a5e31ef0eb4935832deb2cf2944bc9897cc861e1ee4ccf3cf765ee7c3",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    }
+  ]
+}
