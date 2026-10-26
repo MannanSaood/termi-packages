@@ -71,7 +71,7 @@ def apply(patch, original):
     # Two copies of libc++/float.h share an include guard. include_next hits
     # the second wrapper and never reaches Clang's actual floating constants.
     # Retain the prefix's explicit libc++ include, suppress its implicit twin.
-    for package in ["gnucap", "alembic", "polyml", "quick-lint-js"]:
+    for package in ["gnucap", "alembic", "polyml", "quick-lint-js", "libprotobuf", "libxisf", "openexr", "z3", "minizinc", "libimtui", "libmediainfo", "asymptote", "frobtads", "wabt", "openxr"]:
         change(package,lambda t:hook(t,"termux_step_pre_configure",'\tCXXFLAGS+=" -nostdinc++"'))
     # libnl .la references a private convenience archive in its discarded build
     # tree. Rebuild that exact tiny source locally for this consumer, no cache
