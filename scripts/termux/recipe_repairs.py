@@ -73,6 +73,13 @@ def apply(patch, original):
     # Retain the prefix's explicit libc++ include, suppress its implicit twin.
     for package in ["gnucap", "alembic", "polyml", "quick-lint-js", "libprotobuf", "libxisf", "openexr", "z3", "minizinc", "libimtui", "libmediainfo", "asymptote", "frobtads", "wabt", "openxr", "libllvm"]:
         change(package,lambda t:hook(t,"termux_step_pre_configure",'\tCXXFLAGS+=" -nostdinc++"'))
+    # LLVM's source hook requires the separate Flang recipe revision to match.
+    # change() bumps the revision even when the source body is unchanged.
+    change("flang", lambda t: t)
+    def revision(text):
+        return re.search(r"^TERMUX_PKG_REVISION=(\d+)$", text, re.M).group(1)
+    if revision(prepared["libllvm"]) != revision(prepared["flang"]):
+        raise ValueError("Termi LLVM/Flang repair revisions must match")
     # libnl .la references a private convenience archive in its discarded build
     # tree. Rebuild that exact tiny source locally for this consumer, no cache
     # path dependency and no installed-prefix mutation.
