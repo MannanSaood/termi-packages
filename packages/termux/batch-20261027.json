@@ -1,0 +1,18 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "candidates": [
+    {
+      "tag": "candidate-40340641823-1-0",
+      "inventory_sha256": "f759ad65d21d8220700cebf2d373204c2a96a7b437e11c86975ffb7e1c9fa209",
+      "ledger_sha256": "b6f60b70605294354eac175e64a793f2fd68cffe147070b56923d70d4bae6ef0",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40333827178-1-0",
+      "inventory_sha256": "49d8cfa02aba2aab0545507f7f49878c5a24b229a871793d8c81f35089980835",
+      "ledger_sha256": "64589e971fc3e701eff18f97f42c63f0c4deccca55ec758a4ec1cad61f97a9b5",
+      "plan_sha256": "13641e9c72b17738193511b8140d16ca13a8455cfb5dc9e29b04aeb21778a613"
+    }
+  ]
+}
