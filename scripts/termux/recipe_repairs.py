@@ -2,6 +2,22 @@
 import re
 
 
+def llvm_native_host_flags(text):
+    """Keep LLVM's nested Linux generators out of the Android compiler env."""
+    old = '-DCROSS_TOOLCHAIN_FLAGS_LLVM_NATIVE=-DLLVM_NATIVE_TOOL_DIR=$TERMUX_PKG_HOSTBUILD_DIR/bin'
+    if text.count(old) != 1:
+        raise ValueError("LLVM native toolchain anchor changed")
+    flags = [
+        '-DCMAKE_C_COMPILER=/usr/bin/gcc',
+        '-DCMAKE_CXX_COMPILER=/usr/bin/g++',
+        '-DCMAKE_ASM_COMPILER=/usr/bin/gcc',
+        '-DCMAKE_C_FLAGS=', '-DCMAKE_CXX_FLAGS=', '-DCMAKE_ASM_FLAGS=',
+        '-DCMAKE_EXE_LINKER_FLAGS=', '-DCMAKE_SHARED_LINKER_FLAGS=',
+        '-DCMAKE_MODULE_LINKER_FLAGS=',
+    ]
+    return text.replace(old, old + ';' + ';'.join(flags))
+
+
 def apply(patch, original):
     prepared = {}
     def change(name, edit, tree="packages"):
@@ -71,8 +87,10 @@ def apply(patch, original):
     # Two copies of libc++/float.h share an include guard. include_next hits
     # the second wrapper and never reaches Clang's actual floating constants.
     # Retain the prefix's explicit libc++ include, suppress its implicit twin.
-    for package in ["gnucap", "alembic", "polyml", "quick-lint-js", "libprotobuf", "libxisf", "openexr", "z3", "minizinc", "libimtui", "libmediainfo", "asymptote", "frobtads", "wabt", "openxr", "libllvm"]:
+    for package in ["gnucap", "alembic", "polyml", "quick-lint-js", "libprotobuf", "libxisf", "openexr", "z3", "minizinc", "libimtui", "libmediainfo", "asymptote", "frobtads", "wabt", "openxr"]:
         change(package,lambda t:hook(t,"termux_step_pre_configure",'\tCXXFLAGS+=" -nostdinc++"'))
+    change("libllvm", lambda t: llvm_native_host_flags(
+        hook(t, "termux_step_pre_configure", '\tCXXFLAGS+=" -nostdinc++"')))
     # LLVM's source hook requires the separate Flang recipe revision to match.
     # change() bumps the revision even when the source body is unchanged.
     change("flang", lambda t: t)
