@@ -9,7 +9,7 @@ on:
         options: [plan, seed-check, packages, full-catalog]
         default: plan
       recipes:
-        description: Parent recipes, or lane-0-of-4 through lane-3-of-4 for parallel full-catalog
+        description: Parent recipes, or lane-0-of-8 through lane-7-of-8 for parallel full-catalog
         default: hello
       checkpoint_tag:
         description: Optional previous checkpoint release tag

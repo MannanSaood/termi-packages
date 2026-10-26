@@ -29,18 +29,25 @@ class GraphTests(unittest.TestCase):
     def test_parallel_lanes_own_every_root_once_and_include_all_dependencies(self):
         recipes = {str(i): dict(dependencies=[str(i-1)] if i else []) for i in range(30)}
         owners = []
-        for lane in range(4):
-            owned, selected = builder.lane_scope(recipes,f"lane-{lane}-of-4")
+        for lane in range(8):
+            owned, selected = builder.lane_scope(recipes,f"lane-{lane}-of-8")
             owners.extend(owned)
             self.assertTrue(owned <= selected)
             for name in selected:
                 self.assertTrue(set(recipes[name]["dependencies"]) <= selected)
-            self.assertEqual((owned,selected),builder.lane_scope(recipes,f"lane-{lane}-of-4"))
+            self.assertEqual((owned,selected),builder.lane_scope(recipes,f"lane-{lane}-of-8"))
         self.assertEqual(set(recipes),set(owners))
         self.assertEqual(len(recipes),len(owners))
         for invalid in ["lane-4-of-4","lane-0-of-0","lane-0-of-20","arbitrary"]:
             with self.assertRaises(ValueError):
                 builder.lane_scope(recipes,invalid)
+
+    def test_eight_lanes_spread_heavy_roots(self):
+        names=["zig","mono","dotnet9.0","dotnet10.0","llvm","rust","webkit2gtk-4.1","qt6-qtwebengine"]
+        recipes={name:dict(dependencies=[]) for name in names}
+        for index,name in enumerate(names):
+            owned,_=builder.lane_scope(recipes,f"lane-{index}-of-8")
+            self.assertEqual({name},owned)
 
     def test_cycles_are_distinct_from_downstream_blockers(self):
         order, cycles = order_and_cycles({"a": {"b"}, "b": {"a"}, "dependent": {"a"}, "independent": set()})

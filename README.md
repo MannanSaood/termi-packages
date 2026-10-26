@@ -61,3 +61,5 @@ is running; no Android runtime approval implied. Latest live lower bound871
 unique completed recipes (868 saved plus etsh/hunspell-en-us/hunspell-ru);
 shared dictionary completions are counted once. See pipeline notes for snapshot
 method and timing. Existing catalog lanes continue without cancellation.
+
+Eight-lane rounds use lane-0-of-8 through lane-7-of-8, with distinct root ownership and selected heavy roots spread across lanes. Dependency closures can overlap; a shared verified Termi seed avoids rebuilding completed dependencies. Unchanged failed recipes survive seed merging/import and require a source-input fix or explicit retry. Standard public GitHub-hosted runners only; compilation remains five hours within a six-hour job.

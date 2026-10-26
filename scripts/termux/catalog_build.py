@@ -68,11 +68,15 @@ def announce(ledger, event, recipe=None):
 def lane_scope(recipes, lane):
     if not lane:
         return set(recipes), set(recipes)
-    match = re.fullmatch(r"lane-([0-9]+)-of-([2-4])", lane)
+    match = re.fullmatch(r"lane-([0-9]+)-of-([2-8])", lane)
     if not match or int(match[1]) >= int(match[2]):
-        raise ValueError("Require lane-INDEX-of-COUNT with COUNT2–4")
+        raise ValueError("Require lane-INDEX-of-COUNT with COUNT2–8")
     index, count = map(int, match.groups())
-    owned = {name for name in recipes if int.from_bytes(hashlib.sha256(name.encode()).digest()[:8], "big") % count == index}
+    # Keep older lane assignments stable; spread known heavy roots in the new eight-way round.
+    heavy = {name: i for i, name in enumerate(("zig", "mono", "dotnet9.0", "dotnet10.0", "llvm", "rust", "webkit2gtk-4.1", "qt6-qtwebengine"))} if count == 8 else {}
+    def owner(name):
+        return heavy.get(name, int.from_bytes(hashlib.sha256(name.encode()).digest()[:8], "big") % count)
+    owned = {name for name in recipes if owner(name) == index}
     selected = set(owned)
     pending = list(owned)
     while pending:
@@ -112,6 +116,9 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                     raise ValueError("Source-build seed does not match this graph")
                 for name in seed["recipes"]:
                     ledger["recipes"][name].update(status="built", origin="verified-termi-source-build", seed_inventory=seed["inventory_sha256"])
+                for name, failure in seed.get("failures", {}).items():
+                    if name in ledger["recipes"] and ledger["recipes"][name]["status"] != "built":
+                        ledger["recipes"][name].update(failure)
             ledger.update(lane=lane, owned_roots=sorted(owned), selected_recipes=sorted(selected))
             for name, entry in ledger["recipes"].items():
                 if name not in selected and entry["status"] == "pending":

@@ -28,8 +28,11 @@ def merge(inputs, output, prefer_first_compatible=False):
         raise ValueError("At least one pinned candidate required")
     target = sources[0][3]
     records, paths, built, origins, variants = {}, {}, set(), [], []
+    failures = {}
     for directory, inventory, ledger, plan, pins in sources:
-        allowed, _ = compatibility(plan,target,ledger)
+        allowed, invalid = compatibility(plan,target,ledger)
+        failures.update({name: entry for name, entry in ledger["recipes"].items()
+                         if entry["status"] == "failed" and name in target["recipes"] and name not in invalid})
         present = set()
         for record in inventory["packages"]:
             if record["recipe"] not in allowed:
@@ -61,6 +64,9 @@ def merge(inputs, output, prefer_first_compatible=False):
     merged = dict(schema=1,identity=[target["identity"],"verified-candidate-union"],
                   recipes={name:dict(status="built" if name in built else recipe["initial_status"],attempts=0)
                            for name,recipe in target["recipes"].items()}, source_candidates=origins)
+    for name, entry in failures.items():
+        if name not in built:
+            merged["recipes"][name] = entry
     inventory = dict(status="candidate-not-signed-not-device-verified",packages=[records[n] for n in sorted(records)],
                      source_candidates=origins,alternate_builds=variants,
                      duplicate_policy="prefer-first-compatible-parent" if prefer_first_compatible else "identical-only")
@@ -76,7 +82,7 @@ def main():
     sub=parser.add_subparsers(dest="command",required=True)
     dispatch=sub.add_parser("dispatch")
     dispatch.add_argument("--repository",default="MannanSaood/termi-packages")
-    dispatch.add_argument("--lanes",type=int,choices=[2,3,4],default=4)
+    dispatch.add_argument("--lanes",type=int,choices=list(range(2,9)),default=4)
     dispatch.add_argument("--seed-tag",required=True)
     for name in ["inventory","ledger","plan"]:
         dispatch.add_argument("--"+name+"-sha256",required=True)

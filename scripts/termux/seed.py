@@ -76,6 +76,13 @@ def compatibility(old, new, ledger):
     return allowed, invalid
 
 
+def compatible_failures(old, new, ledger):
+    """Retain failed recipes until their inputs change or retry is explicit."""
+    _, invalid = compatibility(old, new, ledger)
+    return {name: entry for name, entry in ledger["recipes"].items()
+            if name in new["recipes"] and name not in invalid and entry["status"] == "failed"}
+
+
 def expand_bundles(raw, inventory):
     """Unpack only inventory-pinned regular Debian members; never tar.extract."""
     expected = {r["file"]:r["sha256"] for r in inventory["packages"]}
@@ -137,7 +144,7 @@ def prepare(raw, context, new_graph, output, inventory_hash, ledger_hash, graph_
         shutil.copyfile(path, output / name)
     receipt = dict(schema=1, inventory_sha256=inventory_hash, ledger_sha256=ledger_hash, graph_sha256=graph_hash,
                    new_graph_identity=new["identity"], recipes=sorted(allowed), invalidated=sorted(invalid),
-                   packages=records, status="source-build-cache-not-runtime-approval")
+                   packages=records, failures=compatible_failures(old, new, ledger), status="source-build-cache-not-runtime-approval")
     (output / "seed.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(dict(reused_recipes=len(allowed), reused_archives=len(records), invalidated_recipes=len(invalid))), flush=True)
 
@@ -257,6 +264,8 @@ def install(seed, root, metadata, artifacts):
     expected = [r for r in inventory["packages"] if r["recipe"] in allowed]
     if receipt["new_graph_identity"] != new["identity"] or receipt["packages"] != expected or set(receipt["recipes"]) != allowed:
         raise ValueError("Source-cache receipt changed or source compatibility differs")
+    if receipt.get("failures", {}) != compatible_failures(old, new, ledger):
+        raise ValueError("Source-cache failure evidence differs")
     existing = artifacts / "seed-provenance.json"
     if existing.exists():
         if json.loads(existing.read_text()) != receipt:

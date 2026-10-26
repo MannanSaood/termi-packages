@@ -61,6 +61,20 @@ class MergeTests(unittest.TestCase):
             self.assertEqual(2,len(inventory["source_candidates"]))
             self.assertTrue(all(e["status"]=="built" for e in ledger["recipes"].values()))
 
+    def test_merge_retains_failure_but_success_in_another_lane_wins(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            first=self.candidate(root/"lane0","a")
+            path=root/"lane0/catalog-ledger.json"
+            ledger=json.loads(path.read_text())
+            ledger["recipes"]["b"]={"status":"failed","attempts":1,"reason":"compile error"}
+            ledger["recipes"]["c"]={"status":"failed","attempts":1,"reason":"source unavailable"}
+            path.write_text(json.dumps(ledger));first[2]=digest(path)
+            second=self.candidate(root/"lane1","b")
+            merged,_=merge([first,second],root/"union")
+            self.assertEqual("built",merged["recipes"]["b"]["status"])
+            self.assertEqual("source unavailable",merged["recipes"]["c"]["reason"])
+
     def test_conflicting_outputs_and_unpinned_metadata_are_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
