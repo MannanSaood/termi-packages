@@ -1,0 +1,42 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "candidates": [
+    {
+      "tag": "candidate-40259377422-2-0",
+      "inventory_sha256": "4d13fb601dfacf40c0271370215468de62bd31b055eacfb8208759e813e8e226",
+      "ledger_sha256": "b0bd051f0cafe33de5f6ac71f213e951e6b4f5b51e27a1f396d4847f31408075",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40293957010-1-0",
+      "inventory_sha256": "e98a6b7d02408b0402be017368aa64084fec44335098487954a0d854e37cf848",
+      "ledger_sha256": "1cb53222ddfbfc697fa2bc0e9750b05dd31c4e4bafc8aee4534532ee8e567c3e",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40293964237-1-0",
+      "inventory_sha256": "7a5a8657d43602e6ef3fa909d8faf05351ad5ddb02732bafe81c83d589edb70a",
+      "ledger_sha256": "64b2eaf5bec74e67697006bba68b375ef99c3d8886d009ab2aadd1a15b63c087",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40293974607-1-0",
+      "inventory_sha256": "0a497b9ba42e6fbc048be359e7c89f5b7a5880cf7086a4edcbf0b4cd9efe180e",
+      "ledger_sha256": "202647f413c8ae53415e884f9239c2101c2facac500993b5084356d7b5f3b228",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40293978739-1-0",
+      "inventory_sha256": "be081fab2565643d6ddf513176088923b1c679d8ab1a7b6b8894edb9660134dd",
+      "ledger_sha256": "685a20aef9a3065c2b44824c4eaa555fd2683a810e84766467afbb24da576975",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    },
+    {
+      "tag": "candidate-40293960987-1-0",
+      "inventory_sha256": "a72b10acd81980239fea3bfa394983bb84fc520a40992590348d52d2b06523d2",
+      "ledger_sha256": "f6adf2630fadf1c661d17ab8539d793774729d58811e48f901ab6ec739c227e9",
+      "plan_sha256": "e6044c108ae788a54c9951eea23813e9e95dab6f6b77421ad5f8e1b7345a2b08"
+    }
+  ]
+}
