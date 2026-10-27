@@ -1,0 +1,8 @@
+{
+  "tag": "checkpoint-40491103578-1",
+  "manifest_sha256": "ac6acaac21fa1f35677e3dc4307d8b67a4fb77964190007cf9a889a4d8951fdd",
+  "input_identity": "59ebe19e68901993793ff8c9c26d79e616000811394b076fd52bfdfad3bdc696",
+  "logs": [
+    "swift-1.log"
+  ]
+}
