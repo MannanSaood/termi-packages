@@ -1,0 +1,31 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "required_completed_recipes": [
+    "below",
+    "rust",
+    "libllvm",
+    "mesa",
+    "nodejs-lts",
+    "boost",
+    "libelf",
+    "libxt",
+    "libsasl",
+    "thin-provisioning-tools",
+    "libvisio"
+  ],
+  "candidates": [
+    {
+      "tag": "candidate-40547209731-1-0",
+      "inventory_sha256": "affebb1ecc3f7bffb195b919f6fca6e834b2024a0d88f7b3404ef6c7a3bceddf",
+      "ledger_sha256": "1699aab0d6ed2b681ade2d0f2b26ce439e5f335505fb2847ef331067482188b7",
+      "plan_sha256": "962e3f589f393416e396a07332d82441b29de8df97282cf42edcde210688412a"
+    },
+    {
+      "tag": "candidate-40538602507-1-0",
+      "inventory_sha256": "a4311fdf2ae8f4f285038a8ec3f2242f315d43d9a31fef455c585b63dd5b434b",
+      "ledger_sha256": "b01cf5a74dd4fade1773a14768920111027542ece92c38cc20a929e92228be68",
+      "plan_sha256": "b2e1b49676f249aa758a947ed84719f185f0c415da0cb1a653ce4db91f68bf32"
+    }
+  ]
+}
