@@ -154,12 +154,22 @@ TERMI_PROTOBUF_NAME'''))
     # Only the Linux host generator needs the legacy C dialect.
     change('motif', lambda t: hook(t, 'termux_step_host_build',
         '''\texport CC="gcc -std=gnu17"
-\tsed -i '1i#include <string.h>' "$TERMUX_PKG_SRCDIR/lib/Xm/XpmI.h"'''), tree='x11-packages')
+\tsed -i '1i#include <string.h>' "$TERMUX_PKG_SRCDIR/lib/Xm/XpmI.h"
+\tpython3 - "$TERMUX_PKG_SRCDIR/tools/wml" <<'TERMI_WML_DECLARATIONS'
+from pathlib import Path
+import sys
+for name in ('wmlparse.y', 'wmlparse.c'):
+    p=Path(sys.argv[1])/name;s=p.read_text()
+    anchor='#include "wml.h"'
+    assert s.count(anchor)==1, 'Motif WML declaration anchor changed'
+    p.write_text(s.replace(anchor,anchor+'\\nint yylex(void);\\nint yyerror(char *s);'))
+TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 
     # GGML auto-detects the Android sccache in the target prefix, then invokes
     # its bare name as a Linux compiler launcher. Its own option disables it.
     change('groonga', lambda t: hook(t, 'termux_step_pre_configure',
-        '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DGGML_CCACHE=OFF"'))
+        '''\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"
+\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DGGML_CCACHE=OFF"'''))
 
     # libnl's pkg-config flags reference its private compatibility archive.
     # A seeded libnl has no old scratch tree; build this consumer's own copy
