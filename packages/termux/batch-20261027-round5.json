@@ -1,0 +1,32 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "required_completed_recipes": [
+    "libllvm",
+    "nodejs-lts",
+    "build-essential",
+    "debootstrap",
+    "sendxmpp",
+    "iwyu"
+  ],
+  "candidates": [
+    {
+      "tag": "candidate-40434317361-1-0",
+      "inventory_sha256": "f254cdfa91770caefc59117d7a4240998a55d46d9f1dbdda62ab536a715620a8",
+      "ledger_sha256": "9789a4d7b06facc6cedbe4253d6e1b86e828e0fc04668eaa0bc73d8149d93669",
+      "plan_sha256": "84357fa969cccf17b3f841c4ef5893e51214b53b29488d31bc170b31a0466387"
+    },
+    {
+      "tag": "candidate-40434149205-1-0",
+      "inventory_sha256": "78206ef8b2bf2d7929118eca124c9263577a38c7136c0d9a79d96d5a51a7f4cd",
+      "ledger_sha256": "260fbebfd28a56d067070cd07cabd7fc2600c6c391d03d5e1a7d05e8d19f747d",
+      "plan_sha256": "998935b7d7ca417a7193968f6133aff9691d6de7a02f2010143b2a9fffe93943"
+    },
+    {
+      "tag": "candidate-40388327893-1-0",
+      "inventory_sha256": "3b8a08cd3a5603d3671a6eb715ec383a16a62bf5b3f49c4802af1bc4df439ecb",
+      "ledger_sha256": "cfc372600f54e1bfc960359dd9dd60ed7e1b800109f1e75b691bfc679193828d",
+      "plan_sha256": "84357fa969cccf17b3f841c4ef5893e51214b53b29488d31bc170b31a0466387"
+    }
+  ]
+}
