@@ -58,6 +58,9 @@ def main():
             raise ValueError("Explicit catalog ledger pin required")
         inputs.append([str(directory),entry["inventory_sha256"],ledger_pin,entry["plan_sha256"]])
     _, inventory=merge(inputs,args.output,prefer_first_compatible=manifest.get("duplicate_policy")=="prefer-first-compatible-parent")
+    missing = set(manifest.get("required_completed_recipes", [])) - {r["recipe"] for r in inventory["packages"]}
+    if missing:
+        raise ValueError("Merge dropped required completed recipes: " + ", ".join(sorted(missing)))
     # Reclaim only this disposable job's known download directory after the
     # verified chosen archives and their input provenance have been preserved.
     shutil.rmtree(Path("build/merge-inputs"))
