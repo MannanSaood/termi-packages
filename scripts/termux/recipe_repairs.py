@@ -32,6 +32,34 @@ def rust_target_cxx_headers(text):
     return text.replace(anchor, setup + anchor)
 
 
+def swift_target_cxx_headers(text):
+    anchor = 'termux_step_make() {'
+    if text.count(anchor) != 1:
+        raise ValueError('Swift target build anchor changed')
+    setup = r"""
+	# Host generators have already built; change only Android C++ flags.
+	python3 - "$TERMUX_PKG_SRCDIR/swift/utils/build-script-impl" <<'TERMI_SWIFT'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = '-DCMAKE_CXX_FLAGS="$(swift_c_flags ${host})"'
+assert s.count(old) == 1, 'Swift C++ flag anchor changed'
+replacement = '-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host})"'
+helper = '''
+function termi_swift_cxx_flags() {
+    case "$1" in android-*) printf '%s' "-nostdinc++ -I${TERMUX_PREFIX}/include/c++/v1 ";; esac
+    swift_c_flags "$1"
+}
+'''
+assert s.count('function swift_c_flags() {') == 1
+s = s.replace('function swift_c_flags() {', helper + '\nfunction swift_c_flags() {')
+p.write_text(s.replace(old, replacement))
+TERMI_SWIFT
+"""
+    return text.replace(anchor, anchor + setup)
+
+
 def mesa_bindgen_headers(text):
     anchor = '\tmkdir -p $_WRAPPER_BIN'
     if text.count(anchor) != 1:
@@ -138,6 +166,7 @@ def apply(patch, original):
     # change() bumps the revision even when the source body is unchanged.
     change("flang", lambda t: t)
     change("rust", rust_target_cxx_headers)
+    change("swift", swift_target_cxx_headers)
     change("mesa", mesa_bindgen_headers)
     def revision(text):
         return re.search(r"^TERMUX_PKG_REVISION=(\d+)$", text, re.M).group(1)
