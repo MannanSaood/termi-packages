@@ -162,7 +162,10 @@ for name in ('wmlparse.y', 'wmlparse.c'):
     p=Path(sys.argv[1])/name;s=p.read_text()
     anchor='#include "wml.h"'
     assert s.count(anchor)==1, 'Motif WML declaration anchor changed'
-    p.write_text(s.replace(anchor,anchor+'\\nint yylex(void);\\nint yyerror(char *s);'))
+    s=s.replace(anchor,anchor+'\\nint yylex(void);\\nint yyerror(const char *s);')
+    old='int yyerror (s)\\nchar *s;'
+    assert s.count(old)==1, 'Motif WML error definition anchor changed'
+    p.write_text(s.replace(old,'int yyerror(const char *s)'))
 TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 
     # GGML auto-detects the Android sccache in the target prefix, then invokes

@@ -43,3 +43,27 @@ class LogRecoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out=Path(d)/"out";extract_logs(buf,out,["swift-cmake"])
             self.assertEqual([p.read_bytes() for p in out.iterdir()],[b"log!"])
+
+    def test_native_archive_scope_and_regular_file_only(self):
+        from recover_logs import diagnostic_foundry_native_path
+        base = 'home/builder/.termux-build/foundry/src/target/aarch64-linux-android/release/'
+        name = base+'build/secp256k1-sys-012abc/out/libsecp256k1.a'
+        self.assertTrue(diagnostic_foundry_native_path(name))
+        self.assertTrue(diagnostic_foundry_native_path(base+'deps/libsecp256k1_sys-012abc.rlib'))
+        for suffix in ['../output', 'deps/program', 'build/other-012abc/out/libsecp256k1.a']:
+            self.assertFalse(diagnostic_foundry_native_path(base+suffix))
+        for symbolic in [False, True]:
+            buf=io.BytesIO()
+            with tarfile.open(fileobj=buf, mode='w:gz') as tar:
+                m=tarfile.TarInfo(name)
+                if symbolic:
+                    m.type=tarfile.SYMTYPE;m.linkname='/etc/passwd';tar.addfile(m)
+                else:
+                    m.size=8;tar.addfile(m,io.BytesIO(b'!<arch>\n'))
+            buf.seek(0)
+            with tempfile.TemporaryDirectory() as d:
+                if symbolic:
+                    with self.assertRaises(ValueError):extract_logs(buf,Path(d)/'out',['foundry-native'])
+                else:
+                    out=Path(d)/'out';extract_logs(buf,out,['foundry-native'])
+                    self.assertEqual([p.read_bytes() for p in out.iterdir()],[b'!<arch>\n'])

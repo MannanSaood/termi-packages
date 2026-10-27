@@ -23,6 +23,6 @@ class SwiftHeadersTest(unittest.TestCase):
             s=s.split('flags=')[0]
             p.write_text(s+'\nunset TERMUX_PREFIX\ntermi_swift_cxx_flags android-aarch64\nprintf "\\n"\ntermi_swift_cxx_flags linux-x86_64\n')
             out=subprocess.check_output([bash,str(p)],text=True)
-            self.assertEqual(out.splitlines(),['-nostdinc++ -I/prefix/include/c++/v1 common-android-aarch64','common-linux-x86_64'])
+            self.assertEqual(out.splitlines(),['-nostdinc++ -I/prefix/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted common-android-aarch64','common-linux-x86_64'])
     def test_source_drift(self):
         with self.assertRaises(ValueError): swift_target_cxx_headers('changed')

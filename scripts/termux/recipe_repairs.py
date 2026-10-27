@@ -52,7 +52,7 @@ function termi_swift_cxx_flags() {
     case "$1" in android-*) printf '%s' @TERMI_CXX_FLAGS@;; esac
     swift_c_flags "$1"
 }
-'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 '))
+'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted '))
 assert s.count('function swift_c_flags() {') == 1
 s = s.replace('function swift_c_flags() {', helper + '\nfunction swift_c_flags() {')
 p.write_text(s.replace(old, replacement))

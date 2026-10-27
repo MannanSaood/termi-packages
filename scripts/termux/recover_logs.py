@@ -18,8 +18,14 @@ def diagnostic_cmake_path(name):
         r"home/builder/\.termux-build/swift/build/(?:[A-Za-z0-9_.+-]+/){0,5}CMakeFiles/(?:CMakeConfigureLog\.yaml|CMakeError\.log|CMakeOutput\.log)", name)))
 
 
+def diagnostic_foundry_native_path(name):
+    return bool(re.fullmatch(
+        r"home/builder/\.termux-build/foundry/src/target/aarch64-linux-android/release/"
+        r"(?:build/secp256k1-sys-[0-9a-f]+/(?:out/libsecp256k1\.a|output)|deps/libsecp256k1_sys-[0-9a-f]+\.rlib)", name))
+
+
 def extract_logs(stream, output, names):
-    if not names or len(names) > 16 or any(n != "swift-cmake" and not re.fullmatch(r"[a-z0-9+_.-]+-[0-9]+\.log", n) for n in names):
+    if not names or len(names) > 16 or any(n not in ("swift-cmake", "foundry-native") and not re.fullmatch(r"[a-z0-9+_.-]+-[0-9]+\.log", n) for n in names):
         raise ValueError("Invalid diagnostic names")
     output.mkdir(parents=True, exist_ok=False)
     found = set()
@@ -33,6 +39,9 @@ def extract_logs(stream, output, names):
                 key = filename = parts[4]
             elif "swift-cmake" in names and diagnostic_cmake_path(member.name):
                 key = "swift-cmake"
+                filename = hashlib.sha256(member.name.encode()).hexdigest()[:16] + "-" + parts[-1]
+            elif "foundry-native" in names and diagnostic_foundry_native_path(member.name):
+                key = "foundry-native"
                 filename = hashlib.sha256(member.name.encode()).hexdigest()[:16] + "-" + parts[-1]
             if key is None:
                 continue
