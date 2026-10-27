@@ -1,0 +1,46 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "required_completed_recipes": [
+    "rust",
+    "libllvm",
+    "mesa",
+    "nodejs-lts",
+    "boost",
+    "libelf",
+    "libxt",
+    "libsasl"
+  ],
+  "candidates": [
+    {
+      "tag": "candidate-40515443997-1-0",
+      "inventory_sha256": "0f1ade009bf8162a21ff46e94da43e3dbde09176fb5bb43373245ddb3e2dcc0c",
+      "ledger_sha256": "8c2c6fc6af30a6adfc30ac5021570d9fa791e0a4e5d488491e86a45c65f58d17",
+      "plan_sha256": "4505b54b5a1ede8fc3af92375803d3917e34405406b334a5819f52d1ca8a5e40"
+    },
+    {
+      "tag": "candidate-40507204645-1-0",
+      "inventory_sha256": "282a9674e3c53da073d033525585331537e3a20547129021572c6946f2827ee3",
+      "ledger_sha256": "eb6ebe0ee5fb3217af01a4bf8940f2b5d6b164d21426a3b2dd51a86ea8be58b9",
+      "plan_sha256": "4505b54b5a1ede8fc3af92375803d3917e34405406b334a5819f52d1ca8a5e40"
+    },
+    {
+      "tag": "candidate-40507216551-1-0",
+      "inventory_sha256": "db77476eb3e22a83203a8744509484c927742e3236b876ab4f416791105c9cc9",
+      "ledger_sha256": "6db58d56635dc9ee2ac7202bf67aedee9cc354a30ed883aefcf5ce4c6c57386b",
+      "plan_sha256": "4505b54b5a1ede8fc3af92375803d3917e34405406b334a5819f52d1ca8a5e40"
+    },
+    {
+      "tag": "candidate-40507241931-1-0",
+      "inventory_sha256": "5588c3539c89670532b830a5e707051cdba3c4cd9b69b9c31148be060246444f",
+      "ledger_sha256": "084effb6401e95cd97b7d690708bd2b938d40d772b7ddbbf5f9dc7257698f450",
+      "plan_sha256": "4505b54b5a1ede8fc3af92375803d3917e34405406b334a5819f52d1ca8a5e40"
+    },
+    {
+      "tag": "candidate-40507254402-1-0",
+      "inventory_sha256": "e2487a9760f49bd46f944a158f96e48f9af9a69a29cc9e7d4d86c4cca8f739aa",
+      "ledger_sha256": "4abd8e446ac855f11356d5b69e8b3d0599f1972c5f7504a1e058f1af714cdceb",
+      "plan_sha256": "4505b54b5a1ede8fc3af92375803d3917e34405406b334a5819f52d1ca8a5e40"
+    }
+  ]
+}
