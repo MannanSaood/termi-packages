@@ -165,6 +165,10 @@ def apply(patch, original):
     # LLVM's source hook requires the separate Flang recipe revision to match.
     # change() bumps the revision even when the source body is unchanged.
     change("flang", lambda t: t)
+    # Native diagnostics: Boost b2 and elfutils debuginfod use prefix C
+    # headers alongside implicit NDK libc++; use the matching prefix C++ set.
+    change("boost",lambda t:hook(t,"termux_step_make_install",'\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'))
+    change("libelf",lambda t:hook(t,"termux_step_pre_configure",'\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'))
     change("rust", rust_target_cxx_headers)
     change("swift", swift_target_cxx_headers)
     change("mesa", mesa_bindgen_headers)
