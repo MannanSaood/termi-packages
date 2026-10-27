@@ -118,6 +118,10 @@ for accessor in ('msg->GetDescriptor()->name()', 'msg.GetDescriptor()->name()'):
     assert s.count(old)==1, 'Monero protobuf name anchor changed'
     s=s.replace(old,'get_message_wire_number(std::string('+accessor+'))')
 p.write_text(s)
+p=p.with_suffix('.hpp');s=p.read_text()
+old='get_message_wire_number(t_message::default_instance().GetDescriptor()->name())'
+assert s.count(old)==1, 'Monero protobuf template anchor changed'
+p.write_text(s.replace(old,'get_message_wire_number(std::string(t_message::default_instance().GetDescriptor()->name()))'))
 TERMI_PROTOBUF_NAME'''))
     # Android's link probe can see reallocarray without its API-level header
     # declaration. Use Xwayland's overflow-checked bundled implementation.
@@ -150,7 +154,12 @@ TERMI_PROTOBUF_NAME'''))
     # Only the Linux host generator needs the legacy C dialect.
     change('motif', lambda t: hook(t, 'termux_step_host_build',
         '''\texport CC="gcc -std=gnu17"
-\tsed -i '1i#include <string.h>' "$TERMUX_PKG_SRCDIR/lib/Xm/XpmCrBufFrI.c"'''), tree='x11-packages')
+\tsed -i '1i#include <string.h>' "$TERMUX_PKG_SRCDIR/lib/Xm/XpmI.h"'''), tree='x11-packages')
+
+    # GGML auto-detects the Android sccache in the target prefix, then invokes
+    # its bare name as a Linux compiler launcher. Its own option disables it.
+    change('groonga', lambda t: hook(t, 'termux_step_pre_configure',
+        '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DGGML_CCACHE=OFF"'))
 
     # libnl's pkg-config flags reference its private compatibility archive.
     # A seeded libnl has no old scratch tree; build this consumer's own copy
