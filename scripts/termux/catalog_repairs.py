@@ -111,3 +111,15 @@ def apply(change, hook, prepared):
     # Same verified source-built AOSP loader binding used by libntl/btop.
     change('sbcl', lambda t: t.replace('termux-proot-run env LD_PRELOAD= LD_LIBRARY_PATH=',
         '''"$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/proot" -q "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/qemu-$TERMUX_ARCH" -R / -b "$TERMUX_PREFIX/opt/aosp:/system" /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH= ANDROID_ROOT=/system ANDROID_DATA=/data'''))
+
+    # Vulkan-Hpp 1.4.365 uses per-command IS_DISPATCHED checks and no longer
+    # declares isDispatchLoader. Keep legacy specializations for older headers.
+    def vkmark(t):
+        t=t.replace('TERMUX_PKG_BUILD_DEPENDS="glm, vulkan-headers"',
+                    'TERMUX_PKG_BUILD_DEPENDS="glm, vulkan-headers, libwayland-cross-scanner"')
+        t=t.replace('TERMUX_PKG_BUILD_DEPENDS="libwayland-cross-scanner"\n', '')
+        return hook(t, 'termux_step_pre_configure', '''\tfor source in src/vulkan_state.cpp src/ws/kms_window_system.cpp; do
+\t\tgrep -q '^#if VK_HEADER_VERSION >= 333$' "$TERMUX_PKG_SRCDIR/$source" || return 1
+\t\tsed -i 's/^#if VK_HEADER_VERSION >= 333$/#if VK_HEADER_VERSION >= 333 \\&\\& VK_HEADER_VERSION < 365/' "$TERMUX_PKG_SRCDIR/$source"
+\tdone''')
+    change('vkmark', vkmark, tree='x11-packages')
