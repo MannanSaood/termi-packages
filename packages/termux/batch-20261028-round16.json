@@ -1,0 +1,73 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "required_completed_recipes": [
+    "below",
+    "rust",
+    "libllvm",
+    "mesa",
+    "nodejs-lts",
+    "boost",
+    "libelf",
+    "libxt",
+    "libsasl",
+    "thin-provisioning-tools",
+    "libvisio",
+    "supercollider",
+    "wlroots",
+    "xwayland",
+    "wmctrl",
+    "xorg-twm",
+    "solidity",
+    "sbcl",
+    "vkmark"
+  ],
+  "candidates": [
+    {
+      "tag": "candidate-40556975905-1-0",
+      "inventory_sha256": "dcfa4da2879e3ca8a5d47c148f689c28ebd0ab93ae3fb74e3e465c29f97530e0",
+      "ledger_sha256": "c869d879163373e866015a789c359113b5611affa04c3256524bb39e7f63d255",
+      "plan_sha256": "962e3f589f393416e396a07332d82441b29de8df97282cf42edcde210688412a"
+    },
+    {
+      "tag": "candidate-40550314941-1-0",
+      "inventory_sha256": "dcd1b93e4f219a240708df9cd73e3582ed7125fc33a23a06e2e0bf1f08f9d04e",
+      "ledger_sha256": "7ec02a96362120763039a7f510f60c3793889c1f90876e4b20835246d76007ae",
+      "plan_sha256": "02a853e937e33c779a0469875973dafb1d35a7f8fe07a51a3c603de154a345f1"
+    },
+    {
+      "tag": "candidate-40538597101-1-0",
+      "inventory_sha256": "8374eaa27705800b914e25ec8926bf5683267fb19563dcbb0e63f4b328770943",
+      "ledger_sha256": "2c4d79b60a8a7b1d2111502ae3a5a5c565ffb6a9780bbf580a423fb8d33696f2",
+      "plan_sha256": "aa2f06dbed83e9feea3930de07ba2337937306487b49812a2bb28246e16b2f69"
+    },
+    {
+      "tag": "candidate-40538608171-1-0",
+      "inventory_sha256": "a166faad8f20b52ce5eb13b8b81d1dba5775df2735cc1877145a6035238336ba",
+      "ledger_sha256": "50f885f0f7a61c206b0c4250033376051b138e41f20761361e96311dbd7b3e36",
+      "plan_sha256": "b2e1b49676f249aa758a947ed84719f185f0c415da0cb1a653ce4db91f68bf32"
+    }
+  ],
+  "restart_lanes": [
+    {
+      "lane": "lane-2-of-8",
+      "after_run": 40554300668
+    },
+    {
+      "lane": "lane-3-of-8",
+      "after_run": 40550314941
+    },
+    {
+      "lane": "lane-4-of-8",
+      "after_run": 40538597101
+    },
+    {
+      "lane": "lane-6-of-8",
+      "after_run": 40554327888
+    },
+    {
+      "lane": "lane-7-of-8",
+      "after_run": 40538608171
+    }
+  ]
+}

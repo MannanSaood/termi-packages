@@ -108,7 +108,17 @@ def apply(change, hook, prepared):
 \tgrep -Fqx 'set(CMAKE_CXX_STANDARD 14)' "$TERMUX_PKG_SRCDIR/CMakeLists.txt" || return 1
 \tsed -i 's/set(CMAKE_CXX_STANDARD 14)/set(CMAKE_CXX_STANDARD 17)/' "$TERMUX_PKG_SRCDIR/CMakeLists.txt"
 \tgrep -q -- '-DCMAKE_CXX_STANDARD=14' "$TERMUX_PKG_SRCDIR/cmake/CheckTrezor.cmake" || return 1
-\tsed -i 's/-DCMAKE_CXX_STANDARD=14/-DCMAKE_CXX_STANDARD=17/' "$TERMUX_PKG_SRCDIR/cmake/CheckTrezor.cmake"'''))
+\tsed -i 's/-DCMAKE_CXX_STANDARD=14/-DCMAKE_CXX_STANDARD=17/' "$TERMUX_PKG_SRCDIR/cmake/CheckTrezor.cmake"
+\tpython3 - "$TERMUX_PKG_SRCDIR/src/device_trezor/trezor/messages_map.cpp" <<'TERMI_PROTOBUF_NAME'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+for accessor in ('msg->GetDescriptor()->name()', 'msg.GetDescriptor()->name()'):
+    old='get_message_wire_number('+accessor+')'
+    assert s.count(old)==1, 'Monero protobuf name anchor changed'
+    s=s.replace(old,'get_message_wire_number(std::string('+accessor+'))')
+p.write_text(s)
+TERMI_PROTOBUF_NAME'''))
     # Android's link probe can see reallocarray without its API-level header
     # declaration. Use Xwayland's overflow-checked bundled implementation.
     change('xwayland', lambda t: hook(t, 'termux_step_pre_configure',
@@ -139,7 +149,17 @@ def apply(change, hook, prepared):
     # GCC15 defaults to C23, where () means no arguments rather than K&R.
     # Only the Linux host generator needs the legacy C dialect.
     change('motif', lambda t: hook(t, 'termux_step_host_build',
-        '\texport CC="gcc -std=gnu17"'), tree='x11-packages')
+        '''\texport CC="gcc -std=gnu17"
+\tsed -i '1i#include <string.h>' "$TERMUX_PKG_SRCDIR/lib/Xm/XpmCrBufFrI.c"'''), tree='x11-packages')
+
+    # libnl's pkg-config flags reference its private compatibility archive.
+    # A seeded libnl has no old scratch tree; build this consumer's own copy
+    # from the same pinned source rather than dropping the link requirement.
+    change('nfs-utils', lambda t: hook(t, 'termux_step_pre_configure', '''\tlocal termi_getsubopt="$TERMUX_PKG_TMPDIR/getsubopt"
+\tmkdir -p "$termi_getsubopt"
+\t$CC $CFLAGS $CPPFLAGS -fvisibility=hidden -c "$TERMUX_PKG_BUILDER_DIR/../../packages/libnl/getsubopt.c" -o "$termi_getsubopt/getsubopt.o"
+\t$AR crs "$termi_getsubopt/libgetsubopt.a" "$termi_getsubopt/getsubopt.o"
+\tLDFLAGS+=" -L$termi_getsubopt"'''), tree='root-packages')
     # Auto-detection otherwise finds the target Android sccache in the seed.
     change('libdart', lambda t: hook(t, 'termux_step_pre_configure',
         '''\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"

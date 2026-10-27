@@ -16,12 +16,12 @@ class SwiftHeadersTest(unittest.TestCase):
             p = Path(tmp)/'impl'
             p.write_text('function swift_c_flags() { printf "common-%s" "$1"; }\n' +
                          'flags=(-DCMAKE_C_FLAGS="$(swift_c_flags ${host})" -DCMAKE_CXX_FLAGS="$(swift_c_flags ${host}) ${cross_c_flags}")\n')
-            subprocess.run([sys.executable,'-c',script,str(p)],check=True)
+            subprocess.run([sys.executable,'-c',script,str(p),'/prefix'],check=True)
             s=p.read_text()
             self.assertIn('-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}"',s)
             self.assertIn('-DCMAKE_C_FLAGS="$(swift_c_flags ${host})"',s)
             s=s.split('flags=')[0]
-            p.write_text(s+'\nTERMUX_PREFIX=/prefix\ntermi_swift_cxx_flags android-aarch64\nprintf "\\n"\ntermi_swift_cxx_flags linux-x86_64\n')
+            p.write_text(s+'\nunset TERMUX_PREFIX\ntermi_swift_cxx_flags android-aarch64\nprintf "\\n"\ntermi_swift_cxx_flags linux-x86_64\n')
             out=subprocess.check_output([bash,str(p)],text=True)
             self.assertEqual(out.splitlines(),['-nostdinc++ -I/prefix/include/c++/v1 common-android-aarch64','common-linux-x86_64'])
     def test_source_drift(self):
