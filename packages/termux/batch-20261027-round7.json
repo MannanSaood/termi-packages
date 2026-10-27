@@ -1,0 +1,58 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "required_completed_recipes": [
+    "rust",
+    "libllvm",
+    "mesa",
+    "nodejs-lts",
+    "build-essential",
+    "debootstrap",
+    "sendxmpp",
+    "iwyu"
+  ],
+  "candidates": [
+    {
+      "tag": "candidate-40469123665-1-0",
+      "inventory_sha256": "1902cf4e38e97efdc84444c950f457cdc1eac6c858f1903c3bb81850ccbb74dc",
+      "ledger_sha256": "21fd892fe68afb7d3094dbb6a4a9d001ecad24c74e7dbb91e9f62e4da7f89d8c",
+      "plan_sha256": "092bfcb44f40eb20614f95335548a75296c5653c8dd4a5cb66774b26af242ba3"
+    },
+    {
+      "tag": "candidate-40463038036-1-0",
+      "inventory_sha256": "75ca368ac90b7291799375979dcec95334853690e9acf96af47df632b85d1fa4",
+      "selected_success": true,
+      "plan_sha256": "885e99c318a92ba89ef47669d7f26e9fe8c47e03066f24fe0e8b4f7cb4c8c222"
+    },
+    {
+      "tag": "candidate-40462977469-1-0",
+      "inventory_sha256": "d9da74eb38f8ef12ee59421b80209df6dcd772201ef588979826a4f201b39fc8",
+      "ledger_sha256": "72d77345a0b6d05eef093b47f8d8d029d2340b3b47e7cb3b2d33a56cacd7d397",
+      "plan_sha256": "885e99c318a92ba89ef47669d7f26e9fe8c47e03066f24fe0e8b4f7cb4c8c222"
+    },
+    {
+      "tag": "candidate-40433949775-1-0",
+      "inventory_sha256": "af78337c068c400eda357907c25c79189702a124429216217c4565688ad92887",
+      "ledger_sha256": "15147cfec93d68456be5e37546c995074d26f272ec4e0d46493e1a698b79d6ff",
+      "plan_sha256": "b8fd5813841d61d76ce9934f764b2c430cf96dde470865f58c55ef3ef403dbd1"
+    },
+    {
+      "tag": "candidate-40433953051-1-0",
+      "inventory_sha256": "c910c09ab382704e85056c42e64c9ed245764ba1ebd1b58683c3d6433bef0f21",
+      "ledger_sha256": "6171a27980e5bba0a40241d12b65822526e2edc24da9f90509d32ab2e2bedddb",
+      "plan_sha256": "b8fd5813841d61d76ce9934f764b2c430cf96dde470865f58c55ef3ef403dbd1"
+    },
+    {
+      "tag": "candidate-40433956088-1-0",
+      "inventory_sha256": "ee0ff3f07d305fb3d5574a915665249ae16f4a968ed26bb428982d8d9bb8f4d9",
+      "ledger_sha256": "fbf2f1820511a1fce6c3b69f56133cc40ac5d0ab3e0513a3338d63a81a3f9062",
+      "plan_sha256": "b8fd5813841d61d76ce9934f764b2c430cf96dde470865f58c55ef3ef403dbd1"
+    },
+    {
+      "tag": "candidate-40469148164-1-0",
+      "inventory_sha256": "a903bd5af8a73f3f30fb0b199e4521f5ac6a2cd59d5f3fb3b97bdc5a54da075a",
+      "ledger_sha256": "46861f545eaf610bc416640584ee1a8162d7872ceb509939f87ed330e0e0b21c",
+      "plan_sha256": "092bfcb44f40eb20614f95335548a75296c5653c8dd4a5cb66774b26af242ba3"
+    }
+  ]
+}
