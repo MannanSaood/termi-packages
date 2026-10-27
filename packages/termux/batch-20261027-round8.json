@@ -1,0 +1,48 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "required_completed_recipes": [
+    "boost",
+    "libelf",
+    "rust",
+    "libllvm",
+    "mesa",
+    "nodejs-lts",
+    "build-essential",
+    "debootstrap",
+    "sendxmpp",
+    "iwyu"
+  ],
+  "candidates": [
+    {
+      "tag": "candidate-40491087072-1-0",
+      "inventory_sha256": "662025cbed4f07692c86746b1e6e0532506a72b60fd0346d8cd7a10cd59cd185",
+      "selected_success": true,
+      "plan_sha256": "6d32ae01a07a9ca725a45a7e532f7ee98f72b63bf42eaa4c676628c8907b5ec8"
+    },
+    {
+      "tag": "candidate-40491095622-1-0",
+      "inventory_sha256": "9791d1c2a317a8e5ce9e22d19a760e587f03c419a9022a506bf699d90b20deed",
+      "selected_success": true,
+      "plan_sha256": "6d32ae01a07a9ca725a45a7e532f7ee98f72b63bf42eaa4c676628c8907b5ec8"
+    },
+    {
+      "tag": "candidate-40476128808-1-0",
+      "inventory_sha256": "de9113e4bd22a5108893ffd377f3014f635a0da17fc00ebec8af700c40de6cd2",
+      "ledger_sha256": "4cd7d0bc7f5d69619187185220c68888f6677564284041baea00a55fdc7bcca5",
+      "plan_sha256": "092bfcb44f40eb20614f95335548a75296c5653c8dd4a5cb66774b26af242ba3"
+    },
+    {
+      "tag": "candidate-40469140377-1-0",
+      "inventory_sha256": "069a8c02da89747429370e1fb2b8bf9726735bcfcfb797bf5cca97b29b3d909e",
+      "ledger_sha256": "957f95a1fef78d906a800d30a8dd6f5bad282f0e5749033b3a5a00268b88bbb6",
+      "plan_sha256": "092bfcb44f40eb20614f95335548a75296c5653c8dd4a5cb66774b26af242ba3"
+    },
+    {
+      "tag": "candidate-40469156977-1-0",
+      "inventory_sha256": "865d6a5637251e398b32cf80dbfe0c731589221720ff33738b0c56327d73d8c3",
+      "ledger_sha256": "d8272db2c7258e4fa28fcf7267fa7b91e076f00d146625d65e96ae053f1cf0f5",
+      "plan_sha256": "092bfcb44f40eb20614f95335548a75296c5653c8dd4a5cb66774b26af242ba3"
+    }
+  ]
+}
