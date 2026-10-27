@@ -18,6 +18,20 @@ def llvm_native_host_flags(text):
     return text.replace(old, old + ';' + ';'.join(flags))
 
 
+def rust_target_cxx_headers(text):
+    anchor = '\tunset CC CFLAGS CFLAGS_${env_host} CPP CPPFLAGS CXX CXXFLAGS LD LDFLAGS PKG_CONFIG RANLIB'
+    if text.count(anchor) != 1:
+        raise ValueError('Rust compiler environment anchor changed')
+    setup = r'''	# LLVM's -I$PREFIX/include must follow the matching libc++ headers.
+	# Bootstrap clears CXXFLAGS; persist this only in the Android target compiler.
+	local termi_cxx="$TERMUX_PKG_TMPDIR/termi-rust-cxx"
+	printf '#!/bin/bash\nexec %q -nostdinc++ -I%q "$@"\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_cxx"
+	chmod 755 "$termi_cxx"
+	sed -i "/^\[target\.${CARGO_TARGET_NAME}\]$/a cxx = \"$termi_cxx\"" bootstrap.toml
+'''
+    return text.replace(anchor, setup + anchor)
+
+
 def apply(patch, original):
     prepared = {}
     def change(name, edit, tree="packages"):
@@ -94,6 +108,7 @@ def apply(patch, original):
     # LLVM's source hook requires the separate Flang recipe revision to match.
     # change() bumps the revision even when the source body is unchanged.
     change("flang", lambda t: t)
+    change("rust", rust_target_cxx_headers)
     def revision(text):
         return re.search(r"^TERMUX_PKG_REVISION=(\d+)$", text, re.M).group(1)
     if revision(prepared["libllvm"]) != revision(prepared["flang"]):
