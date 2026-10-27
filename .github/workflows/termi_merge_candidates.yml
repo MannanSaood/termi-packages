@@ -9,6 +9,7 @@ on:
         default: packages/termux/batch-20261024.json
 permissions:
   contents: write
+  actions: write
 concurrency:
   group: termi-candidate-merge
   cancel-in-progress: false
@@ -22,7 +23,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Check merge contracts
-        run: python3 -m unittest discover -s scripts/termux -p 'test_parallel_catalog.py' -v
+        run: |
+          python3 -m unittest discover -s scripts/termux -p 'test_parallel_catalog.py' -v
+          python3 -m unittest discover -s scripts/termux -p 'test_resume_merged_lanes.py' -v
       - name: Merge pinned own-source candidates
         env:
           GH_TOKEN: ${{ github.token }}
@@ -34,3 +37,10 @@ jobs:
           python3 scripts/termux/merge_releases.py --manifest "$MANIFEST" --output build/merged \
             --tag "candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-0" | tee build/merge.log
           gh release view "candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-0" --repo "$GITHUB_REPOSITORY" >/dev/null
+      - name: Resume explicitly requested preserved lanes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          python3 scripts/termux/resume_merged_lanes.py --manifest "$MANIFEST" --output build/merged \
+            --tag "candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-0"
