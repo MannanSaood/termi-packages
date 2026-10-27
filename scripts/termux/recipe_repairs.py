@@ -197,7 +197,7 @@ def apply(patch, original):
 	grep -Fq 'makemd5$(BUILD_EXEEXT) $(makemd5_OBJECTS): CFLAGS=$(CFLAGS_FOR_BUILD)' "$TERMUX_PKG_SRCDIR/include/Makefile.am" || return 1
 	sed -i '/^makemd5.*: CFLAGS=/a makemd5$(BUILD_EXEEXT) $(makemd5_OBJECTS): CPPFLAGS=' "$TERMUX_PKG_SRCDIR/include/Makefile.am"
 '''))
-    for package in ["assimp", "foundry", "librime", "python-scipy", "supercollider", "libvisio", "libfreehand", "openbabel", "povray"]:
+    for package in ["assimp", "foundry", "librime", "python-scipy", "supercollider", "libvisio", "libfreehand", "openbabel", "povray", "solidity"]:
         change(package,lambda t:hook(t,"termux_step_pre_configure",'\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'))
     change("rust", rust_target_cxx_headers)
     change("swift", swift_target_cxx_headers)

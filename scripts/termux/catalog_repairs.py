@@ -142,7 +142,8 @@ def apply(change, hook, prepared):
         '\texport CC="gcc -std=gnu17"'), tree='x11-packages')
     # Auto-detection otherwise finds the target Android sccache in the seed.
     change('libdart', lambda t: hook(t, 'termux_step_pre_configure',
-        '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DDART_DISABLE_COMPILER_CACHE=ON"'))
+        '''\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"
+\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DDART_DISABLE_COMPILER_CACHE=ON"'''))
 
     # Arrow's separate Python extension configure also needs the matching
     # target libc++ headers ahead of the prefix C headers.
