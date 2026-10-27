@@ -102,7 +102,7 @@ def main():
         parser.error("--packages requires --mode packages")
     if args.cache_image and not re.fullmatch(r"termi-checkpoint:[a-z0-9_.-]+", args.cache_image):
         parser.error("Only an explicitly restored local Termi checkpoint image is accepted")
-    if args.catalog_retry_failed and args.mode != "full-catalog":
+    if args.catalog_retry_failed and args.mode not in ("full-catalog", "packages"):
         parser.error("Catalog retries require full-catalog mode")
     if args.continue_recipe and (not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", args.continue_recipe)
             or not args.cache_image
@@ -165,8 +165,9 @@ def main():
         state = json.loads(subprocess.check_output(["docker", "inspect", container], text=True))[0]["State"]
         (output / "container-state.json").write_text(json.dumps(state, indent=2) + "\n")
         copied = subprocess.run(["docker", "cp", container + ":/home/builder/artifacts/.", str(artifacts)]).returncode
-        # Preserve a failed container for diagnosis; remove only after evidence copy.
-        if copied == 0 and result == 0 and state["ExitCode"] == 0 and args.mode != "full-catalog":
+        # Keep package containers until workflow publication/checkpoint completes.
+        # A successful compile can still suffer an upload failure.
+        if copied == 0 and result == 0 and state["ExitCode"] == 0 and args.mode not in ("full-catalog", "packages"):
             run(["docker", "rm", container])
     if result != 0 or state["ExitCode"] != 0 or copied != 0:
         raise SystemExit("Candidate build failed; inspect retained log/container-state.json")

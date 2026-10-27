@@ -1,0 +1,51 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "required_completed_recipes": [
+    "mesa",
+    "libllvm",
+    "nodejs-lts",
+    "build-essential",
+    "debootstrap",
+    "iwyu",
+    "sendxmpp"
+  ],
+  "candidates": [
+    {
+      "tag": "candidate-40451405960-1-0",
+      "inventory_sha256": "fc43b8a8d3d38e88341ca4bb1f4f4cf96bf87c0465a623961daacc7335f331f8",
+      "ledger_sha256": "a157ecaff9ae6e3e21dffd84336746501dfe2c08ae64f858267c9fd302f514c9",
+      "plan_sha256": "885e99c318a92ba89ef47669d7f26e9fe8c47e03066f24fe0e8b4f7cb4c8c222"
+    },
+    {
+      "tag": "candidate-40451409101-1-0",
+      "inventory_sha256": "aba0b668951554302adb013b4f1631d8f87de7cb9e2a2623a93156babb56f7e7",
+      "ledger_sha256": "d25ce38f21c43d87121047443df34c41287a8e9cb7b73cf7c1225b33f8d02480",
+      "plan_sha256": "885e99c318a92ba89ef47669d7f26e9fe8c47e03066f24fe0e8b4f7cb4c8c222"
+    },
+    {
+      "tag": "candidate-40427531194-1-0",
+      "inventory_sha256": "2319ce69766918a4dc32b60365455717ef5ceff8b82564cacdc36d4d20d52f9f",
+      "ledger_sha256": "ff556d40d1b37b1b543703c3d50f034aa898693c11ffe6098f505833ff15b3cb",
+      "plan_sha256": "b8fd5813841d61d76ce9934f764b2c430cf96dde470865f58c55ef3ef403dbd1"
+    },
+    {
+      "tag": "candidate-40427534322-1-0",
+      "inventory_sha256": "2acf3d01891ce3414988dc32b6597dbd254675a681fcbe07626b8fc0ed9261bf",
+      "ledger_sha256": "2c6a716c383c1120ef460942443b5902a56cd84e9be04df29f3451e77c96ce4b",
+      "plan_sha256": "b8fd5813841d61d76ce9934f764b2c430cf96dde470865f58c55ef3ef403dbd1"
+    },
+    {
+      "tag": "candidate-40439524382-1-0",
+      "inventory_sha256": "6e1b5574af8fbf257b2131d86c639a41f19cae2ebe60be98ca7bdec744ebc313",
+      "ledger_sha256": "43b1c4efcf447985e6d3302f281baa5b3dcbf079645f70cbee3fcb22d9bd5a64",
+      "plan_sha256": "b8fd5813841d61d76ce9934f764b2c430cf96dde470865f58c55ef3ef403dbd1"
+    },
+    {
+      "tag": "candidate-40439566906-1-0",
+      "inventory_sha256": "b8d79ff283bd39e5bf818c739fc0c11ff27d6bb37dbd91435a0aa0a1dda76598",
+      "ledger_sha256": "c05564566fd4e4cbd9024dd1016a29fcd376078d3e1a167254043df86bbf4e53",
+      "plan_sha256": "84357fa969cccf17b3f841c4ef5893e51214b53b29488d31bc170b31a0466387"
+    }
+  ]
+}

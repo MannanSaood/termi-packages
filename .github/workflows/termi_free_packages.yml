@@ -169,9 +169,9 @@ jobs:
           paths=list(pathlib.Path('build').glob('*.log'))+list(pathlib.Path('build').glob('*.json'))
           artifacts=pathlib.Path('build/candidate/artifacts')
           if artifacts.exists(): paths += [p for p in artifacts.iterdir() if p.suffix in ('.deb','.json','.log')]
-          if os.environ['LANE_LABEL'].startswith('lane-'):
-            # Bundle Debian files to keep four simultaneous candidate uploads
-            # within the shared free API mutation budget. Inventory hashes remain
+          if any(p.suffix == '.deb' for p in paths):
+            # Bundle Debian files in EVERY mode, including seeded focused builds,
+            # to stay within the shared API mutation budget. Inventory hashes remain
             # the authority; bundles are never directly installed or executed.
             debs=[p for p in paths if p.suffix == '.deb']
             paths=[p for p in paths if p.suffix != '.deb']
