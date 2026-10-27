@@ -1,0 +1,52 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "required_completed_recipes": [
+    "below",
+    "rust",
+    "libllvm",
+    "mesa",
+    "nodejs-lts",
+    "boost",
+    "libelf",
+    "libxt",
+    "libsasl",
+    "thin-provisioning-tools",
+    "libvisio",
+    "supercollider",
+    "wlroots",
+    "xwayland",
+    "wmctrl",
+    "xorg-twm"
+  ],
+  "candidates": [
+    {
+      "tag": "candidate-40552818014-1-0",
+      "inventory_sha256": "94ac340afc7265f339b5eccbcfeff2fa133220f4bd9b021b9b1ca3480a7ee241",
+      "ledger_sha256": "5c3e28256baf8e139ceb7befe610322e564c3ae374ac1a4d0ab16425083eef93",
+      "plan_sha256": "962e3f589f393416e396a07332d82441b29de8df97282cf42edcde210688412a"
+    },
+    {
+      "tag": "candidate-40538578683-1-0",
+      "inventory_sha256": "437372eb1f5f136425342fafa0bd61b0ee07db2833bce103c65a4d6827c57ac1",
+      "ledger_sha256": "47b27f90b1c867ffe842704a8de18220e7bdc20e41a7e169b13a0d26855d40db",
+      "plan_sha256": "b2e1b49676f249aa758a947ed84719f185f0c415da0cb1a653ce4db91f68bf32"
+    },
+    {
+      "tag": "candidate-40538585197-1-0",
+      "inventory_sha256": "994fac8047a2f557cea92471682e9733012c0825e72104c1352d85dbfb7d3fd7",
+      "ledger_sha256": "d735eced0bfdc6b8fae6a628968b0dc97269b5cb5f81fa88d56ce2879efdf628",
+      "plan_sha256": "b2e1b49676f249aa758a947ed84719f185f0c415da0cb1a653ce4db91f68bf32"
+    }
+  ],
+  "restart_lanes": [
+    {
+      "lane": "lane-0-of-8",
+      "after_run": 40538578683
+    },
+    {
+      "lane": "lane-1-of-8",
+      "after_run": 40538585197
+    }
+  ]
+}
