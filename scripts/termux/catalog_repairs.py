@@ -92,3 +92,22 @@ def apply(change, hook, prepared):
                     'TERMUX_PKG_EXTRA_MAKE_ARGS="-e execgamesdir=$TERMUX_PREFIX/bin"')
         return t
     change('robotfindskitten',robot)
+
+    # Verified publisher HTTPS serves the identical pinned xvkbd 4.1 archive.
+    change('xvkbd', lambda t: t.replace('http://t-sato.in.coocan.jp/',
+        'https://t-sato.in.coocan.jp/'), tree='x11-packages')
+    change('thin-provisioning-tools', lambda t: hook(t, 'termux_step_pre_configure',
+        '\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'), tree='root-packages')
+    # Abseil pulled in by protobuf requires C++17. Fail rather than silently
+    # missing a changed upstream standard setting.
+    change('monero', lambda t: hook(t, 'termux_step_pre_configure',
+        '''\tgrep -Fqx 'set(CMAKE_CXX_STANDARD 14)' "$TERMUX_PKG_SRCDIR/CMakeLists.txt" || return 1
+\tsed -i 's/set(CMAKE_CXX_STANDARD 14)/set(CMAKE_CXX_STANDARD 17)/' "$TERMUX_PKG_SRCDIR/CMakeLists.txt"'''))
+    # Android's link probe can see reallocarray without its API-level header
+    # declaration. Use Xwayland's overflow-checked bundled implementation.
+    change('xwayland', lambda t: hook(t, 'termux_step_pre_configure',
+        '''\tgrep -q "conf_data.set('HAVE_REALLOCARRAY'," "$TERMUX_PKG_SRCDIR/include/meson.build" || return 1
+\tsed -i "/conf_data.set('HAVE_REALLOCARRAY',/c\\conf_data.set('HAVE_REALLOCARRAY', false)" "$TERMUX_PKG_SRCDIR/include/meson.build"'''), tree='x11-packages')
+    # Same verified source-built AOSP loader binding used by libntl/btop.
+    change('sbcl', lambda t: t.replace('termux-proot-run env LD_PRELOAD= LD_LIBRARY_PATH=',
+        '''"$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/proot" -q "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/qemu-$TERMUX_ARCH" -R / -b "$TERMUX_PREFIX/opt/aosp:/system" /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH= ANDROID_ROOT=/system ANDROID_DATA=/data'''))
