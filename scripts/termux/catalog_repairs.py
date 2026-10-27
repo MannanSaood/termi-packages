@@ -143,3 +143,38 @@ def apply(change, hook, prepared):
     # Auto-detection otherwise finds the target Android sccache in the seed.
     change('libdart', lambda t: hook(t, 'termux_step_pre_configure',
         '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DDART_DISABLE_COMPILER_CACHE=ON"'))
+
+    # Arrow's separate Python extension configure also needs the matching
+    # target libc++ headers ahead of the prefix C headers.
+    change('libarrow-cpp', lambda t: hook(hook(t, 'termux_step_pre_configure',
+        '\texport CXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'),
+        'termux_step_post_make_install',
+        '\texport CXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'))
+
+    # Replace global-state strtok with the equivalent per-invocation state.
+    # Android's declaration is deprecated, and upstream enables -Werror.
+    change('xrdp', lambda t: hook(t, 'termux_step_pre_configure', '''\tpython3 - "$TERMUX_PKG_SRCDIR/common/string_calls.c" <<'TERMI_XRDP'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]); s=p.read_text()
+for old,new in [
+    ('p = strtok(properties, delim);', 'char *token_state = NULL;\\n    p = strtok_r(properties, delim, &token_state);'),
+    ('p = strtok(NULL, delim);', 'p = strtok_r(NULL, delim, &token_state);')]:
+    assert s.count(old)==1, 'xrdp tokenizer anchor changed'
+    s=s.replace(old,new)
+p.write_text(s)
+TERMI_XRDP'''), tree='x11-packages')
+
+    # GHC's Android interpreter needs the same own-AOSP binding as libntl.
+    # Regenerate only this recipe's iserv wrappers after setup, not global tools.
+    change('git-annex', lambda t: t.replace('\t\ttermux_setup_ghc_iserv\n', '''\t\ttermux_setup_ghc_iserv
+\t\tlocal termi_iserv="$TERMUX_PKG_TMPDIR/termi-iserv"
+\t\tmkdir -p "$termi_iserv"
+\t\tlocal ghc_bin_dir="$(ghc --print-libdir)/../bin" suffix
+\t\tfor suffix in "" -dyn; do
+\t\t\tprintf '#!/bin/bash\\nexec "%s/proot" -q "%s/qemu-%s" -R / -b "%s/opt/aosp:/system" /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH= ANDROID_ROOT=/system ANDROID_DATA=/data "%s/ghc-iserv%s" "$@"\\n' \\
+\t\t\t    "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH" "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH" "$TERMUX_ARCH" "$TERMUX_PREFIX" "$ghc_bin_dir" "$suffix" > "$termi_iserv/termux-ghc-iserv$suffix"
+\t\t\tchmod 755 "$termi_iserv/termux-ghc-iserv$suffix"
+\t\tdone
+\t\texport PATH="$termi_iserv:$PATH"
+'''))
