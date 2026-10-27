@@ -178,3 +178,35 @@ TERMI_XRDP'''), tree='x11-packages')
 \t\tdone
 \t\texport PATH="$termi_iserv:$PATH"
 '''))
+
+    # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
+    # otherwise inherits Android CPPFLAGS/pkg-config paths from the recipe.
+    change('below', lambda t: t.replace('\tcargo fetch --target $CARGO_TARGET_NAME\n', '''\tcargo fetch --target $CARGO_TARGET_NAME
+\tpython3 - "$CARGO_HOME" <<'TERMI_LIBBPF'
+from pathlib import Path
+import sys
+files=list(Path(sys.argv[1]).glob('registry/src/*/libbpf-sys-*/build.rs'))
+assert files, 'libbpf-sys source missing'
+setup = """
+    if let (Ok(host), Ok(target)) = (env::var("HOST"), env::var("TARGET")) {
+        if host == target && target.ends_with("-linux-gnu") {
+            for key in ["CPPFLAGS", "LDFLAGS", "CFLAGS", "CXXFLAGS", "CPATH",
+                        "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH", "LIBRARY_PATH",
+                        "PKG_CONFIG_PATH", "PKG_CONFIG_LIBDIR", "PKG_CONFIG_SYSROOT_DIR",
+                        "LIBBPF_SYS_EXTRA_CFLAGS", "BINDGEN_EXTRA_CLANG_ARGS"] {
+                env::remove_var(key);
+            }
+            env::set_var("CC", "/usr/bin/gcc");
+            env::set_var("CXX", "/usr/bin/g++");
+            env::set_var("HOST_CFLAGS", "-O2");
+            env::set_var("HOST_CXXFLAGS", "-O2");
+            env::set_var("PKG_CONFIG", "/usr/bin/pkg-config");
+        }
+    }
+"""
+for p in files:
+    s=p.read_text()
+    assert s.count('fn main() {')==1, 'libbpf-sys main anchor changed'
+    p.write_text(s.replace('fn main() {', 'fn main() {'+setup))
+TERMI_LIBBPF
+'''), tree='root-packages')

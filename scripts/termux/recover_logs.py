@@ -1,5 +1,6 @@
 """Extract explicitly named diagnostic logs from verified own checkpoints."""
 import argparse
+import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -11,21 +12,36 @@ from recover_candidate import VerifiedParts
 from seed import digest
 
 
+def diagnostic_cmake_path(name):
+    parts = PurePosixPath(name).parts
+    return (".." not in parts and bool(re.fullmatch(
+        r"home/builder/\.termux-build/swift/build/(?:[A-Za-z0-9_.+-]+/){0,5}CMakeFiles/(?:CMakeConfigureLog\.yaml|CMakeError\.log|CMakeOutput\.log)", name)))
+
+
 def extract_logs(stream, output, names):
-    if not names or len(names) > 16 or any(not re.fullmatch(r"[a-z0-9+_.-]+-[0-9]+\.log", n) for n in names):
+    if not names or len(names) > 16 or any(n != "swift-cmake" and not re.fullmatch(r"[a-z0-9+_.-]+-[0-9]+\.log", n) for n in names):
         raise ValueError("Invalid diagnostic names")
     output.mkdir(parents=True, exist_ok=False)
     found = set()
+    written = set()
     with tarfile.open(fileobj=stream, mode="r|gz") as archive:
         for member in archive:
             parts = PurePosixPath(member.name).parts
-            if len(parts) != 5 or parts[:4] != ("home", "builder", "catalog-state", "logs") or parts[4] not in names:
+            key = None
+            filename = None
+            if len(parts) == 5 and parts[:4] == ("home", "builder", "catalog-state", "logs") and parts[4] in names:
+                key = filename = parts[4]
+            elif "swift-cmake" in names and diagnostic_cmake_path(member.name):
+                key = "swift-cmake"
+                filename = hashlib.sha256(member.name.encode()).hexdigest()[:16] + "-" + parts[-1]
+            if key is None:
                 continue
-            if not member.isfile() or not 0 <= member.size <= 64 * 1024**2 or parts[4] in found:
+            if not member.isfile() or not 0 <= member.size <= 64 * 1024**2 or filename in written or len(written) >= 64:
                 raise ValueError("Unsafe or oversized diagnostic")
-            with archive.extractfile(member) as src, (output / parts[4]).open("xb") as dst:
+            with archive.extractfile(member) as src, (output / filename).open("xb") as dst:
                 shutil.copyfileobj(src, dst, 1024**2)
-            found.add(parts[4])
+            written.add(filename)
+            found.add(key)
     while stream.read(1024**2):
         pass
     if found != set(names):
