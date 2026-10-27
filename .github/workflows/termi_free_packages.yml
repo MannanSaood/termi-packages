@@ -11,6 +11,9 @@ on:
       recipes:
         description: Parent recipes, or lane-0-of-8 through lane-7-of-8 for parallel full-catalog
         default: hello
+      after_run:
+        description: Optional prior same-lane run; require saved candidate and checkpoint before continuing
+        default: ''
       checkpoint_tag:
         description: Optional previous checkpoint release tag
         default: ''
@@ -50,6 +53,13 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+      - name: Require prior lane outputs saved
+        if: inputs.after_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AFTER_RUN: ${{ inputs.after_run }}
+          EXPECTED_TITLE: Termi ${{ inputs.mode }} - ${{ inputs.recipes }}
+        run: python3 scripts/termux/verify_restart.py
       - name: Verify contracts and edge redirector
         run: |
           mkdir -p build
