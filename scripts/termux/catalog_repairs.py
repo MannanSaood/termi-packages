@@ -93,16 +93,21 @@ def apply(change, hook, prepared):
         return t
     change('robotfindskitten',robot)
 
-    # Verified publisher HTTPS serves the identical pinned xvkbd 4.1 archive.
+    # Debian mirrors the identical pinned source; publisher blocks GitHub IPs.
     change('xvkbd', lambda t: t.replace('http://t-sato.in.coocan.jp/',
-        'https://t-sato.in.coocan.jp/'), tree='x11-packages')
+        'https://t-sato.in.coocan.jp/').replace(
+        'https://t-sato.in.coocan.jp/xvkbd/xvkbd-${TERMUX_PKG_VERSION}.tar.gz',
+        'https://deb.debian.org/debian/pool/main/x/xvkbd/xvkbd_${TERMUX_PKG_VERSION}.orig.tar.gz'), tree='x11-packages')
     change('thin-provisioning-tools', lambda t: hook(t, 'termux_step_pre_configure',
-        '\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'), tree='root-packages')
+        '''\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"
+\tsed -i '/#include <iosfwd>/a #include <stddef.h>' "$TERMUX_PKG_SRCDIR/persistent-data/hex_dump.h"'''), tree='root-packages')
     # Abseil pulled in by protobuf requires C++17. Fail rather than silently
     # missing a changed upstream standard setting.
     change('monero', lambda t: hook(t, 'termux_step_pre_configure',
         '''\tgrep -Fqx 'set(CMAKE_CXX_STANDARD 14)' "$TERMUX_PKG_SRCDIR/CMakeLists.txt" || return 1
-\tsed -i 's/set(CMAKE_CXX_STANDARD 14)/set(CMAKE_CXX_STANDARD 17)/' "$TERMUX_PKG_SRCDIR/CMakeLists.txt"'''))
+\tsed -i 's/set(CMAKE_CXX_STANDARD 14)/set(CMAKE_CXX_STANDARD 17)/' "$TERMUX_PKG_SRCDIR/CMakeLists.txt"
+\tgrep -q -- '-DCMAKE_CXX_STANDARD=14' "$TERMUX_PKG_SRCDIR/cmake/CheckTrezor.cmake" || return 1
+\tsed -i 's/-DCMAKE_CXX_STANDARD=14/-DCMAKE_CXX_STANDARD=17/' "$TERMUX_PKG_SRCDIR/cmake/CheckTrezor.cmake"'''))
     # Android's link probe can see reallocarray without its API-level header
     # declaration. Use Xwayland's overflow-checked bundled implementation.
     change('xwayland', lambda t: hook(t, 'termux_step_pre_configure',
