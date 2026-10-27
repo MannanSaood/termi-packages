@@ -104,7 +104,8 @@ def apply(change, hook, prepared):
     # Abseil pulled in by protobuf requires C++17. Fail rather than silently
     # missing a changed upstream standard setting.
     change('monero', lambda t: hook(t, 'termux_step_pre_configure',
-        '''\tgrep -Fqx 'set(CMAKE_CXX_STANDARD 14)' "$TERMUX_PKG_SRCDIR/CMakeLists.txt" || return 1
+        '''\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"
+\tgrep -Fqx 'set(CMAKE_CXX_STANDARD 14)' "$TERMUX_PKG_SRCDIR/CMakeLists.txt" || return 1
 \tsed -i 's/set(CMAKE_CXX_STANDARD 14)/set(CMAKE_CXX_STANDARD 17)/' "$TERMUX_PKG_SRCDIR/CMakeLists.txt"
 \tgrep -q -- '-DCMAKE_CXX_STANDARD=14' "$TERMUX_PKG_SRCDIR/cmake/CheckTrezor.cmake" || return 1
 \tsed -i 's/-DCMAKE_CXX_STANDARD=14/-DCMAKE_CXX_STANDARD=17/' "$TERMUX_PKG_SRCDIR/cmake/CheckTrezor.cmake"'''))
@@ -114,7 +115,12 @@ def apply(change, hook, prepared):
         '''\tgrep -q "conf_data.set('HAVE_REALLOCARRAY'," "$TERMUX_PKG_SRCDIR/include/meson.build" || return 1
 \tsed -i "/conf_data.set('HAVE_REALLOCARRAY',/c\\conf_data.set('HAVE_REALLOCARRAY', false)" "$TERMUX_PKG_SRCDIR/include/meson.build"'''), tree='x11-packages')
     # Same verified source-built AOSP loader binding used by libntl/btop.
-    change('sbcl', lambda t: t.replace('termux-proot-run env LD_PRELOAD= LD_LIBRARY_PATH=',
+    change('sbcl', lambda t: hook(t, 'termux_step_make',
+        '''\tcase "$TERMUX_ARCH" in
+\t\taarch64) export SBCL_ARCH=arm64;;
+\t\tx86_64) export SBCL_ARCH=x86-64;;
+\t\t*) echo "Unsupported SBCL target: $TERMUX_ARCH" >&2; return 1;;
+\tesac''').replace('termux-proot-run env LD_PRELOAD= LD_LIBRARY_PATH=',
         '''"$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/proot" -q "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/qemu-$TERMUX_ARCH" -R / -b "$TERMUX_PREFIX/opt/aosp:/system" /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH= ANDROID_ROOT=/system ANDROID_DATA=/data'''))
 
     # Vulkan-Hpp 1.4.365 uses per-command IS_DISPATCHED checks and no longer
@@ -123,8 +129,17 @@ def apply(change, hook, prepared):
         t=t.replace('TERMUX_PKG_BUILD_DEPENDS="glm, vulkan-headers"',
                     'TERMUX_PKG_BUILD_DEPENDS="glm, vulkan-headers, libwayland-cross-scanner"')
         t=t.replace('TERMUX_PKG_BUILD_DEPENDS="libwayland-cross-scanner"\n', '')
-        return hook(t, 'termux_step_pre_configure', '''\tfor source in src/vulkan_state.cpp src/ws/kms_window_system.cpp; do
+        return hook(t, 'termux_step_pre_configure', '''\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"
+\tfor source in src/vulkan_state.cpp src/ws/kms_window_system.cpp; do
 \t\tgrep -q '^#if VK_HEADER_VERSION >= 333$' "$TERMUX_PKG_SRCDIR/$source" || return 1
 \t\tsed -i 's/^#if VK_HEADER_VERSION >= 333$/#if VK_HEADER_VERSION >= 333 \\&\\& VK_HEADER_VERSION < 365/' "$TERMUX_PKG_SRCDIR/$source"
 \tdone''')
     change('vkmark', vkmark, tree='x11-packages')
+
+    # GCC15 defaults to C23, where () means no arguments rather than K&R.
+    # Only the Linux host generator needs the legacy C dialect.
+    change('motif', lambda t: hook(t, 'termux_step_host_build',
+        '\texport CC="gcc -std=gnu17"'), tree='x11-packages')
+    # Auto-detection otherwise finds the target Android sccache in the seed.
+    change('libdart', lambda t: hook(t, 'termux_step_pre_configure',
+        '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DDART_DISABLE_COMPILER_CACHE=ON"'))
