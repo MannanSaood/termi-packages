@@ -150,7 +150,14 @@ def apply(change, hook, prepared):
     change('libarrow-cpp', lambda t: hook(hook(t, 'termux_step_pre_configure',
         '\texport CXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'),
         'termux_step_post_make_install',
-        '\texport CXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'))
+        '''\texport CXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"
+\t# PyArrow puts target include directories before CMAKE_CXX_FLAGS.
+\t# Prepend matching libc++ headers at compiler invocation instead.
+\tlocal termi_arrow_cxx="$TERMUX_PKG_TMPDIR/termi-arrow-cxx"
+\tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q "$@"\\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_arrow_cxx"
+\tchmod 755 "$termi_arrow_cxx"''').replace(
+        '-C cmake.args="-DCMAKE_PREFIX_PATH=$TERMUX_PREFIX/lib/cmake"',
+        '-C cmake.args="-DCMAKE_CXX_COMPILER=$termi_arrow_cxx" \\\n\t\t-C cmake.args="-DCMAKE_PREFIX_PATH=$TERMUX_PREFIX/lib/cmake"'))
 
     # Replace global-state strtok with the equivalent per-invocation state.
     # Android's declaration is deprecated, and upstream enables -Werror.
@@ -173,8 +180,8 @@ TERMI_XRDP'''), tree='x11-packages')
 \t\tmkdir -p "$termi_iserv"
 \t\tlocal ghc_bin_dir="$(ghc --print-libdir)/../bin" suffix
 \t\tfor suffix in "" -dyn; do
-\t\t\tprintf '#!/bin/bash\\nexec "%s/proot" -q "%s/qemu-%s" -R / -b "%s/opt/aosp:/system" /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH= ANDROID_ROOT=/system ANDROID_DATA=/data "%s/ghc-iserv%s" "$@"\\n' \\
-\t\t\t    "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH" "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH" "$TERMUX_ARCH" "$TERMUX_PREFIX" "$ghc_bin_dir" "$suffix" > "$termi_iserv/termux-ghc-iserv$suffix"
+\t\t\tprintf '#!/bin/bash\\nexec /usr/bin/env -u LD_PRELOAD -u LD_LIBRARY_PATH "%s/proot" -q "%s/qemu-%s" -R / -b "%s/opt/aosp:/system" /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH="%s/lib" ANDROID_ROOT=/system ANDROID_DATA=/data "%s/ghc-iserv%s" "$@"\\n' \\
+\t\t\t    "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH" "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH" "$TERMUX_ARCH" "$TERMUX_PREFIX" "$TERMUX_PREFIX" "$ghc_bin_dir" "$suffix" > "$termi_iserv/termux-ghc-iserv$suffix"
 \t\t\tchmod 755 "$termi_iserv/termux-ghc-iserv$suffix"
 \t\tdone
 \t\texport PATH="$termi_iserv:$PATH"
