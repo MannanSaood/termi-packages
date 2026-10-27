@@ -9,7 +9,7 @@ from recipe_repairs import swift_target_cxx_headers
 
 class SwiftHeadersTest(unittest.TestCase):
     def test_android_cpp_only(self):
-        recipe = swift_target_cxx_headers("termux_step_make() {\n}")
+        recipe = swift_target_cxx_headers("termux_step_make() {\n\t--install-swift-driver --install-sourcekit-lsp\n}")
         script = recipe.split("<<'TERMI_SWIFT'\n")[1].split("\nTERMI_SWIFT")[0]
         bash = 'C:/Program Files/Git/bin/bash.exe' if os.name == 'nt' else shutil.which('bash')
         with tempfile.TemporaryDirectory() as tmp:

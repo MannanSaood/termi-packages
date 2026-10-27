@@ -1,0 +1,53 @@
+{
+  "repository": "MannanSaood/termi-packages",
+  "duplicate_policy": "prefer-first-compatible-parent",
+  "required_completed_recipes": [
+    "below",
+    "rust",
+    "libllvm",
+    "mesa",
+    "nodejs-lts",
+    "boost",
+    "libelf",
+    "libxt",
+    "libsasl"
+  ],
+  "candidates": [
+    {
+      "tag": "candidate-40541592001-1-0",
+      "inventory_sha256": "0a84a4ccba0ca1b66bf60dbd110f367832e71d6cdee0b3a95449fd54c9b6a7de",
+      "plan_sha256": "962e3f589f393416e396a07332d82441b29de8df97282cf42edcde210688412a",
+      "selected_success": true
+    },
+    {
+      "tag": "candidate-40507229550-1-0",
+      "inventory_sha256": "6aa8201c4fbd9108b8e089aabc645ed6b2c22bcab2ae6ebf650fd991c76ca5e3",
+      "plan_sha256": "f11ec9278be4db698a01ddf0728d54315d09365e5774bcdbe7ff840b46e8bb92",
+      "ledger_sha256": "85a67004344414c8538ce0f9a4912defcbbdef687df75538b1e11615df41b1c4"
+    },
+    {
+      "tag": "candidate-40507266446-1-0",
+      "inventory_sha256": "5ccb15e6949d825317b80f2620cc9dbebdc9aa5a98e2a383c38f22ebb7e0d19a",
+      "plan_sha256": "f11ec9278be4db698a01ddf0728d54315d09365e5774bcdbe7ff840b46e8bb92",
+      "ledger_sha256": "c607edc5ce7a2f17196a2d76f6a9e841d3dfc12384c7dbbe8782e46a45c44abf"
+    },
+    {
+      "tag": "candidate-40529464058-1-0",
+      "inventory_sha256": "5762b598a8420ffe0045fba371185af7f45f813fae6947ecb8b5412453d19e10",
+      "plan_sha256": "4b6c5052fe46debb0b2c2adc37988f015521bced47d9cebaabe99233afa5384d",
+      "ledger_sha256": "884af9a9b1c1395600c176d5b09b56c56474306f57cb31ab46c6950018b49bbb"
+    },
+    {
+      "tag": "candidate-40529482358-1-0",
+      "inventory_sha256": "e604da240de76b3a0d7a94cd104e038c46f2a7996ab373e87896129450e7d7b4",
+      "plan_sha256": "66bb2a66f4d855bbdb7ef0426e5958de5085e08a827b8a896ff38c21a5735075",
+      "ledger_sha256": "b77b54248d3cac538e428030e756cfb5d886e4e5657e527cd19b273b0ad8ee72"
+    },
+    {
+      "tag": "candidate-40526106817-1-0",
+      "inventory_sha256": "8d8e066e8e41f7debdc7f3220d8824d23793ae34c6adfb57768a10792046760f",
+      "plan_sha256": "4505b54b5a1ede8fc3af92375803d3917e34405406b334a5819f52d1ca8a5e40",
+      "ledger_sha256": "9764cb2c7b98e880d9f1c2ac3df9055ce415ef721cfdee0d470e273acd76b871"
+    }
+  ]
+}

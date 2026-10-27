@@ -57,7 +57,29 @@ s = s.replace('function swift_c_flags() {', helper + '\nfunction swift_c_flags()
 p.write_text(s.replace(old, replacement))
 TERMI_SWIFT
 """
-    return text.replace(anchor, anchor + setup)
+    text = text.replace(anchor, anchor + setup)
+    end = "\t--install-swift-driver --install-sourcekit-lsp\n"
+    if text.count(end) != 1:
+        raise ValueError("Swift target command anchor changed")
+    capture = r'''	--install-swift-driver --install-sourcekit-lsp || {
+        local termi_swift_status=$?
+        python3 - "$TERMUX_PKG_BUILDDIR" <<'TERMI_SWIFT_DIAGNOSTICS'
+from pathlib import Path
+import sys
+root=Path(sys.argv[1])
+paths=[p for p in root.rglob('*') if p.is_file() and not p.is_symlink()
+       and p.name in ('CMakeConfigureLog.yaml','CMakeError.log','CMakeOutput.log')]
+paths.sort(key=lambda p: ('swift-android' not in str(p),str(p)))
+for p in paths[:16]:
+    print('TERMI SWIFT CONFIGURE DIAGNOSTIC:',p,flush=True)
+    with p.open('rb') as f:
+        f.seek(0,2); size=f.tell(); f.seek(max(0,size-262144))
+        print(f.read().decode('utf-8',errors='replace'),flush=True)
+TERMI_SWIFT_DIAGNOSTICS
+        return "$termi_swift_status"
+    }
+'''
+    return text.replace(end, capture)
 
 
 def mesa_bindgen_headers(text):
