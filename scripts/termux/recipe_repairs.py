@@ -32,6 +32,35 @@ def rust_target_cxx_headers(text):
     return text.replace(anchor, setup + anchor)
 
 
+def mesa_bindgen_headers(text):
+    anchor = '\tmkdir -p $_WRAPPER_BIN'
+    if text.count(anchor) != 1:
+        raise ValueError('Mesa wrapper anchor changed')
+    setup = r'''
+	# Only Rusticl's LLVM C++ bindings need the prefix libc++ headers first.
+	local termi_bindgen="$(command -v bindgen)"
+	{
+		printf '#!/bin/bash\nreal=%q\nprefix=%q\n' "$termi_bindgen" "$TERMUX_PREFIX"
+		cat <<'TERMI_BINDGEN'
+args=()
+llvm_bindings=false
+for arg in "$@"; do
+    case "$arg" in *rusticl_llvm_bindings*) llvm_bindings=true;; esac
+done
+for arg in "$@"; do
+    args+=("$arg")
+    if "$llvm_bindings" && [[ "$arg" == -- ]]; then
+        args+=(-nostdinc++ "-I$prefix/include/c++/v1")
+    fi
+done
+exec "$real" "${args[@]}"
+TERMI_BINDGEN
+	} > "$_WRAPPER_BIN/bindgen"
+	chmod 755 "$_WRAPPER_BIN/bindgen"
+'''
+    return text.replace(anchor, anchor + setup)
+
+
 def apply(patch, original):
     prepared = {}
     def change(name, edit, tree="packages"):
@@ -109,6 +138,7 @@ def apply(patch, original):
     # change() bumps the revision even when the source body is unchanged.
     change("flang", lambda t: t)
     change("rust", rust_target_cxx_headers)
+    change("mesa", mesa_bindgen_headers)
     def revision(text):
         return re.search(r"^TERMUX_PKG_REVISION=(\d+)$", text, re.M).group(1)
     if revision(prepared["libllvm"]) != revision(prepared["flang"]):
