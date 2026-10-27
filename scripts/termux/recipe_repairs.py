@@ -2,6 +2,39 @@
 import re
 
 
+def foundry_link_diagnostics(text):
+    anchor = '\t\t--features="cli"\n'
+    if text.count(anchor) != 1:
+        raise ValueError('Foundry cargo command anchor changed')
+    capture = r'''		--features="cli" || {
+        local termi_foundry_status=$?
+        python3 - "$TERMUX_PKG_SRCDIR/target/$CARGO_TARGET_NAME/release" "${NM:-llvm-nm}" <<'TERMI_FOUNDRY_NATIVE' || true
+from pathlib import Path
+import hashlib
+import shlex
+import subprocess
+import sys
+root=Path(sys.argv[1]);nm=shlex.split(sys.argv[2])
+paths=sorted(root.glob('build/secp256k1-sys-*/out/libsecp256k1.a'))+sorted(root.glob('deps/libsecp256k1_sys-*.rlib'))
+for p in paths[:16]:
+    if p.is_symlink() or not p.is_file() or p.stat().st_size>64*1024**2:
+        continue
+    print('TERMI FOUNDRY NATIVE:',p,'sha256',hashlib.sha256(p.read_bytes()).hexdigest(),flush=True)
+    result=subprocess.run(nm+['--defined-only',str(p)],capture_output=True,text=True)
+    symbols=[s for s in result.stdout.splitlines() if 'rustsecp256k1_' in s]
+    print('defined_prefix_counts', {v:sum(v in s for s in symbols) for v in ('v0_10_0','v0_11')}, 'nm_status',result.returncode,flush=True)
+    print('\n'.join(symbols[:80]),result.stderr[-4096:],flush=True)
+for p in sorted(root.glob('build/secp256k1-sys-*/output'))[:16]:
+    if p.is_file() and not p.is_symlink():
+        print('TERMI FOUNDRY BUILD OUTPUT:',p,flush=True)
+        print(p.read_text(errors='replace')[-65536:],flush=True)
+TERMI_FOUNDRY_NATIVE
+        return "$termi_foundry_status"
+    }
+'''
+    return text.replace(anchor, capture)
+
+
 def llvm_native_host_flags(text):
     """Keep LLVM's nested Linux generators out of the Android compiler env."""
     old = '-DCROSS_TOOLCHAIN_FLAGS_LLVM_NATIVE=-DLLVM_NATIVE_TOOL_DIR=$TERMUX_PKG_HOSTBUILD_DIR/bin'
@@ -198,8 +231,9 @@ def apply(patch, original):
 	grep -Fq 'makemd5$(BUILD_EXEEXT) $(makemd5_OBJECTS): CFLAGS=$(CFLAGS_FOR_BUILD)' "$TERMUX_PKG_SRCDIR/include/Makefile.am" || return 1
 	sed -i '/^makemd5.*: CFLAGS=/a makemd5$(BUILD_EXEEXT) $(makemd5_OBJECTS): CPPFLAGS=' "$TERMUX_PKG_SRCDIR/include/Makefile.am"
 '''))
-    for package in ["assimp", "foundry", "librime", "python-scipy", "supercollider", "libvisio", "libfreehand", "openbabel", "povray", "solidity"]:
+    for package in ["assimp", "librime", "python-scipy", "supercollider", "libvisio", "libfreehand", "openbabel", "povray", "solidity"]:
         change(package,lambda t:hook(t,"termux_step_pre_configure",'\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'))
+    change('foundry',lambda t:foundry_link_diagnostics(hook(t,'termux_step_pre_configure','\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"')))
     change("rust", rust_target_cxx_headers)
     change("swift", swift_target_cxx_headers)
     change("mesa", mesa_bindgen_headers)

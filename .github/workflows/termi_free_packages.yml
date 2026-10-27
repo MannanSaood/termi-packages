@@ -111,9 +111,9 @@ jobs:
           assert re.fullmatch(r'candidate-[0-9]+-[0-9]+-[0-9]+',tag), 'Require a Termi candidate release tag'
           for name in ['SEED_INVENTORY','SEED_LEDGER','SEED_PLAN']: assert re.fullmatch(r'[0-9a-f]{64}',os.environ[name])
           pathlib.Path('build/seed-raw').mkdir()
-          subprocess.run(['gh','release','download',tag,'--repo',os.environ['GITHUB_REPOSITORY'],
-                          '--pattern','*.json','--pattern','*.deb','--pattern','*.tar','--dir','build/seed-raw'],check=True)
           sys.path.insert(0,'scripts/termux')
+          from seed_download import download
+          download(tag,pathlib.Path('build/seed-raw'))
           from seed import prepare
           prepare(pathlib.Path('build/seed-raw'),pathlib.Path('build/context'),pathlib.Path('build/catalog-plan.json'),
                   pathlib.Path('build/context/seed'),os.environ['SEED_INVENTORY'],os.environ['SEED_LEDGER'],os.environ['SEED_PLAN'])
