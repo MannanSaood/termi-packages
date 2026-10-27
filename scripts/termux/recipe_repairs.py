@@ -25,7 +25,7 @@ def rust_target_cxx_headers(text):
     setup = r'''	# LLVM's -I$PREFIX/include must follow the matching libc++ headers.
 	# Bootstrap clears CXXFLAGS; persist this only in the Android target compiler.
 	local termi_cxx="$TERMUX_PKG_TMPDIR/termi-rust-cxx"
-	printf '#!/bin/bash\nexec %q -nostdinc++ -I%q "$@"\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_cxx"
+	printf '#!/bin/bash\nexec %q -nostdinc++ -I%q "$@" --target=%q\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" "${TERMUX_HOST_PLATFORM}${TERMUX_PKG_API_LEVEL}" > "$termi_cxx"
 	chmod 755 "$termi_cxx"
 	sed -i "/^\[target\.${CARGO_TARGET_NAME}\]$/a cxx = \"$termi_cxx\"" bootstrap.toml
 '''

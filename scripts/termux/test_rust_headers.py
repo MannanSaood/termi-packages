@@ -24,19 +24,21 @@ export MSYS_NO_PATHCONV=1
 TERMUX_PKG_TMPDIR="$PWD"
 TERMUX_PREFIX='/data/data/com.terminal.nextgen/files/usr'
 CARGO_TARGET_NAME=aarch64-linux-android
+TERMUX_HOST_PLATFORM=aarch64-linux-android
+TERMUX_PKG_API_LEVEL=26
 CXX="$PWD/fake-cxx"
 chmod +x "$CXX"
 configure() {
 ''' + setup + '''
 }
 configure
-./termi-rust-cxx '-I/data/data/com.terminal.nextgen/files/usr/include' 'file with spaces.cpp'
+./termi-rust-cxx '-I/data/data/com.terminal.nextgen/files/usr/include' '--target=aarch64-linux-android' 'file with spaces.cpp'
 '''
             (p / 'check.sh').write_text(script)
             subprocess.run([bash, 'check.sh'], cwd=p, check=True, capture_output=True)
             self.assertEqual((p / 'args.txt').read_text().splitlines(), [
                 '-nostdinc++', '-I/data/data/com.terminal.nextgen/files/usr/include/c++/v1',
-                '-I/data/data/com.terminal.nextgen/files/usr/include', 'file with spaces.cpp'])
+                '-I/data/data/com.terminal.nextgen/files/usr/include', '--target=aarch64-linux-android', 'file with spaces.cpp', '--target=aarch64-linux-android26'])
             config = (p / 'bootstrap.toml').read_text()
             self.assertIn('[target.aarch64-linux-android]\ncxx = ', config)
             self.assertIn('[target.x86_64-unknown-linux-gnu]\ncxx = "host-cxx"', config)
