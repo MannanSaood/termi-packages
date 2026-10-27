@@ -1,0 +1,33 @@
+name: Recover preserved Termi candidate
+on:
+  workflow_dispatch:
+    inputs:
+      manifest:
+        required: true
+        default: packages/termux/recover-40379070293.json
+permissions:
+  contents: write
+concurrency:
+  group: termi-checkpoint-recovery
+  cancel-in-progress: false
+jobs:
+  recover:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify recovery contracts
+        run: python3 -m unittest discover -s scripts/termux -p 'test_recover_candidate.py' -v
+      - name: Recover only verified package artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANIFEST: ${{ inputs.manifest }}
+        run: |
+          set -euo pipefail
+          case "$MANIFEST" in packages/termux/recover-[0-9]*.json) ;; *) exit 2;; esac
+          mkdir -p build
+          python3 scripts/termux/recover_candidate.py --manifest "$MANIFEST" \
+            --tag "candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-0" | tee build/recovery.log
