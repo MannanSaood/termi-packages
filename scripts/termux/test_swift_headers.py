@@ -15,9 +15,10 @@ class SwiftHeadersTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp)/'impl'
             p.write_text('function swift_c_flags() { printf "common-%s" "$1"; }\n' +
-                         'flags=(-DCMAKE_C_FLAGS="$(swift_c_flags ${host})" -DCMAKE_CXX_FLAGS="$(swift_c_flags ${host})")\n')
+                         'flags=(-DCMAKE_C_FLAGS="$(swift_c_flags ${host})" -DCMAKE_CXX_FLAGS="$(swift_c_flags ${host}) ${cross_c_flags}")\n')
             subprocess.run([sys.executable,'-c',script,str(p)],check=True)
             s=p.read_text()
+            self.assertIn('-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}"',s)
             self.assertIn('-DCMAKE_C_FLAGS="$(swift_c_flags ${host})"',s)
             s=s.split('flags=')[0]
             p.write_text(s+'\nTERMUX_PREFIX=/prefix\ntermi_swift_cxx_flags android-aarch64\nprintf "\\n"\ntermi_swift_cxx_flags linux-x86_64\n')

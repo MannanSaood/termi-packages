@@ -43,9 +43,9 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 s = p.read_text()
-old = '-DCMAKE_CXX_FLAGS="$(swift_c_flags ${host})"'
+old = '-DCMAKE_CXX_FLAGS="$(swift_c_flags ${host}) ${cross_c_flags}"'
 assert s.count(old) == 1, 'Swift C++ flag anchor changed'
-replacement = '-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host})"'
+replacement = '-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}"'
 helper = '''
 function termi_swift_cxx_flags() {
     case "$1" in android-*) printf '%s' "-nostdinc++ -I${TERMUX_PREFIX}/include/c++/v1 ";; esac
