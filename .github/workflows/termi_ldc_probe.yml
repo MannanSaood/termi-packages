@@ -21,9 +21,12 @@ jobs:
           cd build/probe
           curl --fail --location --retry 3 --max-time 300 -o host.tar.xz https://github.com/ldc-developers/ldc/releases/download/v1.30.0/ldc2-1.30.0-linux-x86_64.tar.xz
           curl --fail --location --retry 3 --max-time 300 -o source.tar.gz https://github.com/ldc-developers/ldc/releases/download/v1.30.0/ldc-1.30.0-src.tar.gz
+          curl --fail --location --retry 3 --max-time 300 -o cmake.tar.gz https://github.com/Kitware/CMake/releases/download/v3.31.10/cmake-3.31.10-linux-x86_64.tar.gz
           printf '%s\n' '5784d4cc47d0845af0897d3b7473a08dd0281a4cdabac0a486740840d014fde1  host.tar.xz' 'fdbb376f08242d917922a6a22a773980217fafa310046fc5d6459490af23dacd  source.tar.gz' | sha256sum --check --strict
           tar -xf host.tar.xz
           tar -xf source.tar.gz
+          printf '%s\n' '3cb3dd247b6a1de2d0f4b20c6fd4326c9024e894cebc9dc8699758887e566ca7  cmake.tar.gz' | sha256sum --check --strict
+          tar -xf cmake.tar.gz
       - name: Probe compiler and actual CMake detection in pinned builder
         run: |
           image=$(python3 -c 'import json; print(json.load(open("packages/termux/upstream.lock.json"))["builder_image"])')
