@@ -27,8 +27,31 @@ TERMI_BINUTILS_HOST'''))
 \tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q "$@"\\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_cxx"
 \tchmod 755 "$termi_cxx"
 \texport CXX="$termi_cxx"'''+ ('\n\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER=$termi_cxx"' if cmake else ''))
-    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'pipewire', 'tesseract']]+[('box2d', 'x11-packages'), ('dia', 'x11-packages')]:
+    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract']]+[('box2d', 'x11-packages'), ('dia', 'x11-packages'), ('deadbeef', 'x11-packages')]:
         change(name, lambda t, cmake=name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract'}: matching_cxx(t,cmake),tree=tree)
+
+    # Avahi's include_next malloc patch can jump over the prefix's malloc.h
+    # into its NDK twin. Use a private header copy for this consumer only.
+    change('pipewire', lambda t: matching_cxx(hook(t,'termux_step_pre_configure', '''
+\tpython3 - "$TERMUX_PREFIX" "$TERMUX_PKG_SRCDIR" <<'TERMI_PIPEWIRE_AVAHI'
+from pathlib import Path
+import sys
+prefix=Path(sys.argv[1]);root=Path(sys.argv[2])
+header=prefix/'include/avahi-common/malloc.h'
+if not header.is_file():
+    sys.exit(0)
+s=header.read_text()
+assert s.count('#include_next <malloc.h>')==1, 'Avahi malloc shim changed'
+private=root/'src/termi-avahi-malloc.h'
+private.write_text(s.replace('#include_next <malloc.h>','#include "'+str(prefix/'include/malloc.h')+'"'))
+changed=0
+for p in root.rglob('*.c'):
+    s=p.read_text()
+    old='#include <avahi-common/malloc.h>'
+    if old in s:
+        p.write_text(s.replace(old,'#include "'+str(private)+'"'));changed+=1
+assert changed>0, 'PipeWire Avahi consumer includes changed'
+TERMI_PIPEWIRE_AVAHI''')))
 
     # LLVM 14's SmallVector uses uint32_t/uint64_t but relies on transitive
     # includes removed by newer host standard libraries. Fix the owning header.
@@ -39,7 +62,12 @@ import sys
 p=Path(sys.argv[1]);s=p.read_text()
 assert s.count('#include <cstddef>')==1 and '#include <cstdint>' not in s, 'LDC LLVM14 header changed'
 p.write_text(s.replace('#include <cstddef>','#include <cstddef>\\n#include <cstdint>'))
-TERMI_LDC_STDINT'''), True))
+TERMI_LDC_STDINT'''), True).replace('termux_step_configure() {', '''termux_step_configure() {
+\tlocal termi_ldc_launcher="$TERMUX_PKG_TMPDIR/termi-ldc-cxx-launcher"
+\tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_ldc_launcher"
+\tchmod 755 "$termi_ldc_launcher"
+\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_ldc_launcher"
+'''))
 
     # API-26 libc headers omit RWF_DSYNC; Linux AIO still needs its kernel
     # UAPI constant. Include the defining kernel header rather than invent it.
