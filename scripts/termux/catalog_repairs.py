@@ -6,15 +6,27 @@ def apply(change, hook, prepared):
     # binutils/Makefile.am compiles sysinfo with Linux CC_FOR_BUILD but its
     # default CPPFLAGS_FOR_BUILD otherwise inherits the Android include path.
     change('binutils', lambda t: hook(t, 'termux_step_pre_configure',
-        '\texport CPPFLAGS_FOR_BUILD=" "'))
+        '''\texport CPPFLAGS_FOR_BUILD=" "
+\tpython3 - "$TERMUX_PKG_SRCDIR/binutils" <<'TERMI_BINUTILS_HOST'
+from pathlib import Path
+import sys
+for name in ('Makefile.am', 'Makefile.in'):
+    p=Path(sys.argv[1])/name;s=p.read_text()
+    old='AM_CFLAGS_FOR_BUILD = $(WARN_CFLAGS_FOR_BUILD) $(ZLIBINC) $(ZSTD_CFLAGS)'
+    assert s.count(old)==1, 'binutils host compression flags anchor changed'
+    s=s.replace(old,'AM_CFLAGS_FOR_BUILD = $(WARN_CFLAGS_FOR_BUILD)')
+    old='$(CC_FOR_BUILD) -o $@ $(AM_CPPFLAGS) $(AM_CFLAGS_FOR_BUILD)'
+    assert s.count(old)==1, 'binutils host bin2c flags anchor changed'
+    p.write_text(s.replace(old,'$(CC_FOR_BUILD) -o $@ $(AM_CFLAGS_FOR_BUILD)'))
+TERMI_BINUTILS_HOST'''))
 
     # These native failures show prefix C headers before implicit NDK libc++.
     # A compiler wrapper also precedes dependency-generated -I options.
     for name in ['libavif', 'libopenmpt']:
-        change(name, lambda t: hook(t, 'termux_step_pre_configure', '''\tlocal termi_cxx="$TERMUX_PKG_TMPDIR/termi-matching-cxx"
+        change(name, lambda t, cmake=name=='libavif': hook(t, 'termux_step_pre_configure', '''\tlocal termi_cxx="$TERMUX_PKG_TMPDIR/termi-matching-cxx"
 \tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q "$@"\\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_cxx"
 \tchmod 755 "$termi_cxx"
-\texport CXX="$termi_cxx"'''))
+\texport CXX="$termi_cxx"'''+ ('\n\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER=$termi_cxx"' if cmake else '')))
 
     # libsvn_subr directly uses the Android System V semaphore shim. LIBS
     # keeps the shim after objects on --as-needed link lines.

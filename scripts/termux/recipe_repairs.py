@@ -71,7 +71,7 @@ def swift_target_cxx_headers(text):
         raise ValueError('Swift target build anchor changed')
     setup = r"""
 	# Host generators have already built; change only Android C++ flags.
-	python3 - "$TERMUX_PKG_SRCDIR/swift/utils/build-script-impl" "$TERMUX_PREFIX" <<'TERMI_SWIFT'
+	python3 - "$TERMUX_PKG_SRCDIR/swift/utils/build-script-impl" "$TERMUX_PREFIX" "$TERMUX_PKG_TMPDIR/termi-swift-cxx" <<'TERMI_SWIFT'
 from pathlib import Path
 import sys
 import shlex
@@ -79,13 +79,20 @@ p = Path(sys.argv[1])
 s = p.read_text()
 old = '-DCMAKE_CXX_FLAGS="$(swift_c_flags ${host}) ${cross_c_flags}"'
 assert s.count(old) == 1, 'Swift C++ flag anchor changed'
-replacement = '-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}"'
+replacement = '-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}" $(termi_swift_cxx_launcher_option ${host})'
+launcher=Path(sys.argv[3])
+assert not any(c.isspace() for c in str(launcher)), 'Swift launcher path must not contain whitespace'
+launcher.write_text('#!/bin/bash\nexec "$@" -Wno-error=variadic-macro-arguments-omitted\n')
+launcher.chmod(0o755)
 helper = '''
 function termi_swift_cxx_flags() {
     case "$1" in android-*) printf '%s' @TERMI_CXX_FLAGS@;; esac
     swift_c_flags "$1"
 }
-'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted '))
+function termi_swift_cxx_launcher_option() {
+    case "$1" in android-*) printf '%s' @TERMI_CXX_LAUNCHER@;; esac
+}
+'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted ')).replace('@TERMI_CXX_LAUNCHER@', shlex.quote('-DCMAKE_CXX_COMPILER_LAUNCHER='+str(launcher)))
 assert s.count('function swift_c_flags() {') == 1
 s = s.replace('function swift_c_flags() {', helper + '\nfunction swift_c_flags() {')
 p.write_text(s.replace(old, replacement))
