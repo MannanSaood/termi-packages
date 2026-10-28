@@ -51,7 +51,10 @@ class Parts:
 
 
 def gh(repository, *arguments):
-    return subprocess.run(["gh", "release", *arguments, "--repo", repository], check=True)
+    # A stalled transport must not consume the entire checkpoint allowance.
+    # Fail without deleting remote parts; manifest-last keeps them unusable
+    # until every part is known to have uploaded successfully.
+    return subprocess.run(["gh", "release", *arguments, "--repo", repository], check=True, timeout=600)
 
 
 def save(container, repository, tag, identity):

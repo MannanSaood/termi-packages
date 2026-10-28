@@ -4,11 +4,28 @@ import io
 from pathlib import Path
 import tempfile
 import unittest
+import subprocess
+from unittest.mock import patch
 
-from checkpoint import Parts
+from checkpoint import Parts, gh
 
 
 class CheckpointParts(unittest.TestCase):
+    def test_stalled_upload_is_bounded_and_keeps_failed_part(self):
+        with patch('checkpoint.subprocess.run',side_effect=subprocess.TimeoutExpired('gh',600)) as run:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                gh('owner/public','upload','checkpoint-1','part')
+            self.assertEqual(600,run.call_args.kwargs['timeout'])
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            def stalled(path):
+                raise subprocess.TimeoutExpired('gh',600)
+            sink=Parts(root,stalled,limit=4)
+            with self.assertRaises(subprocess.TimeoutExpired):
+                sink.write(b'data')
+            self.assertEqual(b'data',(root/'checkpoint-0000.gz.part').read_bytes())
+            self.assertFalse((root/'checkpoint.json').exists())
+
     def test_streamed_parts_are_bounded_hashed_and_lossless(self):
         payload = bytes(range(256)) * 257
         uploaded = []
