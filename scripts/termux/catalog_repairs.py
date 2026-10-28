@@ -80,6 +80,7 @@ TERMI_GMIME_AUTOGEN'''))
     # Upstream's Android pthread workaround sets discovery variables but
     # wxrc now links the modern imported target. Android pthreads are in libc.
     change('wxwidgets', lambda t: hook(t, 'termux_step_pre_configure', '''
+\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"
 \tpython3 - "$TERMUX_PKG_SRCDIR/build/cmake/init.cmake" <<'TERMI_WX_THREADS'
 from pathlib import Path
 import sys
@@ -89,6 +90,11 @@ assert s.count(old)==1 and '# Android has pthreads' in s, 'wxWidgets Android thr
 s=s.replace(old,old+"\\n        if(NOT TARGET Threads::Threads)\\n            add_library(Threads::Threads INTERFACE IMPORTED GLOBAL)\\n        endif()")
 p.write_text(s)
 TERMI_WX_THREADS'''),tree='x11-packages')
+
+    # Qt5 writes target CXXFLAGS into its cross-qmake spec before clearing
+    # compiler environment variables; repair the flags before that capture.
+    change('qt5-qtbase', lambda t: hook(t, 'termux_step_pre_configure',
+        '\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'),tree='x11-packages')
 
     # binutils/Makefile.am compiles sysinfo with Linux CC_FOR_BUILD but its
     # default CPPFLAGS_FOR_BUILD otherwise inherits the Android include path.
