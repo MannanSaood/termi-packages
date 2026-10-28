@@ -2,6 +2,44 @@
 import re
 
 
+def foundry_unique_native_archives(text):
+    """Avoid prefix libsecp256k1.a shadowing Cargo's versioned native builds."""
+    anchor = '\tcargo vendor\n'
+    if text.count(anchor) != 1 or text.count('\t\t! -wholename ./vendor/cc \\\n') != 1:
+        raise ValueError('Foundry vendor anchors changed')
+    repair = r'''
+	python3 - <<'TERMI_SECP_ARCHIVES'
+from pathlib import Path
+import tomllib
+root=Path('.')
+entries=[]
+versions=set()
+for directory in sorted((root/'vendor').glob('secp256k1-sys*')):
+    package=tomllib.loads((directory/'Cargo.toml').read_text())['package']
+    version=package['version']
+    if package['name']!='secp256k1-sys' or version not in {'0.10.1','0.11.0'} or version in versions:
+        raise ValueError('Unexpected Foundry secp256k1 source')
+    versions.add(version)
+    build=directory/'build.rs'
+    source=build.read_text()
+    if source.count('"libsecp256k1.a"')!=2:
+        raise ValueError('secp256k1 archive anchors changed')
+    unique='termi_secp256k1_'+version.replace('.','_')
+    build.write_text(source.replace('"libsecp256k1.a"','"lib'+unique+'.a"'))
+    entries.append('termi_secp_'+version.replace('.','_')+' = { package = "secp256k1-sys", path = "'+directory.as_posix()+'" }')
+if versions!={'0.10.1','0.11.0'}:
+    raise ValueError('Missing pinned secp256k1 version')
+manifest=root/'Cargo.toml'
+source=manifest.read_text()
+if source.count('[patch.crates-io]')!=1:
+    raise ValueError('Foundry patch section changed')
+manifest.write_text(source.replace('[patch.crates-io]','[patch.crates-io]\n'+'\n'.join(entries)))
+TERMI_SECP_ARCHIVES
+'''
+    text=text.replace(anchor,anchor+repair)
+    return text.replace('\t\t! -wholename ./vendor/cc \\\n', '\t\t! -name "secp256k1-sys*" \\\n\t\t! -wholename ./vendor/cc \\\n')
+
+
 def foundry_link_diagnostics(text):
     anchor = '\t\t--features="cli"\n'
     if text.count(anchor) != 1:
@@ -15,7 +53,7 @@ import shlex
 import subprocess
 import sys
 root=Path(sys.argv[1]);nm=shlex.split(sys.argv[2])
-paths=sorted(root.glob('build/secp256k1-sys-*/out/libsecp256k1.a'))+sorted(root.glob('deps/libsecp256k1_sys-*.rlib'))
+paths=sorted(root.glob('build/secp256k1-sys-*/out/*secp256k1*.a'))+sorted(root.glob('deps/libsecp256k1_sys-*.rlib'))
 for p in paths[:16]:
     if p.is_symlink() or not p.is_file() or p.stat().st_size>64*1024**2:
         continue
@@ -240,7 +278,7 @@ def apply(patch, original):
 '''))
     for package in ["assimp", "librime", "python-scipy", "supercollider", "libvisio", "libfreehand", "openbabel", "povray", "solidity"]:
         change(package,lambda t:hook(t,"termux_step_pre_configure",'\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'))
-    change('foundry',lambda t:foundry_link_diagnostics(hook(t,'termux_step_pre_configure','\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"')))
+    change('foundry',lambda t:foundry_link_diagnostics(foundry_unique_native_archives(hook(t,'termux_step_pre_configure','\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'))))
     change("rust", rust_target_cxx_headers)
     change("swift", swift_target_cxx_headers)
     change("mesa", mesa_bindgen_headers)
