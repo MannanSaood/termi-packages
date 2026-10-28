@@ -23,13 +23,16 @@ def failure_excerpt(path):
         return ""
     first = []
     size = 0
+    context = 0
     with path.open("rb") as stream:
         for line in stream:
             size += len(line)
             if size > 32*1024**2:
                 break
-            if re.search(rb"error:|fatal error|Wrong checksum|FAILED:|Killed", line, re.I):
+            cmake = re.search(rb"CMake Error(?: at|:)", line, re.I)
+            if cmake or context or re.search(rb"error:|fatal error|Wrong checksum|FAILED:|Killed", line, re.I):
                 first.append(line[:512])
+                context = 4 if cmake else max(0, context - 1)
                 if len(first) == 8:
                     break
     # Configure feature probes can fill the first eight matches. Also inspect
@@ -42,9 +45,12 @@ def failure_excerpt(path):
     lines = data.splitlines(keepends=True)
     if offset:
         lines = lines[1:]  # The window may begin partway through a line.
+    context = 0
     for line in lines:
-        if re.search(rb"error:|fatal error|Wrong checksum|FAILED:|Killed", line, re.I):
+        cmake = re.search(rb"CMake Error(?: at|:)", line, re.I)
+        if cmake or context or re.search(rb"error:|fatal error|Wrong checksum|FAILED:|Killed", line, re.I):
             latest.append(line[:512])
+            context = 4 if cmake else max(0, context - 1)
             latest = latest[-8:]
     if not first and not latest:
         return tail(path)

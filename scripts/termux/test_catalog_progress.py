@@ -27,6 +27,15 @@ class ProgressTests(unittest.TestCase):
             self.assertIn('make: stopped',excerpt)
             self.assertLessEqual(len(excerpt.encode()),8192)
 
+    def test_cmake_multiline_error_survives_later_configuration_output(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'configure.log'
+            path.write_text('configure: error: optional probe\n'*8+'CMake Error at cmake/check.cmake:12 (message):\n  Missing required target dependency\n\n' + 'successful configure probe\n'*2000)
+            excerpt=catalog_progress.failure_excerpt(path)
+            self.assertIn('CMake Error at',excerpt)
+            self.assertIn('Missing required target dependency',excerpt)
+            self.assertLessEqual(len(excerpt.encode()),8192)
+
     def test_first_error_is_retained_when_parallel_output_pushes_it_out_of_tail(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'compile.log'
