@@ -77,10 +77,13 @@ def compatibility(old, new, ledger):
 
 
 def compatible_failures(old, new, ledger):
-    """Retain failed recipes until their inputs change or retry is explicit."""
+    """Retain failures and disk blockers until inputs change or retry is explicit."""
     _, invalid = compatibility(old, new, ledger)
     return {name: entry for name, entry in ledger["recipes"].items()
-            if name in new["recipes"] and name not in invalid and entry["status"] == "failed"}
+            if name in new["recipes"] and name not in invalid
+            and (entry["status"] == "failed" or
+                 (entry["status"] == "interrupted" and entry.get("exit_code") == 75
+                  and entry.get("compile_resume_available") is False))}
 
 
 def expand_bundles(raw, inventory):

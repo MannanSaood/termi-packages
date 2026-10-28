@@ -59,6 +59,22 @@ class PayloadAliasResolution(unittest.TestCase):
 
 
 class SeedCompatibility(unittest.TestCase):
+    def test_import_retains_disk_blockers_but_not_normal_budget_interruptions(self):
+        plan = self.plan()
+        disk = dict(status="interrupted", exit_code=75, compile_resume_available=False,
+                    reason="Insufficient disk during recipe compilation", attempts=1)
+        ledger = dict(identity=["old-graph", "runner"], recipes={
+            "a": disk, "b": dict(status="interrupted", exit_code=124),
+            "c": dict(status="failed", exit_code=1)})
+        self.assertEqual({"a": disk, "c": ledger["recipes"]["c"]},
+                         seed.compatible_failures(plan, plan, ledger))
+        changed = copy.deepcopy(plan)
+        changed["configuration"]["patches"] = [dict(path="packages/a/build.sh", after_sha256="fixed")]
+        self.assertEqual({"c": ledger["recipes"]["c"]},
+                         seed.compatible_failures(plan, changed, ledger))
+        ledger["recipes"]["a"] = dict(status="built")
+        self.assertNotIn("a", seed.compatible_failures(plan, plan, ledger))
+
     def plan(self):
         return dict(identity="old-graph", configuration=dict(lock={"application_id": "com.terminal.nextgen"},
                     source={"commit": "pinned"}, patches=[], graph_sha256="resolver", upstream_graph_sha256="upstream"),
