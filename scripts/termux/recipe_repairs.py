@@ -293,7 +293,10 @@ def apply(patch, original):
         hook(t, "termux_step_pre_configure", '\tCXXFLAGS+=" -nostdinc++"')))
     # LLVM's source hook requires the separate Flang recipe revision to match.
     # change() bumps the revision even when the source body is unchanged.
-    change("flang", lambda t: t)
+    # The runtime's LDBL_MANT_DIG probe must reach Clang's float.h instead
+    # of a second libc++ wrapper. Keep its revision matched to libllvm.
+    change("flang", lambda t: hook(t, "termux_step_pre_configure",
+        '\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'))
     # Native diagnostics: Boost b2 and elfutils debuginfod use prefix C
     # headers alongside implicit NDK libc++; use the matching prefix C++ set.
     change("boost",lambda t:hook(t,"termux_step_make_install",'\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'))

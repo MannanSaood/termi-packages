@@ -77,6 +77,19 @@ fi"""
 m=matches[0];p.write_text(s[:m.start()]+replacement+s[m.end():])
 TERMI_GMIME_AUTOGEN'''))
 
+    # Upstream's Android pthread workaround sets discovery variables but
+    # wxrc now links the modern imported target. Android pthreads are in libc.
+    change('wxwidgets', lambda t: hook(t, 'termux_step_pre_configure', '''
+\tpython3 - "$TERMUX_PKG_SRCDIR/build/cmake/init.cmake" <<'TERMI_WX_THREADS'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+old='        set(Threads_FOUND TRUE)'
+assert s.count(old)==1 and '# Android has pthreads' in s, 'wxWidgets Android thread workaround changed'
+s=s.replace(old,old+"\\n        if(NOT TARGET Threads::Threads)\\n            add_library(Threads::Threads INTERFACE IMPORTED GLOBAL)\\n        endif()")
+p.write_text(s)
+TERMI_WX_THREADS'''),tree='x11-packages')
+
     # binutils/Makefile.am compiles sysinfo with Linux CC_FOR_BUILD but its
     # default CPPFLAGS_FOR_BUILD otherwise inherits the Android include path.
     change('binutils', lambda t: hook(t, 'termux_step_pre_configure',
