@@ -22,11 +22,34 @@ TERMI_BINUTILS_HOST'''))
 
     # These native failures show prefix C headers before implicit NDK libc++.
     # A compiler wrapper also precedes dependency-generated -I options.
-    for name in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes']:
-        change(name, lambda t, cmake=name in {'libavif', 'libjxl', 'poppler'}: hook(t, 'termux_step_pre_configure', '''\tlocal termi_cxx="$TERMUX_PKG_TMPDIR/termi-matching-cxx"
+    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz']]+[('box2d', 'x11-packages')]:
+        change(name, lambda t, cmake=name in {'libavif', 'libjxl', 'poppler', 'box2d'}: hook(t, 'termux_step_pre_configure', '''\tlocal termi_cxx="$TERMUX_PKG_TMPDIR/termi-matching-cxx"
 \tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q "$@"\\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_cxx"
 \tchmod 755 "$termi_cxx"
-\texport CXX="$termi_cxx"'''+ ('\n\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER=$termi_cxx"' if cmake else '')))
+\texport CXX="$termi_cxx"'''+ ('\n\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER=$termi_cxx"' if cmake else '')),tree=tree)
+
+    # LLVM 14's SmallVector uses uint32_t/uint64_t but relies on transitive
+    # includes removed by newer host standard libraries. Fix the owning header.
+    change('ldc', lambda t: hook(t, 'termux_step_host_build', '''
+\tpython3 - "$TERMUX_PKG_SRCDIR/llvm/include/llvm/ADT/SmallVector.h" <<'TERMI_LDC_STDINT'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+assert s.count('#include <cstddef>')==1 and '#include <cstdint>' not in s, 'LDC LLVM14 header changed'
+p.write_text(s.replace('#include <cstddef>','#include <cstddef>\\n#include <cstdint>'))
+TERMI_LDC_STDINT'''))
+
+    # API-26 libc headers omit RWF_DSYNC; Linux AIO still needs its kernel
+    # UAPI constant. Include the defining kernel header rather than invent it.
+    change('qemu-system-x86-64-headless', lambda t: hook(t, 'termux_step_pre_configure', '''
+\tpython3 - "$TERMUX_PKG_SRCDIR/block/linux-aio.c" <<'TERMI_QEMU_RWF'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+anchor='#include "qemu/osdep.h"'
+assert s.count(anchor)==1, 'QEMU Linux AIO include anchor changed'
+p.write_text(s.replace(anchor,anchor+'\\n#ifndef RWF_DSYNC\\n#include <linux/fs.h>\\n#endif'))
+TERMI_QEMU_RWF'''))
 
     # libsvn_subr directly uses the Android System V semaphore shim. LIBS
     # keeps the shim after objects on --as-needed link lines.
