@@ -27,8 +27,12 @@ TERMI_BINUTILS_HOST'''))
 \tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q "$@"\\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_cxx"
 \tchmod 755 "$termi_cxx"
 \texport CXX="$termi_cxx"'''+ ('\n\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER=$termi_cxx"' if cmake else ''))
-    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract']]+[('box2d', 'x11-packages'), ('dia', 'x11-packages'), ('deadbeef', 'x11-packages')]:
-        change(name, lambda t, cmake=name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract'}: matching_cxx(t,cmake),tree=tree)
+    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti']]:
+        change(name, lambda t, cmake=name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti'}: matching_cxx(t,cmake),tree=tree)
+
+    # Keep the legacy tokenizer's warning visible without treating the NDK's
+    # newly added deprecation annotation as a build error.
+    change('sway',lambda t:hook(t,'termux_step_pre_configure','\tCFLAGS+=" -Wno-error=deprecated-declarations"'),tree='x11-packages')
 
     # Avahi's include_next malloc patch can jump over the prefix's malloc.h
     # into its NDK twin. Use a private header copy for this consumer only.
