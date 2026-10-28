@@ -42,7 +42,10 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: free-package-builder-${{ inputs.mode }}-${{ inputs.recipes }}
+  # Revised focused checks have separate isolated builders, so a failed older
+  # revision can finish saving without blocking verification of its fix.
+  # Catalog lanes keep their existing serialization across revisions.
+  group: free-package-builder-${{ inputs.mode }}-${{ inputs.recipes }}${{ inputs.mode == 'packages' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: false
 jobs:
   candidate:
