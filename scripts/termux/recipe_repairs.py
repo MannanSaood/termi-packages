@@ -154,6 +154,17 @@ assert s.count(swift_flags)==5, 'Swift importer flag anchors changed'
 s=s.replace(swift_flags,'-DCMAKE_Swift_FLAGS:STRING="$(termi_swift_importer_flags ${host})"')
 p.write_text(s.replace(old, replacement))
 TERMI_SWIFT
+	# Foundation is configured independently of the compiler's CXX launcher.
+	python3 - "$TERMUX_PKG_SRCDIR/swift-corelibs-foundation/CMakeLists.txt" "$TERMUX_PREFIX" <<'TERMI_SWIFT_FOUNDATION'
+from pathlib import Path
+import re, sys
+p=Path(sys.argv[1]);s=p.read_text();prefix=sys.argv[2]
+assert re.fullmatch(r'/[A-Za-z0-9_./-]+',prefix), 'Unexpected Foundation prefix'
+anchor='cmake_minimum_required(VERSION 3.24)'
+assert s.count(anchor)==1, 'Swift Foundation CMake entry changed'
+extra='\nif(CMAKE_SYSTEM_NAME STREQUAL "Android")\n  set(CMAKE_CXX_FLAGS "-nostdinc++ -I'+prefix+'/include/c++/v1 ${CMAKE_CXX_FLAGS}")\nendif()\n'
+p.write_text(s.replace(anchor,anchor+extra))
+TERMI_SWIFT_FOUNDATION
 """
     text = text.replace(anchor, anchor + setup)
     end = "\t--install-swift-driver --install-sourcekit-lsp\n"
