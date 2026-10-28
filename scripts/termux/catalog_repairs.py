@@ -98,8 +98,16 @@ TERMI_BINUTILS_HOST'''))
             assert t.count(anchor)==1, 'MuPDF dependency anchor changed'
             t=t.replace(anchor,'libandroid-shmem, libandroid-spawn, libc++')
             t=hook(t,'termux_step_pre_configure','\tLDFLAGS+=" -landroid-spawn"')
+        if name == 'webkit2gtk-4.1':
+            # Its CMake invocation chooses the NDK compiler directly. The
+            # failing ANGLE file already includes cfloat: fix header order at
+            # the effective compiler invocation, not the source declaration.
+            return hook(t,'termux_step_pre_configure', '''\tlocal termi_webkit_launcher="$TERMUX_PKG_TMPDIR/termi-webkit-cxx-launcher"
+\tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_webkit_launcher"
+\tchmod 755 "$termi_webkit_launcher"
+\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_webkit_launcher"''')
         return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti'})
-    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti']]:
+    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1']]:
         change(name, lambda t, name=name: configure_consumer(t,name),tree=tree)
 
     # Keep the legacy tokenizer's warning visible without treating the NDK's
