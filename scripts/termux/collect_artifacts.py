@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Export built Debian candidates with portable filenames and exact inventories."""
 import argparse
+import errno
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -14,7 +16,7 @@ def checksum(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def collect(source, destination, plan=None, resume=False):
+def collect(source, destination, plan=None, resume=False, link_immutable=False):
     files = sorted(source.glob("*.deb"))
     if not files:
         raise ValueError("No built packages; refusing success")
@@ -46,7 +48,15 @@ def collect(source, destination, plan=None, resume=False):
             if target.is_symlink() or checksum(target) != checksum(file):
                 raise ValueError("Existing candidate object changed; use a new package revision")
         else:
-            shutil.copyfile(file, target)
+            if link_immutable:
+                try:
+                    os.link(file, target)
+                except OSError as error:
+                    if error.errno not in (errno.EXDEV, errno.EPERM, errno.ENOTSUP):
+                        raise
+                    shutil.copyfile(file, target)
+            else:
+                shutil.copyfile(file, target)
         packages.append({"file": name, "original_file": file.name,
                          "sha256": checksum(target), "control": fields,
                          **(classification or {})})
@@ -61,5 +71,8 @@ if __name__ == "__main__":
     parser.add_argument("destination", type=Path)
     parser.add_argument("--plan", type=Path)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--link-immutable", action="store_true",
+                        help="Link completed immutable archives on the same filesystem to avoid a second copy")
     args = parser.parse_args()
-    collect(args.source, args.destination, json.loads(args.plan.read_text()) if args.plan else None, args.resume)
+    collect(args.source, args.destination, json.loads(args.plan.read_text()) if args.plan else None,
+            args.resume, args.link_immutable)

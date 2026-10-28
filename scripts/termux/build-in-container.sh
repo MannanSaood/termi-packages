@@ -59,7 +59,7 @@ if [ "$mode" = full-catalog ]; then
         --output /home/builder/artifacts/progress.json
     if compgen -G 'output/*.deb' >/dev/null; then
         python3 /home/builder/collect_artifacts.py output /home/builder/artifacts \
-            --plan /home/builder/catalog-state/plan.json --resume
+            --plan /home/builder/catalog-state/plan.json --resume --link-immutable
     fi
     if [ "$result" -ne 0 ]; then exit "$result"; fi
 elif [ "$mode" = packages ]; then
@@ -116,9 +116,9 @@ fi
 if [ "$mode" != full-catalog ]; then
     if [ -f /home/builder/artifacts/catalog-plan.json ]; then
         python3 /home/builder/collect_artifacts.py output /home/builder/artifacts \
-            --plan /home/builder/artifacts/catalog-plan.json --resume
+            --plan /home/builder/artifacts/catalog-plan.json --resume --link-immutable
     else
-        python3 /home/builder/collect_artifacts.py output /home/builder/artifacts --resume
+        python3 /home/builder/collect_artifacts.py output /home/builder/artifacts --resume --link-immutable
     fi
 fi
 if [ "$mode" = bootstrap ]; then
