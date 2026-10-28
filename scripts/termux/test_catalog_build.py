@@ -3,13 +3,24 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 import catalog_build as builder
 from catalog_graph import order_and_cycles
 
 
 class GraphTests(unittest.TestCase):
+    def test_disk_guard_keeps_full_configured_reserve_during_compilation(self):
+        process=Mock()
+        with patch.object(builder.shutil,'disk_usage',return_value=Mock(free=12*1024**3)):
+            with self.assertRaises(builder.DiskPressure):
+                builder.guarded_wait(process,Path('.'),60,16)
+        process.wait.assert_not_called()
+        process.wait.return_value=0
+        with patch.object(builder.shutil,'disk_usage',return_value=Mock(free=20*1024**3)):
+            self.assertEqual(0,builder.guarded_wait(process,Path('.'),60,16))
+        self.assertLessEqual(process.wait.call_args.kwargs['timeout'],1)
+
     @unittest.skipUnless(os.name == "posix", "Linux isolated lane runner")
     def test_lane_executes_only_owned_independent_roots_and_cannot_restore_another_lane(self):
         with tempfile.TemporaryDirectory() as directory:

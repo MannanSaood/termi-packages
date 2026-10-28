@@ -22,6 +22,9 @@ class SwiftHeadersTest(unittest.TestCase):
             s=p.read_text()
             self.assertIn('-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}"',s)
             self.assertIn('-DCMAKE_C_FLAGS="$(swift_c_flags ${host})"',s)
+            # BasicSwift belongs to the main Swift configure block, separate
+            # from the five auxiliary projects' existing Swift flag sites.
+            self.assertEqual(6,s.count('-DCMAKE_Swift_FLAGS:STRING="$(termi_swift_importer_flags ${host})"'))
             s=s.split('flags=')[0]
             p.write_text(s+'\nunset TERMUX_PREFIX\ntermi_swift_cxx_flags android-aarch64\nprintf "\\n"\ntermi_swift_cxx_flags linux-x86_64\n')
             out=subprocess.check_output([bash,str(p)],text=True)

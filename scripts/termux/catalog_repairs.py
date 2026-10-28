@@ -153,7 +153,7 @@ TERMI_LDC_STDINT
 \tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_ldc_launcher"
 \tchmod 755 "$termi_ldc_launcher"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_ldc_launcher"
-''').replace('termux_step_post_configure() {', 'termux_step_post_configure() {\n\t_termi_ldc_host_xml').replace('termux_step_make() {', 'termux_step_make() {\n\t_termi_ldc_host_xml') + LDC_HOST_XML_SETUP)
+''').replace('termux_step_post_configure() {', 'termux_step_post_configure() {\n\t_termi_ldc_host_xml').replace('termux_step_make() {', 'termux_step_make() {\n\t_termi_ldc_host_xml').replace('libcurl, zlib"','libcurl, libandroid-execinfo, zlib"').replace('-lphobos2-ldc;-ldruntime-ldc;', '-lphobos2-ldc;-ldruntime-ldc;-landroid-execinfo;') + LDC_HOST_XML_SETUP)
 
     # API-26 libc headers omit RWF_DSYNC; Linux AIO still needs its kernel
     # UAPI constant. Include the defining kernel header rather than invent it.

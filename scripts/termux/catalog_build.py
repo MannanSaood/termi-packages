@@ -26,7 +26,7 @@ def guarded_wait(process, root, timeout, minimum_free_gib):
     if not minimum_free_gib:
         return process.wait(timeout=timeout)
     deadline = time.monotonic() + timeout
-    floor = min(8, minimum_free_gib / 2) * 1024**3
+    floor = minimum_free_gib * 1024**3
     while True:
         if shutil.disk_usage(root).free < floor:
             raise DiskPressure("Insufficient disk during recipe compilation")
@@ -34,7 +34,7 @@ def guarded_wait(process, root, timeout, minimum_free_gib):
         if remaining <= 0:
             raise subprocess.TimeoutExpired(process.args, timeout)
         try:
-            return process.wait(timeout=min(5, remaining))
+            return process.wait(timeout=min(1, remaining))
         except subprocess.TimeoutExpired:
             continue
 

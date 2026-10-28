@@ -61,7 +61,7 @@ class ResourceGuards(unittest.TestCase):
         process = Mock(args=['compiler'])
         process.wait.side_effect = [subprocess.TimeoutExpired('compiler', 5), 0]
         with patch('catalog_build.shutil.disk_usage', side_effect=[
-                SimpleNamespace(free=12*1024**3), SimpleNamespace(free=7*1024**3)]):
+                SimpleNamespace(free=20*1024**3), SimpleNamespace(free=15*1024**3)]):
             with self.assertRaises(DiskPressure):
                 guarded_wait(process, Path('.'), 100, 16)
         self.assertEqual(1, process.wait.call_count)
@@ -69,7 +69,7 @@ class ResourceGuards(unittest.TestCase):
     def test_completed_recipe_returns_actual_exit_code(self):
         process = Mock(args=['compiler'])
         process.wait.return_value = 7
-        with patch('catalog_build.shutil.disk_usage', return_value=SimpleNamespace(free=12*1024**3)):
+        with patch('catalog_build.shutil.disk_usage', return_value=SimpleNamespace(free=20*1024**3)):
             self.assertEqual(7, guarded_wait(process, Path('.'), 100, 16))
 
     def test_reclaim_keeps_metadata_and_rejects_paths_outside_workflow(self):

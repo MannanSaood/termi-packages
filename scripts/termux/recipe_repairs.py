@@ -123,7 +123,8 @@ p = Path(sys.argv[1])
 s = p.read_text()
 old = '-DCMAKE_CXX_FLAGS="$(swift_c_flags ${host}) ${cross_c_flags}"'
 assert s.count(old) == 1, 'Swift C++ flag anchor changed'
-replacement = '-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}" $(termi_swift_cxx_launcher_option ${host})'
+replacement = ('-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}" $(termi_swift_cxx_launcher_option ${host})'
+               + ' -DCMAKE_Swift_FLAGS:STRING="$(termi_swift_importer_flags ${host})"')
 launcher=Path(sys.argv[3])
 assert not any(c.isspace() for c in str(launcher)), 'Swift launcher path must not contain whitespace'
 launcher.write_text('#!/bin/bash\ncompiler="$1"\nshift\nexec "$compiler" -nostdinc++ -I'+shlex.quote(sys.argv[2]+'/include/c++/v1')+' "$@" -Wno-error=variadic-macro-arguments-omitted -Wno-error=gnu-include-next\n')
