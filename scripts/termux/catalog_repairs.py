@@ -38,10 +38,14 @@ def apply(change, hook, prepared):
         anchor='\t\t-DCMAKE_BUILD_TYPE=MinSizeRel \\\n'
         assert t.count(anchor)==1, 'Qt Declarative host configure anchor changed'
         assert t.count('TERMUX_PKG_REVISION="1"')==1, 'Qt Declarative revision changed'
-        t=t.replace('TERMUX_PKG_REVISION="1"','TERMUX_PKG_REVISION=1')
+        t=t.replace('TERMUX_PKG_REVISION="1"','TERMUX_PKG_REVISION=2')
         t=t.replace(anchor,anchor+'\t\t-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \\\n')
         return hook(t,'termux_step_pre_configure',
-                    '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON"')
+                    '''\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON"
+\tlocal termi_qt_launcher="$TERMUX_PKG_TMPDIR/termi-qt-cxx-launcher"
+\tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_qt_launcher"
+\tchmod 755 "$termi_qt_launcher"
+\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_qt_launcher"''')
     change('qt6-qtdeclarative',qt_declarative_disk,tree='x11-packages')
 
     # The upstream autogen allowlists reject modern host libtool/automake even
