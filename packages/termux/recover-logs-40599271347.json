@@ -1,0 +1,8 @@
+{
+  "tag": "checkpoint-40599271347-1",
+  "manifest_sha256": "86f1d3ad9904eef6b86409dc75d3c292e7dd972aa9d66a24a34613c3f213db65",
+  "input_identity": "dbb15d2efa1fba2f842f3528161563b41fb47e753db05754d9cf6b6208a345c3",
+  "logs": [
+    "foundry-1.log"
+  ]
+}
