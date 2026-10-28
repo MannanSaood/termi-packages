@@ -32,6 +32,18 @@ _termi_ldc_host_xml() {
 
 
 def apply(change, hook, prepared):
+    # Qt Declarative repeatedly exhausts standard-runner disk while emitting
+    # many module PCH files. PCH is only a build optimization; keep all modules.
+    def qt_declarative_disk(t):
+        anchor='\t\t-DCMAKE_BUILD_TYPE=MinSizeRel \\\n'
+        assert t.count(anchor)==1, 'Qt Declarative host configure anchor changed'
+        assert t.count('TERMUX_PKG_REVISION="1"')==1, 'Qt Declarative revision changed'
+        t=t.replace('TERMUX_PKG_REVISION="1"','TERMUX_PKG_REVISION=1')
+        t=t.replace(anchor,anchor+'\t\t-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \\\n')
+        return hook(t,'termux_step_pre_configure',
+                    '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON"')
+    change('qt6-qtdeclarative',qt_declarative_disk,tree='x11-packages')
+
     # The upstream autogen allowlists reject modern host libtool/automake even
     # though they exceed its advertised minimums. Keep the bootstrap sequence.
     change('libgmime', lambda t: hook(t, 'termux_step_pre_configure', '''
