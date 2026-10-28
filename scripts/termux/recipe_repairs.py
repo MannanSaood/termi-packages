@@ -213,6 +213,15 @@ def apply(patch, original):
             return text.replace(anchor,anchor+"\n"+body,1)
         return text+f"\n{anchor}\n{body}\n}}\n"
 
+    # Official v1.5.7 commit archive verified against all 335 upstream Git blobs.
+    # Keep source immutable instead of accepting the changed tag-archive digest.
+    def libsrt_commit_source(text):
+        url='https://github.com/Haivision/srt/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz'
+        checksum='fee6aee6b4933f01ba8b7e18d5d9e4896ad604053fdad2ac55df4a4f1561f30a'
+        if 'TERMUX_PKG_VERSION="1.5.7"' not in text or text.count(url)!=1 or text.count(checksum)!=1:
+            raise ValueError('Pinned libsrt source changed')
+        return text.replace(url,'https://codeload.github.com/Haivision/srt/tar.gz/899348d8318eb9a3c5a5b6ec43c4a1114288773a').replace(checksum,'82050d96a1a55d54b423fed4ad80ddb6f30b31bf33e317ffd6726c91ee9a6170')
+    change('libsrt',libsrt_commit_source)
     change("etsh",lambda t:t.replace("https://etsh.nl/src/","https://etsh.dev/src/"))
     # Freetz's source cache serves the exact original release, independently
     # downloaded from two mirrors and checked against the existing source pin.
