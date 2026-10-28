@@ -85,11 +85,22 @@ TERMI_BINUTILS_HOST'''))
 \tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q "$@"\\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_cxx"
 \tchmod 755 "$termi_cxx"
 \texport CXX="$termi_cxx"'''+ ('\n\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER=$termi_cxx"' if cmake else ''))
-    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti']]:
+    def configure_consumer(t, name):
         # Qt6's public dialect bits predate md4c 0.6's new default flags (one
         # collides with Qt's front-matter bit). Build Qt's matching bundled
         # source parser using its documented input; retain Markdown support.
-        change(name, lambda t, cmake=name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti'}, bundled=name=='qt6-qtbase': matching_cxx(hook(t,'termux_step_pre_configure','\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DINPUT_libmd4c=qt"') if bundled else t,cmake),tree=tree)
+        if name == 'qt6-qtbase':
+            t=hook(t,'termux_step_pre_configure','\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DINPUT_libmd4c=qt"')
+        if name == 'mupdf':
+            # Its GL viewer calls posix_spawnp, absent from API26 libc. Link
+            # our source-built compatibility library and declare runtime use.
+            anchor='libandroid-shmem, libc++'
+            assert t.count(anchor)==1, 'MuPDF dependency anchor changed'
+            t=t.replace(anchor,'libandroid-shmem, libandroid-spawn, libc++')
+            t=hook(t,'termux_step_pre_configure','\tLDFLAGS+=" -landroid-spawn"')
+        return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti'})
+    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti']]:
+        change(name, lambda t, name=name: configure_consumer(t,name),tree=tree)
 
     # Keep the legacy tokenizer's warning visible without treating the NDK's
     # newly added deprecation annotation as a build error.
