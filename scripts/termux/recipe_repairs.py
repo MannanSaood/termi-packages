@@ -109,6 +109,23 @@ def rust_target_cxx_headers(text):
     return text.replace(anchor, setup + anchor)
 
 
+SWIFT_ANDROID_STAT_MODULE = r'''
+	# Foundation includes the prefix's stat.h while Swift's Android module map
+	# otherwise resolves a second NDK copy. Both use pragma once, so Clang
+	# modules see two different struct definitions. Share one physical header.
+	python3 - "$TERMUX_PKG_SRCDIR/swift/stdlib/public/Platform/android.modulemap" "$TERMUX_PREFIX" <<'TERMI_SWIFT_STAT_MODULE'
+from pathlib import Path
+import re, sys
+p=Path(sys.argv[1]);prefix=sys.argv[2];s=p.read_text()
+assert re.fullmatch(r'/[A-Za-z0-9_./-]+',prefix), 'Unexpected Swift module prefix'
+assert (Path(prefix)/'include/sys/stat.h').is_file(), 'Termi stat header missing'
+anchor='header "sys/stat.h"'
+assert s.count(anchor)==1, 'Swift Android stat module anchor changed'
+p.write_text(s.replace(anchor,'header "'+prefix+'/include/sys/stat.h"'))
+TERMI_SWIFT_STAT_MODULE
+'''
+
+
 def swift_target_cxx_headers(text):
     anchor = 'termux_step_make() {'
     if text.count(anchor) != 1:
@@ -166,7 +183,7 @@ extra='\nif(CMAKE_SYSTEM_NAME STREQUAL "Android")\n  set(CMAKE_CXX_FLAGS "-nostd
 p.write_text(s.replace(anchor,anchor+extra))
 TERMI_SWIFT_FOUNDATION
 """
-    text = text.replace(anchor, anchor + setup)
+    text = text.replace(anchor, anchor + setup + SWIFT_ANDROID_STAT_MODULE)
     end = "\t--install-swift-driver --install-sourcekit-lsp\n"
     if text.count(end) != 1:
         raise ValueError("Swift target command anchor changed")
