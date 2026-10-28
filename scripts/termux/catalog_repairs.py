@@ -22,8 +22,8 @@ TERMI_BINUTILS_HOST'''))
 
     # These native failures show prefix C headers before implicit NDK libc++.
     # A compiler wrapper also precedes dependency-generated -I options.
-    for name in ['libavif', 'libopenmpt']:
-        change(name, lambda t, cmake=name=='libavif': hook(t, 'termux_step_pre_configure', '''\tlocal termi_cxx="$TERMUX_PKG_TMPDIR/termi-matching-cxx"
+    for name in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes']:
+        change(name, lambda t, cmake=name in {'libavif', 'libjxl', 'poppler'}: hook(t, 'termux_step_pre_configure', '''\tlocal termi_cxx="$TERMUX_PKG_TMPDIR/termi-matching-cxx"
 \tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q "$@"\\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_cxx"
 \tchmod 755 "$termi_cxx"
 \texport CXX="$termi_cxx"'''+ ('\n\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER=$termi_cxx"' if cmake else '')))
