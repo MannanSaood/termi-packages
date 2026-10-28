@@ -1,6 +1,29 @@
 """Repairs grounded in the first completed four-lane catalog failure logs."""
 import re
 
+QT5_HOST_HEADERS = r'''
+_termi_qt5_host_headers() {
+    python3 - "$TERMUX_PREFIX/include" "$TERMUX_PKG_TMPDIR/termi-qt5-host-headers" <<'TERMI_QT5_HOST_HEADERS'
+from pathlib import Path
+import re, shutil, sys
+prefix=Path(sys.argv[1]);private=Path(sys.argv[2]);private.mkdir(parents=True,exist_ok=True)
+assert not any(c.isspace() for c in str(private)), 'Unexpected Qt host include path'
+# Host tools need Qt's portable headers, never the Android C sysroot.
+for source in prefix.glob('Qt*'):
+    if source.is_dir() and not (private/source.name).exists():
+        shutil.copytree(source,private/source.name)
+files=[p for p in Path.cwd().glob('Makefile*') if p.is_file() and not p.is_symlink()]
+assert files, 'Qt host qmake produced no makefile'
+pattern=r'(?<!\S)(?:-I|-isystem)\s*'+re.escape(str(prefix))+r'(?=\s|$)'
+for p in files:
+    s=re.sub(pattern,'',p.read_text())
+    s,n=re.subn(r'(?m)^(INCPATH\s*=.*)$',lambda m:m[1]+' -I'+str(private),s)
+    assert n==1, 'Qt host INCPATH assignment changed'
+    p.write_text(s)
+TERMI_QT5_HOST_HEADERS
+}
+'''
+
 LDC_HOST_XML_SETUP = r'''
 # LDC 1.30's official Linux host bootstrap needs the older libxml2 SONAME.
 # Keep this source-built compatibility library private to the host recipe.
@@ -96,6 +119,19 @@ TERMI_WX_THREADS'''),tree='x11-packages')
     change('qt5-qtbase', lambda t: hook(t, 'termux_step_pre_configure',
         '\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"'),tree='x11-packages')
 
+    # These projects auto-detect the Android ccache in the target prefix and
+    # try to execute it on Linux. Disable only the optional build cache.
+    change('opencv',lambda t:hook(t,'termux_step_pre_configure',
+        '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DENABLE_CCACHE=OFF"'),tree='x11-packages')
+    change('flameshot',lambda t:hook(t,'termux_step_pre_configure',
+        '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DENABLE_CACHE=OFF"'),tree='x11-packages')
+
+    def qt5_declarative_host_headers(t):
+        anchor='-spec "${TERMUX_PREFIX}/lib/qt/mkspecs/termux-host"\n'
+        assert t.count(anchor)==4, 'Qt5 Declarative host qmake sites changed'
+        return t.replace(anchor,anchor+'\t_termi_qt5_host_headers\n') + QT5_HOST_HEADERS
+    change('qt5-qtdeclarative',qt5_declarative_host_headers,tree='x11-packages')
+
     # binutils/Makefile.am compiles sysinfo with Linux CC_FOR_BUILD but its
     # default CPPFLAGS_FOR_BUILD otherwise inherits the Android include path.
     change('binutils', lambda t: hook(t, 'termux_step_pre_configure',
@@ -141,8 +177,8 @@ TERMI_BINUTILS_HOST'''))
 \tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_webkit_launcher"
 \tchmod 755 "$termi_webkit_launcher"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_webkit_launcher"''')
-        return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys'})
-    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg']]:
+        return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza'})
+    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza']]:
         change(name, lambda t, name=name: configure_consumer(t,name),tree=tree)
 
     # Keep the legacy tokenizer's warning visible without treating the NDK's
