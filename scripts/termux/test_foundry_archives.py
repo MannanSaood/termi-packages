@@ -36,6 +36,7 @@ class FoundryArchivesTests(unittest.TestCase):
                 self.assertNotIn('"libsecp256k1.a"',build)
                 self.assertIn('libtermi_secp256k1_'+version.replace('.','_')+'.a',build)
                 self.assertIn('cargo:rustc-check-cfg=cfg(secp256k1_fuzz)',build)
+                self.assertIn('cargo:rustc-check-cfg=cfg(rust_secp_no_symbol_renaming)',build)
 
     def test_missing_pinned_version_stops_build(self):
         with tempfile.TemporaryDirectory() as tmp:

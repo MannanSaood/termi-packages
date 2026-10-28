@@ -27,7 +27,7 @@ class SwiftHeadersTest(unittest.TestCase):
             self.assertEqual(out.splitlines(),['-nostdinc++ -I/prefix/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted common-android-aarch64','common-linux-x86_64'])
             fake=Path(tmp)/'compiler';fake.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n');fake.chmod(0o755)
             out=subprocess.check_output([bash,str(launcher),fake.as_posix(),'-I/prefix/include','-Werror=gnu'],text=True)
-            self.assertEqual(out.splitlines(),['-nostdinc++','-I/prefix/include/c++/v1','-I/prefix/include','-Werror=gnu','-Wno-error=variadic-macro-arguments-omitted'])
+            self.assertEqual(out.splitlines(),['-nostdinc++','-I/prefix/include/c++/v1','-I/prefix/include','-Werror=gnu','-Wno-error=variadic-macro-arguments-omitted','-Wno-error=gnu-include-next'])
             self.assertIn('termi_swift_cxx_launcher_option',s)
     def test_source_drift(self):
         with self.assertRaises(ValueError): swift_target_cxx_headers('changed')

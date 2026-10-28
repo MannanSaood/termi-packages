@@ -31,7 +31,7 @@ for directory in sorted((root/'vendor').glob('secp256k1-sys*')):
     source=build.read_text()
     if source.count('fn main() {')!=1:
         raise ValueError('secp256k1 build entry point changed')
-    build.write_text(source.replace('fn main() {','fn main() {\n    println!("cargo:rustc-check-cfg=cfg(secp256k1_fuzz)");'))
+    build.write_text(source.replace('fn main() {','fn main() {\n    println!("cargo:rustc-check-cfg=cfg(secp256k1_fuzz)");\n    println!("cargo:rustc-check-cfg=cfg(rust_secp_no_symbol_renaming)");'))
     entries.append('termi_secp_'+version.replace('.','_')+' = { package = "secp256k1-sys", path = "'+directory.as_posix()+'" }')
 if versions!={'0.10.1','0.11.0'}:
     raise ValueError('Missing pinned secp256k1 version')
@@ -126,7 +126,7 @@ assert s.count(old) == 1, 'Swift C++ flag anchor changed'
 replacement = '-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}" $(termi_swift_cxx_launcher_option ${host})'
 launcher=Path(sys.argv[3])
 assert not any(c.isspace() for c in str(launcher)), 'Swift launcher path must not contain whitespace'
-launcher.write_text('#!/bin/bash\ncompiler="$1"\nshift\nexec "$compiler" -nostdinc++ -I'+shlex.quote(sys.argv[2]+'/include/c++/v1')+' "$@" -Wno-error=variadic-macro-arguments-omitted\n')
+launcher.write_text('#!/bin/bash\ncompiler="$1"\nshift\nexec "$compiler" -nostdinc++ -I'+shlex.quote(sys.argv[2]+'/include/c++/v1')+' "$@" -Wno-error=variadic-macro-arguments-omitted -Wno-error=gnu-include-next\n')
 launcher.chmod(0o755)
 helper = '''
 function termi_swift_cxx_flags() {
