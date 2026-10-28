@@ -19,7 +19,7 @@ from catalog_graph import create_plan, digest
 
 # These currently dominate shared dependency rebuilds. Focused source jobs may
 # also produce them; other lanes wait for hash-verified outputs in the next seed.
-SHARED_BUILD_OWNERS = {"qt6-qtdeclarative": 3, "ldc": 7, "swift": 5}
+SHARED_BUILD_OWNERS = {"qt6-qtdeclarative": 3, "ldc": 7, "swift": 5, "flang": 7}
 
 
 class DiskPressure(Exception):
