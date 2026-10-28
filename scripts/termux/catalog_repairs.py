@@ -3,6 +3,25 @@ import re
 
 
 def apply(change, hook, prepared):
+    # binutils/Makefile.am compiles sysinfo with Linux CC_FOR_BUILD but its
+    # default CPPFLAGS_FOR_BUILD otherwise inherits the Android include path.
+    change('binutils', lambda t: hook(t, 'termux_step_pre_configure',
+        '\texport CPPFLAGS_FOR_BUILD=" "'))
+
+    # These native failures show prefix C headers before implicit NDK libc++.
+    # A compiler wrapper also precedes dependency-generated -I options.
+    for name in ['libavif', 'libopenmpt']:
+        change(name, lambda t: hook(t, 'termux_step_pre_configure', '''\tlocal termi_cxx="$TERMUX_PKG_TMPDIR/termi-matching-cxx"
+\tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q "$@"\\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_cxx"
+\tchmod 755 "$termi_cxx"
+\texport CXX="$termi_cxx"'''))
+
+    # libsvn_subr directly uses the Android System V semaphore shim. LIBS
+    # keeps the shim after objects on --as-needed link lines.
+    change('subversion', lambda t: hook(t.replace(
+        'utf8proc, zlib, libmagic"', 'utf8proc, zlib, libmagic, libandroid-sysv-semaphore"'),
+        'termux_step_pre_configure', '\texport LIBS="${LIBS:-} -landroid-sysv-semaphore"'))
+
     # HOST manpage/completion generators must never inherit Android cgo flags.
     for name in ['restic', 'scc', 'tdl']:
         change(name, lambda t: t.replace('unset GOOS GOARCH CGO_LDFLAGS',
