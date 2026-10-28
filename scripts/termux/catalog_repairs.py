@@ -152,12 +152,16 @@ TERMI_PIPEWIRE_AVAHI''')))
     # LLVM 14's SmallVector uses uint32_t/uint64_t but relies on transitive
     # includes removed by newer host standard libraries. Fix the owning header.
     change('ldc', lambda t: matching_cxx(hook(t, 'termux_step_host_build', '''
-\tpython3 - "$TERMUX_PKG_SRCDIR/llvm/include/llvm/ADT/SmallVector.h" <<'TERMI_LDC_STDINT'
+\tpython3 - "$TERMUX_PKG_SRCDIR/llvm/include/llvm/ADT/SmallVector.h" "$TERMUX_PKG_SRCDIR/tools/CMakeLists.txt" <<'TERMI_LDC_STDINT'
 from pathlib import Path
 import sys
 p=Path(sys.argv[1]);s=p.read_text()
 assert s.count('#include <cstddef>')==1 and '#include <cstdint>' not in s, 'LDC LLVM14 header changed'
 p.write_text(s.replace('#include <cstddef>','#include <cstddef>\\n#include <cstdint>'))
+p=Path(sys.argv[2]);s=p.read_text()
+anchor='    target_link_libraries(ldc-profdata ${LLVM_LIBRARIES} ${CMAKE_DL_LIBS} ${LLVM_LDFLAGS})'
+assert s.count(anchor)==1, 'LDC profiler link anchor changed'
+p.write_text(s.replace(anchor,anchor+'\\n    if(ANDROID)\\n        target_link_libraries(ldc-profdata android-execinfo)\\n    endif()'))
 TERMI_LDC_STDINT
 \t_termi_ldc_host_xml
 \t"$TERMUX_PKG_SRCDIR/ldc2-$TERMUX_PKG_VERSION-linux-x86_64/bin/ldmd2" --version'''), True).replace('termux_step_configure() {', '''termux_step_configure() {
