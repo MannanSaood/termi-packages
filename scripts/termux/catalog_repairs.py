@@ -3,6 +3,35 @@ import re
 
 
 def apply(change, hook, prepared):
+    # The upstream autogen allowlists reject modern host libtool/automake even
+    # though they exceed its advertised minimums. Keep the bootstrap sequence.
+    change('libgmime', lambda t: hook(t, 'termux_step_pre_configure', '''
+\tpython3 - "$TERMUX_PKG_SRCDIR/autogen.sh" <<'TERMI_GMIME_AUTOGEN'
+from pathlib import Path
+import re, sys
+p=Path(sys.argv[1]);s=p.read_text()
+old="""\tcase $libtool_version in
+\t    1.4*|1.5*|2.2*|2.4*)
+\t\thave_libtool=true
+\t\t;;
+\tesac"""
+assert s.count(old)==1, 'GMime libtool version check changed'
+s=s.replace(old, """\tif test -n "$libtool_version" && test "$(printf '%s\\n' 1.4 "$libtool_version" | sort -V | head -n 1)" = 1.4; then
+\t\thave_libtool=true
+\tfi""")
+pattern=r'for automake_version in 1\\.9 1\\.10 1\\.11 1\\.12 1\\.13 1\\.14 1\\.15 1\\.16; do\\n.*?\\ndone'
+matches=list(re.finditer(pattern,s,re.S))
+assert len(matches)==1, 'GMime automake version check changed'
+replacement="""if automake --version < /dev/null > /dev/null 2>&1 && aclocal --version < /dev/null > /dev/null 2>&1; then
+    automake_version=$(automake --version | sed '/^$/d;s/([^)]*)//g;s/^[^0-9]*//;s/[- ].*//g;q')
+    if test -n "$automake_version" && test "$(printf '%s\\n' 1.9 "$automake_version" | sort -V | head -n 1)" = 1.9; then
+        AUTOMAKE=automake
+        ACLOCAL=aclocal
+    fi
+fi"""
+m=matches[0];p.write_text(s[:m.start()]+replacement+s[m.end():])
+TERMI_GMIME_AUTOGEN'''))
+
     # binutils/Makefile.am compiles sysinfo with Linux CC_FOR_BUILD but its
     # default CPPFLAGS_FOR_BUILD otherwise inherits the Android include path.
     change('binutils', lambda t: hook(t, 'termux_step_pre_configure',
