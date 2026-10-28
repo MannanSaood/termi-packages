@@ -12,6 +12,21 @@ import publish_progress
 
 
 class ProgressTests(unittest.TestCase):
+    def test_late_compile_failure_survives_early_configure_probe_errors(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'compile.log'
+            with path.open('wb') as stream:
+                stream.write(b'configure: error: optional feature probe\n'*8)
+                stream.seek(33*1024**2)
+                stream.write(b'\nsource.cpp:123: error: actual late failure\n')
+                stream.write(b'parallel successful output\n'*1000)
+                stream.write(b'make: stopped\n')
+            excerpt=catalog_progress.failure_excerpt(path)
+            self.assertIn('optional feature probe',excerpt)
+            self.assertIn('actual late failure',excerpt)
+            self.assertIn('make: stopped',excerpt)
+            self.assertLessEqual(len(excerpt.encode()),8192)
+
     def test_first_error_is_retained_when_parallel_output_pushes_it_out_of_tail(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'compile.log'

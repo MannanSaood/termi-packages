@@ -32,9 +32,26 @@ def failure_excerpt(path):
                 first.append(line[:512])
                 if len(first) == 8:
                     break
-    if not first:
+    # Configure feature probes can fill the first eight matches. Also inspect
+    # a bounded end window so the later real compile failure remains visible.
+    latest = []
+    with path.open("rb") as stream:
+        offset = max(0, path.stat().st_size - 8*1024**2)
+        stream.seek(offset)
+        data = stream.read(8*1024**2)
+    lines = data.splitlines(keepends=True)
+    if offset:
+        lines = lines[1:]  # The window may begin partway through a line.
+    for line in lines:
+        if re.search(rb"error:|fatal error|Wrong checksum|FAILED:|Killed", line, re.I):
+            latest.append(line[:512])
+            latest = latest[-8:]
+    if not first and not latest:
         return tail(path)
-    return "First diagnostics (bounded):\n" + b"".join(first).decode("utf-8", errors="replace")[:3500] + "\nLast output:\n" + tail(path,4096)
+    result = ("First diagnostics (bounded):\n" + b"".join(first).decode("utf-8", errors="replace")[:1500]
+              + "\nLatest diagnostics (bounded):\n" + b"".join(latest).decode("utf-8", errors="replace")[:1500]
+              + "\nLast output:\n" + tail(path,4096))
+    return result.encode("utf-8")[:8192].decode("utf-8", errors="ignore")
 
 
 def snapshot(root, state):
