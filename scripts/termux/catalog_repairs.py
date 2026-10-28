@@ -28,7 +28,10 @@ TERMI_BINUTILS_HOST'''))
 \tchmod 755 "$termi_cxx"
 \texport CXX="$termi_cxx"'''+ ('\n\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER=$termi_cxx"' if cmake else ''))
     for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti']]:
-        change(name, lambda t, cmake=name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti'}: matching_cxx(t,cmake),tree=tree)
+        # Qt6's public dialect bits predate md4c 0.6's new default flags (one
+        # collides with Qt's front-matter bit). Build Qt's matching bundled
+        # source parser using its documented input; retain Markdown support.
+        change(name, lambda t, cmake=name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti'}, bundled=name=='qt6-qtbase': matching_cxx(hook(t,'termux_step_pre_configure','\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DINPUT_libmd4c=qt"') if bundled else t,cmake),tree=tree)
 
     # Keep the legacy tokenizer's warning visible without treating the NDK's
     # newly added deprecation annotation as a build error.

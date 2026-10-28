@@ -136,9 +136,16 @@ function termi_swift_cxx_flags() {
 function termi_swift_cxx_launcher_option() {
     case "$1" in android-*) printf '%s' @TERMI_CXX_LAUNCHER@;; esac
 }
-'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted ')).replace('@TERMI_CXX_LAUNCHER@', shlex.quote('-DCMAKE_CXX_COMPILER_LAUNCHER='+str(launcher)))
+function termi_swift_importer_flags() {
+    case "$1" in android-*) printf '%s' @TERMI_IMPORTER_FLAGS@;; esac
+    common_swift_flags
+}
+'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted ')).replace('@TERMI_CXX_LAUNCHER@', shlex.quote('-DCMAKE_CXX_COMPILER_LAUNCHER='+str(launcher))).replace('@TERMI_IMPORTER_FLAGS@',shlex.quote('-Xcc -nostdinc++ -Xcc -I'+sys.argv[2]+'/include/c++/v1 '))
 assert s.count('function swift_c_flags() {') == 1
 s = s.replace('function swift_c_flags() {', helper + '\nfunction swift_c_flags() {')
+swift_flags='-DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"'
+assert s.count(swift_flags)==5, 'Swift importer flag anchors changed'
+s=s.replace(swift_flags,'-DCMAKE_Swift_FLAGS:STRING="$(termi_swift_importer_flags ${host})"')
 p.write_text(s.replace(old, replacement))
 TERMI_SWIFT
 """
