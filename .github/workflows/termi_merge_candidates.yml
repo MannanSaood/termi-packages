@@ -27,6 +27,7 @@ jobs:
           python3 -m unittest discover -s scripts/termux -p 'test_parallel_catalog.py' -v
           python3 -m unittest discover -s scripts/termux -p 'test_resume_merged_lanes.py' -v
           python3 -m unittest discover -s scripts/termux -p 'test_merge_streaming.py' -v
+          python3 -m unittest discover -s scripts/termux -p 'test_selected_candidate.py' -v
       - name: Merge pinned own-source candidates
         env:
           GH_TOKEN: ${{ github.token }}

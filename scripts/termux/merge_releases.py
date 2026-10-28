@@ -10,6 +10,7 @@ import tarfile
 
 from parallel_catalog import merge
 from seed import pinned, digest
+from selected_candidate import ledger_from_progress
 
 
 def run(command):
@@ -56,6 +57,16 @@ def main():
                         recipes={n:dict(status="built" if n in parents else r["initial_status"],attempts=0)
                                  for n,r in plan["recipes"].items()},verified_successful_run=run_id)
             path=directory/"catalog-ledger.json";path.write_text(json.dumps(ledger,indent=2)+"\n")
+            ledger_pin=digest(path)
+        elif entry.get('selected_progress'):
+            proof=entry['selected_progress']
+            progress=json.loads(pinned(directory,'progress.json',proof['progress_sha256']).read_text())
+            receipt=json.loads(pinned(directory,'seed-provenance.json',proof['seed_provenance_sha256']).read_text())
+            run_id=tag.split('-')[1]
+            status=json.loads(run(['gh','run','view',run_id,'--repo',repository,'--json','status,conclusion,jobs']))
+            ledger=ledger_from_progress(plan,inventory,progress,receipt,proof['base_seed'],status,run_id)
+            ledger['selected_proof_pins']=proof
+            path=directory/'catalog-ledger.json';path.write_text(json.dumps(ledger,indent=2)+'\n')
             ledger_pin=digest(path)
         if not ledger_pin:
             raise ValueError("Explicit catalog ledger pin required")

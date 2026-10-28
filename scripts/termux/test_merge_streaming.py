@@ -13,6 +13,46 @@ import test_parallel_catalog
 
 
 class StreamingMergeTests(unittest.TestCase):
+    def test_mixed_focused_candidate_requires_pinned_final_root_proofs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            value=test_parallel_catalog.MergeTests().candidate(root/'source','ab')
+            directory=root/'source'
+            plan=json.loads((directory/'catalog-plan.json').read_text())
+            inventory=json.loads((directory/'inventory.json').read_text())
+            base=dict(inventory='1'*64,ledger='2'*64,plan='3'*64)
+            receipt=dict(schema=1,status='source-build-cache-not-runtime-approval',new_graph_identity=plan['identity'],
+                         inventory_sha256=base['inventory'],ledger_sha256=base['ledger'],graph_sha256=base['plan'],
+                         recipes=['a'],packages=[r for r in inventory['packages'] if r['recipe']=='a'])
+            progress=dict(schema=1,scope='requested-roots',approved=False,current=[],total_recipes=2,
+                          counts=dict(built=1,failed=1),completed_recipes=['b'],
+                          failures=[dict(recipe='c',status='failed',exit_code=1)])
+            for name,content in [('progress.json',progress),('seed-provenance.json',receipt)]:
+                (directory/name).write_text(json.dumps(content))
+            entry=dict(tag='candidate-1-1-0',inventory_sha256=value[1],plan_sha256=value[3],
+                       selected_progress=dict(progress_sha256=digest(directory/'progress.json'),
+                           seed_provenance_sha256=digest(directory/'seed-provenance.json'),base_seed=base))
+            manifest=root/'manifest.json'
+            manifest.write_text(json.dumps(dict(repository='MannanSaood/termi-packages',candidates=[entry],required_completed_recipes=['a','b'])))
+            state=dict(status='in_progress',jobs=[dict(steps=[
+                dict(name='Compile bounded source batch with time left for checkpoint export',status='completed',conclusion='failure'),
+                dict(name='Publish candidate evidence to Releases, never the live APT repo',status='completed',conclusion='success')])])
+            def read(command):
+                return json.dumps(state if command[1:3]==['run','view'] else dict(visibility='PUBLIC'))
+            def command(args,**kwargs):
+                if args[1:3]==['release','download']:
+                    target=Path(args[args.index('--dir')+1])
+                    for source in directory.iterdir():shutil.copyfile(source,target/source.name)
+            previous=Path.cwd()
+            try:
+                os.chdir(root)
+                with patch.object(sys,'argv',['merge','--manifest',str(manifest),'--output','build/merged','--tag','candidate-99-1-0']),patch.object(merge_releases,'run',side_effect=read),patch.object(merge_releases.subprocess,'run',side_effect=command):
+                    merge_releases.main()
+                ledger=json.loads(Path('build/merged/catalog-ledger.json').read_text())
+                self.assertEqual({'a','b'},{n for n,r in ledger['recipes'].items() if r['status']=='built'})
+                self.assertEqual('failed',ledger['recipes']['c']['status'])
+            finally:os.chdir(previous)
+
     def test_incremental_merge_reclaims_inputs_and_keeps_all_provenance(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
