@@ -17,6 +17,10 @@ import time
 
 from catalog_graph import create_plan, digest
 
+# These currently dominate shared dependency rebuilds. Focused source jobs may
+# also produce them; other lanes wait for hash-verified outputs in the next seed.
+SHARED_BUILD_OWNERS = {"qt6-qtdeclarative": 3, "ldc": 7, "swift": 5}
+
 
 class DiskPressure(Exception):
     """Stop before a single large recipe can fill the shared runner filesystem."""
@@ -74,6 +78,8 @@ def lane_scope(recipes, lane):
     index, count = map(int, match.groups())
     # Keep older lane assignments stable; spread known heavy roots in the new eight-way round.
     heavy = {name: i for i, name in enumerate(("zig", "mono", "dotnet9.0", "dotnet10.0", "llvm", "rust", "webkit2gtk-4.1", "qt6-qtwebengine"))} if count == 8 else {}
+    if count == 8:
+        heavy.update(SHARED_BUILD_OWNERS)
     def owner(name):
         return heavy.get(name, int.from_bytes(hashlib.sha256(name.encode()).digest()[:8], "big") % count)
     owned = {name for name in recipes if owner(name) == index}
@@ -140,6 +146,12 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
             if name not in selected:
                 continue
             entry = ledger["recipes"][name]
+            if (lane and lane.endswith('-of-8') and name in SHARED_BUILD_OWNERS
+                    and name not in owned and entry['status'] != 'built'):
+                if entry['status'] not in ('failed', 'interrupted'):
+                    entry.update(status='deferred-shared-build',
+                                 shared_build_lane=f'lane-{SHARED_BUILD_OWNERS[name]}-of-8')
+                continue
             status = next_status({**recipe, "name": name}, ledger["recipes"], retry_failed)
             if status != "ready":
                 if status == "blocked-dependency":

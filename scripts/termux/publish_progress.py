@@ -28,7 +28,7 @@ def markdown(value):
               f"Verified prior Termi source recipes reused: **{value.get('reused_recipes', 0)}**\n\n"
               "| State | Count |\n|---|---:|\n" +
               "".join(f"| {name} | {counts.get(name, 0) if known else 'unknown'} |\n" for name in
-                      ["running", "failed", "interrupted", "blocked-dependency", "blocked-cycle", "pending", "excluded-architecture", "deferred-shard"]))
+                      ["running", "failed", "interrupted", "blocked-dependency", "blocked-cycle", "pending", "excluded-architecture", "deferred-shard", "deferred-shared-build"]))
     if value.get("lane"):
         result += f"\nLane: `{value['lane']}`; owned roots: {len(value.get('owned_roots', []))}. Other roots are deferred; shared dependencies and reused files overlap across lanes. Do not sum lane counts.\n"
     if value.get("halt"):

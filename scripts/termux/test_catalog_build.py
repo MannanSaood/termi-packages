@@ -10,6 +10,32 @@ from catalog_graph import order_and_cycles
 
 
 class GraphTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'posix', 'Linux isolated lane runner')
+    def test_shared_dependency_waits_for_seed_while_independent_work_continues(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            names=[f'fixture-{i}' for i in range(100)]
+            owned,_=builder.lane_scope({n:dict(dependencies=[]) for n in names},'lane-1-of-8')
+            app,independent=sorted(owned)[:2]
+            plan=dict(identity='shared-fixture',configuration={},recipes={
+                'qt6-qtdeclarative':dict(path='packages/qt6-qtdeclarative',dependencies=[],rank=0,initial_status='pending'),
+                app:dict(path='packages/'+app,dependencies=['qt6-qtdeclarative'],rank=1,initial_status='pending'),
+                independent:dict(path='packages/'+independent,dependencies=[],rank=2,initial_status='pending')})
+            for seeded in (False,True):
+                root=Path(temporary)/str(seeded);root.mkdir()
+                for name in ['upstream.lock.json','source.json','patches.json']:
+                    (root/name).write_text('{}')
+                (root/'build-package.sh').write_text('#!/bin/bash\necho "${@: -1}" >> executed\n')
+                if seeded:
+                    (root/'artifacts').mkdir()
+                    (root/'artifacts/seed-provenance.json').write_text(json.dumps(dict(
+                        new_graph_identity='shared-fixture',recipes=['qt6-qtdeclarative'],inventory_sha256='fixture')))
+                with patch.object(builder,'create_plan',return_value=plan):
+                    self.assertEqual(0 if seeded else 1,builder.build(root,root,root/'state',minimum_free_gib=0,lane='lane-1-of-8'))
+                executed=set((root/'executed').read_text().splitlines())
+                self.assertEqual({'packages/'+independent}|({'packages/'+app} if seeded else set()),executed)
+                ledger=json.loads((root/'state/ledger.json').read_text())
+                self.assertEqual('built' if seeded else 'deferred-shared-build',ledger['recipes']['qt6-qtdeclarative']['status'])
+
     def test_disk_guard_keeps_full_configured_reserve_during_compilation(self):
         process=Mock()
         with patch.object(builder.shutil,'disk_usage',return_value=Mock(free=12*1024**3)):
