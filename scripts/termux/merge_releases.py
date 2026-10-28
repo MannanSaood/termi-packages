@@ -29,6 +29,9 @@ def main():
     if json.loads(run(["gh","repo","view",repository,"--json","visibility"]))["visibility"]!="PUBLIC":
         raise ValueError("Free public repository required")
     inputs=[]
+    source_pins=[]
+    alternates=[]
+    accumulator=None
     for index,entry in enumerate(manifest["candidates"]):
         tag=entry["tag"]
         if not re.fullmatch(r"candidate-[0-9]+-[0-9]+-0",tag):
@@ -56,8 +59,33 @@ def main():
             ledger_pin=digest(path)
         if not ledger_pin:
             raise ValueError("Explicit catalog ledger pin required")
-        inputs.append([str(directory),entry["inventory_sha256"],ledger_pin,entry["plan_sha256"]])
-    _, inventory=merge(inputs,args.output,prefer_first_compatible=manifest.get("duplicate_policy")=="prefer-first-compatible-parent")
+        candidate=[str(directory),entry["inventory_sha256"],ledger_pin,entry["plan_sha256"]]
+        source_pins.append(dict(inventory=candidate[1],ledger=candidate[2],plan=candidate[3]))
+        inputs.append(candidate)
+        # Download/expand only one new candidate at a time. Keeping all lane
+        # bundles AND extracted copies exhausted the standard runner's disk.
+        next_output=Path('build/merge-working')/str(index)
+        _, inventory=merge(inputs,next_output,prefer_first_compatible=manifest.get("duplicate_policy")=="prefer-first-compatible-parent")
+        alternates.extend(inventory.get('alternate_builds',[]))
+        # Reclaim only these explicitly created disposable input directories,
+        # and only AFTER every chosen output has been hash-verified/copied.
+        shutil.rmtree(directory)
+        if accumulator is not None:
+            shutil.rmtree(accumulator)
+        accumulator=next_output
+        inputs=[[str(accumulator),*[digest(accumulator/name) for name in
+                 ['inventory.json','catalog-ledger.json','catalog-plan.json']]]]
+    if accumulator is None:
+        raise ValueError('At least one candidate required')
+    accumulator.rename(args.output)
+    # Preserve original candidate provenance, not hashes of deleted temporary
+    # accumulators, and retain alternate builds from every incremental merge.
+    inventory['source_candidates']=source_pins
+    inventory['alternate_builds']=alternates
+    (args.output/'inventory.json').write_text(json.dumps(inventory,indent=2)+'\n')
+    ledger=json.loads((args.output/'catalog-ledger.json').read_text())
+    ledger['source_candidates']=source_pins
+    (args.output/'catalog-ledger.json').write_text(json.dumps(ledger,indent=2)+'\n')
     missing = set(manifest.get("required_completed_recipes", [])) - {r["recipe"] for r in inventory["packages"]}
     if missing:
         raise ValueError("Merge dropped required completed recipes: " + ", ".join(sorted(missing)))

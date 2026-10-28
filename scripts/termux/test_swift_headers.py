@@ -25,9 +25,9 @@ class SwiftHeadersTest(unittest.TestCase):
             p.write_text(s+'\nunset TERMUX_PREFIX\ntermi_swift_cxx_flags android-aarch64\nprintf "\\n"\ntermi_swift_cxx_flags linux-x86_64\n')
             out=subprocess.check_output([bash,str(p)],text=True)
             self.assertEqual(out.splitlines(),['-nostdinc++ -I/prefix/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted common-android-aarch64','common-linux-x86_64'])
-            fake=Path(tmp)/'compiler.py';fake.write_text('import sys\nprint("\\n".join(sys.argv[1:]))\n')
-            out=subprocess.check_output([bash,str(launcher),sys.executable,str(fake),'-Werror=gnu'],text=True)
-            self.assertEqual(out.splitlines(),['-Werror=gnu','-Wno-error=variadic-macro-arguments-omitted'])
+            fake=Path(tmp)/'compiler';fake.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n');fake.chmod(0o755)
+            out=subprocess.check_output([bash,str(launcher),fake.as_posix(),'-I/prefix/include','-Werror=gnu'],text=True)
+            self.assertEqual(out.splitlines(),['-nostdinc++','-I/prefix/include/c++/v1','-I/prefix/include','-Werror=gnu','-Wno-error=variadic-macro-arguments-omitted'])
             self.assertIn('termi_swift_cxx_launcher_option',s)
     def test_source_drift(self):
         with self.assertRaises(ValueError): swift_target_cxx_headers('changed')

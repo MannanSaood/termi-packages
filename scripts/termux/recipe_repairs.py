@@ -26,6 +26,12 @@ for directory in sorted((root/'vendor').glob('secp256k1-sys*')):
         raise ValueError('secp256k1 archive anchors changed')
     unique='termi_secp256k1_'+version.replace('.','_')
     build.write_text(source.replace('"libsecp256k1.a"','"lib'+unique+'.a"'))
+    # Local path patches are first-party to Cargo, so dependency cap-lints no
+    # longer masks upstream's custom cfg under Foundry's -Dunexpected-cfgs.
+    source=build.read_text()
+    if source.count('fn main() {')!=1:
+        raise ValueError('secp256k1 build entry point changed')
+    build.write_text(source.replace('fn main() {','fn main() {\n    println!("cargo:rustc-check-cfg=cfg(secp256k1_fuzz)");'))
     entries.append('termi_secp_'+version.replace('.','_')+' = { package = "secp256k1-sys", path = "'+directory.as_posix()+'" }')
 if versions!={'0.10.1','0.11.0'}:
     raise ValueError('Missing pinned secp256k1 version')
@@ -120,7 +126,7 @@ assert s.count(old) == 1, 'Swift C++ flag anchor changed'
 replacement = '-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}" $(termi_swift_cxx_launcher_option ${host})'
 launcher=Path(sys.argv[3])
 assert not any(c.isspace() for c in str(launcher)), 'Swift launcher path must not contain whitespace'
-launcher.write_text('#!/bin/bash\nexec "$@" -Wno-error=variadic-macro-arguments-omitted\n')
+launcher.write_text('#!/bin/bash\ncompiler="$1"\nshift\nexec "$compiler" -nostdinc++ -I'+shlex.quote(sys.argv[2]+'/include/c++/v1')+' "$@" -Wno-error=variadic-macro-arguments-omitted\n')
 launcher.chmod(0o755)
 helper = '''
 function termi_swift_cxx_flags() {

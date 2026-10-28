@@ -26,12 +26,23 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/termux -p 'test_parallel_catalog.py' -v
           python3 -m unittest discover -s scripts/termux -p 'test_resume_merged_lanes.py' -v
+          python3 -m unittest discover -s scripts/termux -p 'test_merge_streaming.py' -v
       - name: Merge pinned own-source candidates
         env:
           GH_TOKEN: ${{ github.token }}
           MANIFEST: ${{ inputs.manifest }}
         run: |
           set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$RUNNER_OS" = Linux
+          df -h /
+          for directory in /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL; do
+            if [ -d "$directory" ]; then
+              test "$(readlink -f "$directory")" = "$directory"
+              sudo rm -rf -- "$directory"
+            fi
+          done
+          df -h /
           case "$MANIFEST" in packages/termux/batch-[0-9]*.json) ;; *) exit 2;; esac
           mkdir -p build
           python3 scripts/termux/merge_releases.py --manifest "$MANIFEST" --output build/merged \

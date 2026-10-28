@@ -21,7 +21,7 @@ class FoundryArchivesTests(unittest.TestCase):
             directory=root/'vendor'/('secp256k1-sys-'+version)
             directory.mkdir(parents=True)
             (directory/'Cargo.toml').write_text('[package]\nname="secp256k1-sys"\nversion="'+version+'"\n')
-            (directory/'build.rs').write_text('base.try_compile("libsecp256k1.a");\nbase.compile("libsecp256k1.a");\n')
+            (directory/'build.rs').write_text('fn main() {\nbase.try_compile("libsecp256k1.a");\nbase.compile("libsecp256k1.a");\n}\n')
 
     def test_both_crate_versions_use_distinct_names_and_keep_existing_patches(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -35,6 +35,7 @@ class FoundryArchivesTests(unittest.TestCase):
                 build=(root/patches[key]['path']/'build.rs').read_text()
                 self.assertNotIn('"libsecp256k1.a"',build)
                 self.assertIn('libtermi_secp256k1_'+version.replace('.','_')+'.a',build)
+                self.assertIn('cargo:rustc-check-cfg=cfg(secp256k1_fuzz)',build)
 
     def test_missing_pinned_version_stops_build(self):
         with tempfile.TemporaryDirectory() as tmp:
