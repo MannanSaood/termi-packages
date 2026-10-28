@@ -40,6 +40,42 @@ class SelectedCandidateTests(unittest.TestCase):
         args=self.inputs();args[1]['packages'][0]['sha256']='7'*64
         with self.assertRaises(ValueError):ledger_from_progress(*args)
 
+    def dependency_inputs(self):
+        args=self.inputs()
+        args[0]['recipes']['dependency']=dict(initial_status='pending',dependencies=[])
+        # Dependencies of a failed root may have completed before that root
+        # failed; the failed root itself must retain its failed status.
+        args[0]['recipes']['bad']['dependencies']=['dependency']
+        args[1]['packages'].append(dict(file='dependency.deb',recipe='dependency',sha256='6'*64))
+        return args
+
+    def test_dependency_requires_complete_native_log_finish_proof(self):
+        args=self.dependency_inputs()
+        with self.assertRaises(ValueError):ledger_from_progress(*args)
+        log="termux - build of 'dependency' done\ntermux - build of 'good' done\n"
+        value=ledger_from_progress(*args,build_log=log)
+        self.assertEqual(['dependency'],value['verified_completed_dependencies'])
+        self.assertEqual('built',value['recipes']['dependency']['status'])
+        self.assertEqual('failed',value['recipes']['bad']['status'])
+
+    def test_dependency_log_rejects_unreachable_or_missing_success(self):
+        for log in ["termux - build of 'good' done\n", "termux - build of 'dependency' done\n"]:
+            with self.assertRaises(ValueError):ledger_from_progress(*self.dependency_inputs(),build_log=log)
+        args=self.dependency_inputs();args[0]['recipes']['bad']['dependencies']=[]
+        with self.assertRaises(ValueError):
+            ledger_from_progress(*args,build_log="termux - build of 'dependency' done\ntermux - build of 'good' done\n")
+
+    def test_failed_root_cannot_be_admitted_by_log_marker(self):
+        args=self.inputs();args[0]['recipes']['good']['dependencies']=['bad']
+        args[1]['packages'].append(dict(file='bad.deb',recipe='bad',sha256='6'*64))
+        with self.assertRaises(ValueError):
+            ledger_from_progress(*args,build_log="termux - build of 'bad' done\ntermux - build of 'good' done\n")
+
+    def test_dependency_proof_cannot_change_unrebuilt_seed_bytes(self):
+        args=self.dependency_inputs();args[1]['packages'][0]['sha256']='7'*64
+        with self.assertRaises(ValueError):
+            ledger_from_progress(*args,build_log="termux - build of 'dependency' done\ntermux - build of 'good' done\n")
+
     def test_wrong_seed_or_graph_receipt_is_rejected(self):
         for key in ['new_graph_identity','inventory_sha256']:
             args=self.inputs();args[3][key]='wrong'

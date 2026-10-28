@@ -39,8 +39,12 @@ def main():
             raise ValueError("Untrusted candidate tag")
         directory=Path("build/merge-inputs")/str(index)
         directory.mkdir(parents=True)
-        subprocess.run(["gh","release","download",tag,"--repo",repository,"--pattern","*.json",
-                        "--pattern","*.deb","--pattern","*.tar","--dir",str(directory)],check=True)
+        patterns = ["*.json", "*.deb", "*.tar"]
+        if entry.get('selected_progress', {}).get('build_log_sha256'):
+            patterns.append('*build.log')
+        subprocess.run(["gh","release","download",tag,"--repo",repository,
+                        *[arg for pattern in patterns for arg in ['--pattern', pattern]],
+                        "--dir",str(directory)],check=True)
         inventory=json.loads(pinned(directory,"inventory.json",entry["inventory_sha256"]).read_text())
         plan_path=pinned(directory,"catalog-plan.json",entry["plan_sha256"])
         plan=json.loads(plan_path.read_text())
@@ -64,7 +68,10 @@ def main():
             receipt=json.loads(pinned(directory,'seed-provenance.json',proof['seed_provenance_sha256']).read_text())
             run_id=tag.split('-')[1]
             status=json.loads(run(['gh','run','view',run_id,'--repo',repository,'--json','status,conclusion,jobs']))
-            ledger=ledger_from_progress(plan,inventory,progress,receipt,proof['base_seed'],status,run_id)
+            build_log = None
+            if proof.get('build_log_sha256'):
+                build_log = pinned(directory,'build.log',proof['build_log_sha256']).read_text()
+            ledger=ledger_from_progress(plan,inventory,progress,receipt,proof['base_seed'],status,run_id,build_log)
             ledger['selected_proof_pins']=proof
             path=directory/'catalog-ledger.json';path.write_text(json.dumps(ledger,indent=2)+'\n')
             ledger_pin=digest(path)

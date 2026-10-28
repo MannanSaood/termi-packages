@@ -2,7 +2,7 @@
 import re
 
 
-def ledger_from_progress(plan, inventory, progress, receipt, base_pins, run, run_id):
+def ledger_from_progress(plan, inventory, progress, receipt, base_pins, run, run_id, build_log=None):
     jobs = run.get('jobs', [])
     if len(jobs) != 1 or run.get('status') not in ('in_progress', 'completed'):
         raise ValueError('Unexpected selected source run lifecycle')
@@ -46,6 +46,28 @@ def ledger_from_progress(plan, inventory, progress, receipt, base_pins, run, run
     if not built <= plan['recipes'].keys():
         raise ValueError('Unlisted completed source parent')
     records = inventory.get('packages', [])
+    parents = {r['recipe'] for r in records}
+    dependencies = parents - built
+    if dependencies:
+        # Focused progress reports requested roots, while their dependencies
+        # can also finish successfully before a different root fails. Admit
+        # only graph-reachable dependencies with explicit finish markers in
+        # this run's independently hash-pinned, published full native log.
+        reachable = completed | {f['recipe'] for f in failures}
+        while True:
+            expanded = reachable | {d for n in reachable
+                                    for d in plan['recipes'][n].get('dependencies', [])}
+            if expanded == reachable:
+                break
+            if not expanded <= plan['recipes'].keys():
+                raise ValueError('Unlisted focused dependency')
+            reachable = expanded
+        finished = set(re.findall(r"^termux - build of '([^'\r\n]+)' done$", build_log or '', re.M))
+        failed = {f['recipe'] for f in failures}
+        if (not dependencies <= reachable or dependencies & failed
+                or not (dependencies | completed) <= finished):
+            raise ValueError('Unproven focused dependency outputs')
+        built |= dependencies
     if {r['recipe'] for r in records} != built:
         raise ValueError('Candidate includes unproven parents or lacks completed outputs')
     # Failed roots never gain successful status merely because some archive
@@ -54,12 +76,13 @@ def ledger_from_progress(plan, inventory, progress, receipt, base_pins, run, run
     if {r['recipe'] for r in original.values()} != seeded:
         raise ValueError('Seed receipt has incomplete parent outputs')
     for record in records:
-        if record['recipe'] not in completed and record != original.get(record['file']):
+        if record['recipe'] not in completed | dependencies and record != original.get(record['file']):
             raise ValueError('Adopted output changed without successful root evidence')
     result = dict(identity=[plan['identity'], 'verified-selected-roots-' + str(run_id)],
                 recipes={n: dict(status='built' if n in built else r['initial_status'], attempts=0)
                          for n, r in plan['recipes'].items()},
                 verified_completed_roots=sorted(completed), base_seed_pins=base_pins,
+                verified_completed_dependencies=sorted(dependencies),
                 candidate_only=True)
     for failure in failures:
         if failure['recipe'] not in built:

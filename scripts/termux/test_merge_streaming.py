@@ -14,6 +14,15 @@ import test_parallel_catalog
 
 class StreamingMergeTests(unittest.TestCase):
     def test_mixed_focused_candidate_requires_pinned_final_root_proofs(self):
+        self.mixed_candidate()
+
+    def test_mixed_dependency_outputs_require_pinned_native_log(self):
+        self.mixed_candidate(dependencies=True)
+
+    def test_mixed_dependency_log_hash_mismatch_is_rejected(self):
+        self.mixed_candidate(dependencies=True,corrupt_log=True)
+
+    def mixed_candidate(self,dependencies=False,corrupt_log=False):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
             value=test_parallel_catalog.MergeTests().candidate(root/'source','ab')
@@ -24,6 +33,11 @@ class StreamingMergeTests(unittest.TestCase):
             receipt=dict(schema=1,status='source-build-cache-not-runtime-approval',new_graph_identity=plan['identity'],
                          inventory_sha256=base['inventory'],ledger_sha256=base['ledger'],graph_sha256=base['plan'],
                          recipes=['a'],packages=[r for r in inventory['packages'] if r['recipe']=='a'])
+            if dependencies:
+                plan['recipes']['b']['dependencies']=['a']
+                (directory/'catalog-plan.json').write_text(json.dumps(plan))
+                value[3]=digest(directory/'catalog-plan.json')
+                receipt.update(recipes=[],packages=[])
             progress=dict(schema=1,scope='requested-roots',approved=False,current=[],total_recipes=2,
                           counts=dict(built=1,failed=1),completed_recipes=['b'],
                           failures=[dict(recipe='c',status='failed',exit_code=1)])
@@ -32,6 +46,9 @@ class StreamingMergeTests(unittest.TestCase):
             entry=dict(tag='candidate-1-1-0',inventory_sha256=value[1],plan_sha256=value[3],
                        selected_progress=dict(progress_sha256=digest(directory/'progress.json'),
                            seed_provenance_sha256=digest(directory/'seed-provenance.json'),base_seed=base))
+            if dependencies:
+                (directory/'build.log').write_text("termux - build of 'a' done\ntermux - build of 'b' done\n")
+                entry['selected_progress']['build_log_sha256']=digest(directory/'build.log')
             manifest=root/'manifest.json'
             manifest.write_text(json.dumps(dict(repository='MannanSaood/termi-packages',candidates=[entry],required_completed_recipes=['a','b'])))
             state=dict(status='in_progress',jobs=[dict(steps=[
@@ -41,12 +58,17 @@ class StreamingMergeTests(unittest.TestCase):
                 return json.dumps(state if command[1:3]==['run','view'] else dict(visibility='PUBLIC'))
             def command(args,**kwargs):
                 if args[1:3]==['release','download']:
+                    if dependencies:self.assertIn('*build.log',args)
                     target=Path(args[args.index('--dir')+1])
                     for source in directory.iterdir():shutil.copyfile(source,target/source.name)
+                    if corrupt_log:(target/'build.log').write_text('tampered log')
             previous=Path.cwd()
             try:
                 os.chdir(root)
                 with patch.object(sys,'argv',['merge','--manifest',str(manifest),'--output','build/merged','--tag','candidate-99-1-0']),patch.object(merge_releases,'run',side_effect=read),patch.object(merge_releases.subprocess,'run',side_effect=command):
+                    if corrupt_log:
+                        with self.assertRaisesRegex(ValueError,'hash-pinned'):merge_releases.main()
+                        return
                     merge_releases.main()
                 ledger=json.loads(Path('build/merged/catalog-ledger.json').read_text())
                 self.assertEqual({'a','b'},{n for n,r in ledger['recipes'].items() if r['status']=='built'})
