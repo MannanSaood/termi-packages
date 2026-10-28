@@ -124,7 +124,7 @@ s = p.read_text()
 old = '-DCMAKE_CXX_FLAGS="$(swift_c_flags ${host}) ${cross_c_flags}"'
 assert s.count(old) == 1, 'Swift C++ flag anchor changed'
 replacement = ('-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}" $(termi_swift_cxx_launcher_option ${host})'
-               + ' -DCMAKE_Swift_FLAGS:STRING="$(termi_swift_importer_flags ${host})"')
+               + ' -DCMAKE_Swift_FLAGS:STRING="$(termi_swift_main_importer_flags ${host})"')
 launcher=Path(sys.argv[3])
 assert not any(c.isspace() for c in str(launcher)), 'Swift launcher path must not contain whitespace'
 launcher.write_text('#!/bin/bash\ncompiler="$1"\nshift\nexec "$compiler" -nostdinc++ -I'+shlex.quote(sys.argv[2]+'/include/c++/v1')+' "$@" -Wno-error=variadic-macro-arguments-omitted -Wno-error=gnu-include-next\n')
@@ -137,8 +137,13 @@ function termi_swift_cxx_flags() {
 function termi_swift_cxx_launcher_option() {
     case "$1" in android-*) printf '%s' @TERMI_CXX_LAUNCHER@;; esac
 }
-function termi_swift_importer_flags() {
+# Main compiler configuration precedes the Android standard-library build.
+# Keep its original compiler target/resource directory; only fix imports.
+function termi_swift_main_importer_flags() {
     case "$1" in android-*) printf '%s' @TERMI_IMPORTER_FLAGS@;; esac
+}
+function termi_swift_importer_flags() {
+    termi_swift_main_importer_flags "$1"
     common_swift_flags
 }
 '''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted ')).replace('@TERMI_CXX_LAUNCHER@', shlex.quote('-DCMAKE_CXX_COMPILER_LAUNCHER='+str(launcher))).replace('@TERMI_IMPORTER_FLAGS@',shlex.quote('-Xcc -nostdinc++ -Xcc -I'+sys.argv[2]+'/include/c++/v1 '))

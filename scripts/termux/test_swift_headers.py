@@ -24,7 +24,8 @@ class SwiftHeadersTest(unittest.TestCase):
             self.assertIn('-DCMAKE_C_FLAGS="$(swift_c_flags ${host})"',s)
             # BasicSwift belongs to the main Swift configure block, separate
             # from the five auxiliary projects' existing Swift flag sites.
-            self.assertEqual(6,s.count('-DCMAKE_Swift_FLAGS:STRING="$(termi_swift_importer_flags ${host})"'))
+            self.assertEqual(5,s.count('-DCMAKE_Swift_FLAGS:STRING="$(termi_swift_importer_flags ${host})"'))
+            self.assertEqual(1,s.count('-DCMAKE_Swift_FLAGS:STRING="$(termi_swift_main_importer_flags ${host})"'))
             s=s.split('flags=')[0]
             p.write_text(s+'\nunset TERMUX_PREFIX\ntermi_swift_cxx_flags android-aarch64\nprintf "\\n"\ntermi_swift_cxx_flags linux-x86_64\n')
             out=subprocess.check_output([bash,str(p)],text=True)
@@ -35,6 +36,9 @@ class SwiftHeadersTest(unittest.TestCase):
             p.write_text(s+'\nunset TERMUX_PREFIX\ntermi_swift_importer_flags android-aarch64\nprintf "\\n"\ntermi_swift_importer_flags linux-x86_64\n')
             out=subprocess.check_output([bash,str(p)],text=True)
             self.assertEqual(out.splitlines(),['-Xcc -nostdinc++ -Xcc -I/prefix/include/c++/v1 original-swift-flags','original-swift-flags'])
+            p.write_text(s+'\nunset TERMUX_PREFIX\ntermi_swift_main_importer_flags android-aarch64\nprintf "\\n"\ntermi_swift_main_importer_flags linux-x86_64\n')
+            out=subprocess.check_output([bash,str(p)],text=True)
+            self.assertEqual(out.splitlines(),['-Xcc -nostdinc++ -Xcc -I/prefix/include/c++/v1 '])
             self.assertIn('termi_swift_cxx_launcher_option',s)
     def test_source_drift(self):
         with self.assertRaises(ValueError): swift_target_cxx_headers('changed')
