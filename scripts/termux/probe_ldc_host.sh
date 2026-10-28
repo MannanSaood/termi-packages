@@ -10,6 +10,13 @@ cmake=/inputs/cmake-3.31.10-linux-x86_64/bin/cmake
 "$cmake" --version
 libtoolize --version | head -n 1
 automake --version | head -n 1
+export TERMUX_PKG_HOSTBUILD_DIR=/tmp/ldc-host TERMUX_PKG_TMPDIR=/tmp TERMUX_PKG_MAKE_PROCESSES=2
+termux_download() {
+    cp /inputs/libxml2-2.13.9.tar.xz "$2"
+    printf '%s  %s\n' "$3" "$2" | sha256sum --check --strict
+}
+source /inputs/ldc-host-xml.sh
+_termi_ldc_host_xml
 ldd /inputs/ldc2-1.30.0-linux-x86_64/bin/ldc2 || true
 version_status=0
 "$compiler" --version >/tmp/ldc-stdout.log 2>/tmp/ldc-stderr.log || version_status=$?

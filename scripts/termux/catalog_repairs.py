@@ -1,6 +1,35 @@
 """Repairs grounded in the first completed four-lane catalog failure logs."""
 import re
 
+LDC_HOST_XML_SETUP = r'''
+# LDC 1.30's official Linux host bootstrap needs the older libxml2 SONAME.
+# Keep this source-built compatibility library private to the host recipe.
+_termi_ldc_host_xml() {
+    local base="$TERMUX_PKG_HOSTBUILD_DIR/termi-host-xml"
+    local install="$base/install"
+    if [ ! -f "$install/lib/libxml2.so.2" ]; then
+        local archive="$TERMUX_PKG_TMPDIR/libxml2-2.13.9.tar.xz"
+        termux_download https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.9.tar.xz \
+            "$archive" a2c9ae7b770da34860050c309f903221c67830c86e4a7e760692b803df95143a
+        mkdir -p "$base"
+        tar -xf "$archive" -C "$base"
+        (
+            cd "$base/libxml2-2.13.9"
+            unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
+            unset PKG_CONFIG_PATH PKG_CONFIG_SYSROOT_DIR
+            export CC=gcc CXX=g++ CFLAGS=-O2 CXXFLAGS=-O2 CPPFLAGS= LDFLAGS=
+            export PKG_CONFIG_LIBDIR=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+            ./configure --build=x86_64-pc-linux-gnu --host=x86_64-pc-linux-gnu \
+                --prefix="$install" --libdir="$install/lib" --enable-shared --disable-static \
+                --without-python --without-lzma --without-zlib --without-icu
+            make -j "$TERMUX_PKG_MAKE_PROCESSES"
+            make install
+        )
+    fi
+    export LD_LIBRARY_PATH="$install/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+}
+'''
+
 
 def apply(change, hook, prepared):
     # The upstream autogen allowlists reject modern host libtool/automake even
@@ -98,12 +127,14 @@ import sys
 p=Path(sys.argv[1]);s=p.read_text()
 assert s.count('#include <cstddef>')==1 and '#include <cstdint>' not in s, 'LDC LLVM14 header changed'
 p.write_text(s.replace('#include <cstddef>','#include <cstddef>\\n#include <cstdint>'))
-TERMI_LDC_STDINT'''), True).replace('termux_step_configure() {', '''termux_step_configure() {
+TERMI_LDC_STDINT
+\t_termi_ldc_host_xml
+\t"$TERMUX_PKG_SRCDIR/ldc2-$TERMUX_PKG_VERSION-linux-x86_64/bin/ldmd2" --version'''), True).replace('termux_step_configure() {', '''termux_step_configure() {
 \tlocal termi_ldc_launcher="$TERMUX_PKG_TMPDIR/termi-ldc-cxx-launcher"
 \tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_ldc_launcher"
 \tchmod 755 "$termi_ldc_launcher"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_ldc_launcher"
-'''))
+''').replace('termux_step_post_configure() {', 'termux_step_post_configure() {\n\t_termi_ldc_host_xml').replace('termux_step_make() {', 'termux_step_make() {\n\t_termi_ldc_host_xml') + LDC_HOST_XML_SETUP)
 
     # API-26 libc headers omit RWF_DSYNC; Linux AIO still needs its kernel
     # UAPI constant. Include the defining kernel header rather than invent it.

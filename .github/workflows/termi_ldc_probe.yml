@@ -27,6 +27,10 @@ jobs:
           tar -xf source.tar.gz
           printf '%s\n' '3cb3dd247b6a1de2d0f4b20c6fd4326c9024e894cebc9dc8699758887e566ca7  cmake.tar.gz' | sha256sum --check --strict
           tar -xf cmake.tar.gz
+          curl --fail --location --retry 3 --max-time 300 -o libxml2-2.13.9.tar.xz https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.9.tar.xz
+          printf '%s\n' 'a2c9ae7b770da34860050c309f903221c67830c86e4a7e760692b803df95143a  libxml2-2.13.9.tar.xz' | sha256sum --check --strict
+          cd ../..
+          PYTHONPATH=scripts/termux python3 -c 'from catalog_repairs import LDC_HOST_XML_SETUP; print(LDC_HOST_XML_SETUP)' > build/probe/ldc-host-xml.sh
       - name: Probe compiler and actual CMake detection in pinned builder
         run: |
           image=$(python3 -c 'import json; print(json.load(open("packages/termux/upstream.lock.json"))["builder_image"])')
