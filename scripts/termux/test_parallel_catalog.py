@@ -87,6 +87,24 @@ class MergeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 merge([first],root/"union")
 
+    def test_disk_interruption_is_not_reset_to_pending_but_later_success_wins(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            first=self.candidate(root/'lane0','a')
+            path=root/'lane0/catalog-ledger.json'
+            ledger=json.loads(path.read_text())
+            blocked=dict(status='interrupted',exit_code=75,compile_resume_available=False,
+                         reason='Insufficient disk during recipe compilation',attempts=1)
+            ledger['recipes']['b']=blocked
+            ledger['recipes']['c']=dict(status='interrupted',exit_code=124,attempts=1)
+            path.write_text(json.dumps(ledger));first[2]=digest(path)
+            merged,_=merge([first],root/'held')
+            self.assertEqual(blocked,merged['recipes']['b'])
+            self.assertEqual('pending',merged['recipes']['c']['status'])
+            second=self.candidate(root/'lane1','b')
+            merged,_=merge([first,second],root/'resolved')
+            self.assertEqual('built',merged['recipes']['b']['status'])
+
     def test_explicit_compatible_parent_preference_retains_alternate_hashes(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)

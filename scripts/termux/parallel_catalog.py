@@ -32,7 +32,10 @@ def merge(inputs, output, prefer_first_compatible=False):
     for directory, inventory, ledger, plan, pins in sources:
         allowed, invalid = compatibility(plan,target,ledger)
         failures.update({name: entry for name, entry in ledger["recipes"].items()
-                         if entry["status"] == "failed" and name in target["recipes"] and name not in invalid})
+                         if (entry["status"] == "failed" or
+                             (entry["status"] == "interrupted" and entry.get("exit_code") == 75
+                              and entry.get("compile_resume_available") is False))
+                         and name in target["recipes"] and name not in invalid})
         present = set()
         for record in inventory["packages"]:
             if record["recipe"] not in allowed:
