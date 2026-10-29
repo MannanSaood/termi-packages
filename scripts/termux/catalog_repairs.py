@@ -93,6 +93,15 @@ _termi_ldc_host_xml() {
 
 
 def apply(change, hook, prepared):
+    # The pinned development version is rejected by this recipe's own stable
+    # release policy. Use the latest supported upstream source, keeping the guard.
+    def mate_utils_supported_source(t):
+        old_version='TERMUX_PKG_VERSION="1.29.1"'
+        old_hash='TERMUX_PKG_SHA256=8b9e882daab76314f8e6518ff8cd6ddd19f727eb1f2e9a985f7fc68bd025bf07'
+        assert t.count(old_version)==1 and t.count(old_hash)==1, 'MATE utilities source pin changed'
+        return t.replace(old_version,'TERMUX_PKG_VERSION="1.28.3"').replace(old_hash,'TERMUX_PKG_SHA256=ff11a1be12ff563d9a6a4ab1d51030d0994705ab3eeea4ee5a97e89fd61ff11b')
+    change('mate-utils',mate_utils_supported_source,tree='x11-packages')
+
     # Qt Declarative repeatedly exhausts standard-runner disk while emitting
     # many module PCH files. PCH is only a build optimization; keep all modules.
     def qt_declarative_disk(t):
