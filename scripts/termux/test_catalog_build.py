@@ -21,7 +21,7 @@ class GraphTests(unittest.TestCase):
     def test_common_frontier_has_one_owner_across_eight_lanes(self):
         names=['libkdcraw','imagemagick','libpangomm-2.48','kf6-kimageformats',
                'libzim','openimageio','recoll','libatkmm-1.6','libxml++-2.6',
-               'libpangomm-1.4','gegl']
+               'libpangomm-1.4','gegl','gtkmm4','libvips','eom','libkiwix','kdegraphics-thumbnailers']
         recipes={name:dict(dependencies=[]) for name in names}
         recipes.update({f'app{i}':dict(dependencies=names) for i in range(8)})
         counts={name:0 for name in names}
@@ -32,7 +32,11 @@ class GraphTests(unittest.TestCase):
                 if name in selected and builder.shared_build_wait(name,label,owned) is None:
                     self.assertIn(name,owned)
                     counts[name]+=1
-        self.assertEqual(dict.fromkeys(names,1),counts)
+        self.assertEqual({name:0 if name in ('kf6-kimageformats','gegl') else 1 for name in names},counts)
+        for name in ('kf6-kimageformats','gegl'):
+            self.assertEqual('focused-'+name,builder.shared_build_wait(name,'lane-2-of-8',{name}))
+            self.assertIsNone(builder.shared_build_wait(name,None,{name}))
+            self.assertIsNone(builder.shared_build_wait(name,'lane-2-of-4',{name}))
         self.assertEqual('focused-alsa-plugins',builder.shared_build_wait('alsa-plugins','lane-0-of-8',{'alsa-plugins'}))
         self.assertIsNone(builder.shared_build_wait('alsa-plugins',None,{'alsa-plugins'}))
 

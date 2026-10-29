@@ -26,6 +26,8 @@ SHARED_BUILD_OWNERS = {
     "libkdcraw": 0, "imagemagick": 1, "libpangomm-2.48": 1,
     "kf6-kimageformats": 2, "libzim": 2, "openimageio": 3, "recoll": 3,
     "libatkmm-1.6": 4, "libxml++-2.6": 5, "libpangomm-1.4": 6, "gegl": 7,
+    "gtkmm4": 1, "libvips": 4, "eom": 6, "libkiwix": 6,
+    "kdegraphics-thumbnailers": 2,
 }
 
 
@@ -34,7 +36,7 @@ def shared_build_wait(name, lane, owned):
         return None
     # Focused repairs run in isolated jobs; lanes can still build independent
     # roots while waiting for their candidates to enter the shared seed.
-    if name in ('swift', 'alsa-plugins'):
+    if name in ('swift', 'alsa-plugins', 'kf6-kimageformats', 'gegl'):
         return 'focused-' + name
     if name in SHARED_BUILD_OWNERS and name not in owned:
         return f'lane-{SHARED_BUILD_OWNERS[name]}-of-8'
