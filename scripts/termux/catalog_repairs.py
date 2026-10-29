@@ -157,6 +157,23 @@ TERMI_PYQT_EVENTS'''),tree='x11-packages')
     for name in ('kigo', 'lskat', 'kpat'):
         change(name,lambda t:hook(t,'termux_step_pre_configure',
             '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_DISABLE_FIND_PACKAGE_7Zip=ON -Dgzip_EXECUTABLE=/usr/bin/gzip"'),tree='x11-packages')
+    # mGBA's optional HTML documentation found an Android markdown executable.
+    # Build the catalog's pinned Discount source privately for the Linux host.
+    change('mgba',lambda t:hook(t,'termux_step_pre_configure', r'''	if [[ "$TERMUX_ON_DEVICE_BUILD" == "false" ]]; then
+		termux_setup_cmake
+		local termi_discount="$TERMUX_PKG_TMPDIR/termi-host-discount"
+		local termi_archive="$TERMUX_PKG_CACHEDIR/termi-host-discount-3.0.2.0.tar.gz"
+		termux_download https://github.com/Orc/discount/archive/refs/tags/v3.0.2.0.tar.gz "$termi_archive" 99f6db36d3fff6c99acd21d4c6096176d4ac8785eab319d0faf77ad995b8b7c5
+		mkdir -p "$termi_discount/src"
+		tar -xzf "$termi_archive" --strip-components=1 -C "$termi_discount/src"
+		(
+			unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS AR LD RANLIB CMAKE_TOOLCHAIN_FILE CMAKE_PREFIX_PATH PKG_CONFIG_LIBDIR PKG_CONFIG_PATH
+			cmake -S "$termi_discount/src/cmake" -B "$termi_discount/build" -G "Unix Makefiles" -DCMAKE_C_COMPILER=/usr/bin/cc -DCMAKE_CXX_COMPILER=/usr/bin/c++ -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_SHARED_LIBS=OFF
+			cmake --build "$termi_discount/build" --target markdown -j "$TERMUX_PKG_MAKE_PROCESSES"
+		)
+		test -x "$termi_discount/build/markdown"
+		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DMARKDOWN=$termi_discount/build/markdown"
+	fi'''),tree='x11-packages')
     change('melonds',lambda t:hook(t,'termux_step_pre_configure',
         '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DUSE_CCACHE=OFF"'),tree='x11-packages')
     change('ktextaddons',lambda t:hook(t,'termux_step_pre_configure',
