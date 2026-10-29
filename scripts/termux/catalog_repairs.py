@@ -174,6 +174,8 @@ TERMI_PYQT_EVENTS'''),tree='x11-packages')
 		test -x "$termi_discount/build/markdown"
 		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DMARKDOWN=$termi_discount/build/markdown"
 	fi'''),tree='x11-packages')
+    change('strawberry',lambda t:hook(t,'termux_step_pre_configure',
+        '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCCACHE_EXECUTABLE=OFF"'),tree='x11-packages')
     change('melonds',lambda t:hook(t,'termux_step_pre_configure',
         '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DUSE_CCACHE=OFF"'),tree='x11-packages')
     change('ktextaddons',lambda t:hook(t,'termux_step_pre_configure',
@@ -211,6 +213,24 @@ TERMI_BINUTILS_HOST'''))
             anchor='-DTDE2E_INSTALL_INCLUDES=ON\n'
             assert t.count(anchor)==1, 'Telegram libtd configure anchor changed'
             t=t.replace(anchor,anchor+'-DCCACHE_FOUND=OFF\n')
+            anchor='\t\ttermux_setup_proot\n'
+            assert t.count(anchor)==1, 'Telegram proot setup anchor changed'
+            t=t.replace(anchor,anchor+r'''		local termi_proot_bin="$TERMUX_PKG_TMPDIR/termi-proot-bin"
+		mkdir -p "$termi_proot_bin"
+		python3 - "$(command -v termux-proot-run)" "$termi_proot_bin/termux-proot-run" "$TERMUX_PREFIX" <<'TERMI_TELEGRAM_PROOT'
+from pathlib import Path
+import shlex, sys
+source, target, prefix=map(Path,sys.argv[1:])
+assert (prefix/'opt/aosp/bin/linker64').is_file(), 'Source-built Android linker missing'
+s=source.read_text()
+anchor='-R / "$@"'
+assert s.count(anchor)==1, 'Proot wrapper root anchor changed'
+s=s.replace(anchor,'-R / -b '+shlex.quote(str(prefix/'opt/aosp')+':/system')+' "$@"')
+target.write_text(s)
+target.chmod(0o755)
+TERMI_TELEGRAM_PROOT
+		export PATH="$termi_proot_bin:$PATH"
+''')
         if name == 'opencv':
             t=hook(t,'termux_step_pre_configure','\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DENABLE_CCACHE=OFF"')
         if name == 'mixxx':
