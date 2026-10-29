@@ -183,6 +183,20 @@ assert s.count(swift_flags)==5, 'Swift importer flag anchors changed'
 s=s.replace(swift_flags,'-DCMAKE_Swift_FLAGS:STRING="$(termi_swift_importer_flags ${host})"')
 p.write_text(s.replace(old, replacement))
 TERMI_SWIFT
+	# Platform already uses the runtime importer list, but private stdlib
+	# libraries construct custom Swift commands without CMAKE_Swift_FLAGS.
+	python3 - "$TERMUX_PKG_SRCDIR/swift/stdlib/cmake/modules/AddSwiftStdlib.cmake" <<'TERMI_SWIFT_STDLIB_IMPORTERS'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+anchor='    set(swiftlib_swift_compile_flags_all ${SWIFTLIB_SWIFT_COMPILE_FLAGS})'
+assert s.count(anchor)==1, 'Swift shared stdlib flag anchor changed'
+extra='''
+    if(sdk STREQUAL "ANDROID" AND NOT "-nostdlibinc" IN_LIST swiftlib_swift_compile_flags_all)
+      list(APPEND swiftlib_swift_compile_flags_all ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS})
+    endif()'''
+p.write_text(s.replace(anchor,anchor+extra))
+TERMI_SWIFT_STDLIB_IMPORTERS
 	# Foundation is configured independently of the compiler's CXX launcher.
 	python3 - "$TERMUX_PKG_SRCDIR/swift-corelibs-foundation/CMakeLists.txt" "$TERMUX_PREFIX" <<'TERMI_SWIFT_FOUNDATION'
 from pathlib import Path
