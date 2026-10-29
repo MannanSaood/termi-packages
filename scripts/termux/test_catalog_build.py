@@ -21,7 +21,7 @@ class GraphTests(unittest.TestCase):
     def test_common_frontier_has_one_owner_across_eight_lanes(self):
         names=['libkdcraw','imagemagick','libpangomm-2.48','kf6-kimageformats',
                'libzim','openimageio','recoll','libatkmm-1.6','libxml++-2.6',
-               'libpangomm-1.4','gegl','gtkmm4','libvips','eom','libkiwix','kdegraphics-thumbnailers']
+               'libpangomm-1.4','gegl','gtkmm4','gtkmm3','gtkmm2','libvips','eom','libkiwix','kdegraphics-thumbnailers']
         recipes={name:dict(dependencies=[]) for name in names}
         recipes.update({f'app{i}':dict(dependencies=names) for i in range(8)})
         counts={name:0 for name in names}

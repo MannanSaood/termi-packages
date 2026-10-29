@@ -26,7 +26,7 @@ SHARED_BUILD_OWNERS = {
     "libkdcraw": 0, "imagemagick": 1, "libpangomm-2.48": 1,
     "kf6-kimageformats": 2, "libzim": 2, "openimageio": 3, "recoll": 3,
     "libatkmm-1.6": 4, "libxml++-2.6": 5, "libpangomm-1.4": 6, "gegl": 7,
-    "gtkmm4": 1, "libvips": 4, "eom": 6, "libkiwix": 6,
+    "gtkmm4": 1, "gtkmm3": 6, "gtkmm2": 7, "libvips": 4, "eom": 6, "libkiwix": 6,
     "kdegraphics-thumbnailers": 2,
 }
 
