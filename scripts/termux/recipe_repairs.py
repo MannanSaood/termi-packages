@@ -110,9 +110,8 @@ def rust_target_cxx_headers(text):
 
 
 SWIFT_ANDROID_STAT_MODULE = r'''
-	# Foundation includes the prefix's stat.h while Swift's Android module map
-	# otherwise resolves a second NDK copy. Both use pragma once, so Clang
-	# modules see two different struct definitions. Share one physical header.
+	# The Android module map and transitive includes must resolve the same
+	# physical Bionic headers in both the standard library and Foundation.
 	python3 - "$TERMUX_PKG_SRCDIR/swift/stdlib/public/Platform/android.modulemap" "$TERMUX_PREFIX" <<'TERMI_SWIFT_STAT_MODULE'
 from pathlib import Path
 import re, sys
@@ -121,7 +120,16 @@ assert re.fullmatch(r'/[A-Za-z0-9_./-]+',prefix), 'Unexpected Swift module prefi
 assert (Path(prefix)/'include/sys/stat.h').is_file(), 'Termi stat header missing'
 anchor='header "sys/stat.h"'
 assert s.count(anchor)==1, 'Swift Android stat module anchor changed'
-p.write_text(s.replace(anchor,'header "'+prefix+'/include/sys/stat.h"'))
+def canonical(match):
+    name=match[1]
+    if name in ('SwiftAndroidNDK.h', 'SwiftBionic.h'):
+        return match[0]
+    assert not name.startswith('/') and '..' not in Path(name).parts, 'Unexpected Android module header'
+    header=Path(prefix)/'include'/name
+    return 'header "'+header.as_posix()+'"' if header.is_file() else match[0]
+s=re.sub(r'header "([^"\n]+)"',canonical,s)
+assert 'header "'+prefix+'/include/sys/stat.h"' in s
+p.write_text(s)
 TERMI_SWIFT_STAT_MODULE
 '''
 
@@ -141,7 +149,7 @@ s = p.read_text()
 old = '-DCMAKE_CXX_FLAGS="$(swift_c_flags ${host}) ${cross_c_flags}"'
 assert s.count(old) == 1, 'Swift C++ flag anchor changed'
 replacement = ('-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}" $(termi_swift_cxx_launcher_option ${host})'
-               + ' -DCMAKE_Swift_FLAGS:STRING="$(termi_swift_main_importer_flags ${host})"')
+               + ' -DCMAKE_Swift_FLAGS:STRING="$(termi_swift_main_importer_flags ${host})" $(termi_swift_runtime_importer_option ${host})')
 launcher=Path(sys.argv[3])
 assert not any(c.isspace() for c in str(launcher)), 'Swift launcher path must not contain whitespace'
 launcher.write_text('#!/bin/bash\ncompiler="$1"\nshift\nexec "$compiler" -nostdinc++ -I'+shlex.quote(sys.argv[2]+'/include/c++/v1')+' "$@" -Wno-error=variadic-macro-arguments-omitted -Wno-error=gnu-include-next\n')
@@ -159,11 +167,14 @@ function termi_swift_cxx_launcher_option() {
 function termi_swift_main_importer_flags() {
     case "$1" in android-*) printf '%s' @TERMI_IMPORTER_FLAGS@;; esac
 }
+function termi_swift_runtime_importer_option() {
+    case "$1" in android-*) printf '%s' @TERMI_RUNTIME_IMPORTER@;; esac
+}
 function termi_swift_importer_flags() {
     termi_swift_main_importer_flags "$1"
     common_swift_flags
 }
-'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted ')).replace('@TERMI_CXX_LAUNCHER@', shlex.quote('-DCMAKE_CXX_COMPILER_LAUNCHER='+str(launcher))).replace('@TERMI_IMPORTER_FLAGS@',shlex.quote('-Xcc -nostdinc++ -Xcc -I'+sys.argv[2]+'/include/c++/v1 '))
+'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted ')).replace('@TERMI_CXX_LAUNCHER@', shlex.quote('-DCMAKE_CXX_COMPILER_LAUNCHER='+str(launcher))).replace('@TERMI_IMPORTER_FLAGS@',shlex.quote('-Xcc -nostdinc++ -Xcc -I'+sys.argv[2]+'/include/c++/v1 -Xcc -I'+sys.argv[2]+'/include ')).replace('@TERMI_RUNTIME_IMPORTER@',shlex.quote('-DSWIFT_RUNTIME_SWIFT_COMPILE_FLAGS:STRING=-Xcc;-nostdinc++;-Xcc;-I'+sys.argv[2]+'/include/c++/v1;-Xcc;-I'+sys.argv[2]+'/include'))
 assert s.count('function swift_c_flags() {') == 1
 s = s.replace('function swift_c_flags() {', helper + '\nfunction swift_c_flags() {')
 swift_flags='-DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"'

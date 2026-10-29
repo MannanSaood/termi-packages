@@ -124,11 +124,12 @@ TERMI_WX_THREADS'''),tree='x11-packages')
     change('flameshot',lambda t:hook(t,'termux_step_pre_configure',
         '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DENABLE_CACHE=OFF"'),tree='x11-packages')
 
-    def qt5_declarative_host_headers(t):
+    def qt5_declarative_host_headers(t,expected=4):
         anchor='-spec "${TERMUX_PREFIX}/lib/qt/mkspecs/termux-host"\n'
-        assert t.count(anchor)==4, 'Qt5 Declarative host qmake sites changed'
+        assert t.count(anchor)==expected, 'Qt5 host qmake sites changed'
         return t.replace(anchor,anchor+'\t_termi_qt5_host_headers\n') + QT5_HOST_HEADERS
     change('qt5-qtdeclarative',qt5_declarative_host_headers,tree='x11-packages')
+    change('qt5-qttools',lambda t:qt5_declarative_host_headers(t,expected=2),tree='x11-packages')
 
     # KDE's optional compressor discovery selects the Android 7zz from the
     # seed. Its upstream gzip fallback emits the same SVGZ resources using
@@ -152,6 +153,12 @@ for name in ('EnterEditFocus', 'LeaveEditFocus'):
     s=s.replace(anchor,'')
 p.write_text(s)
 TERMI_PYQT_EVENTS'''),tree='x11-packages')
+
+    for name in ('kigo', 'lskat'):
+        change(name,lambda t:hook(t,'termux_step_pre_configure',
+            '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_DISABLE_FIND_PACKAGE_7Zip=ON -Dgzip_EXECUTABLE=/usr/bin/gzip"'),tree='x11-packages')
+    change('ktextaddons',lambda t:hook(t,'termux_step_pre_configure',
+        '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DUSE_FASTER_LINKER=OFF"'),tree='x11-packages')
 
     # binutils/Makefile.am compiles sysinfo with Linux CC_FOR_BUILD but its
     # default CPPFLAGS_FOR_BUILD otherwise inherits the Android include path.
@@ -202,8 +209,8 @@ TERMI_BINUTILS_HOST'''))
 \tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_webkit_launcher"
 \tchmod 755 "$termi_webkit_launcher"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_webkit_launcher"''')
-        return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx'})
-    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'qscintilla-qt6', 'signond', 'leocad']]:
+        return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle'})
+    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'qscintilla-qt6', 'signond', 'leocad', 'signon-plugin-oauth2']]:
         change(name, lambda t, name=name: configure_consumer(t,name),tree=tree)
 
     # Keep the legacy tokenizer's warning visible without treating the NDK's
