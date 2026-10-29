@@ -22,6 +22,18 @@ from catalog_graph import create_plan, digest
 SHARED_BUILD_OWNERS = {"qt6-qtdeclarative": 3, "ldc": 7, "swift": 5, "flang": 7}
 
 
+def shared_build_wait(name, lane, owned):
+    if not lane or not lane.endswith('-of-8'):
+        return None
+    # Swift is verified in its isolated focused job; lane 5 can still build
+    # independent roots while waiting for that candidate to enter the seed.
+    if name == 'swift':
+        return 'focused-swift'
+    if name in SHARED_BUILD_OWNERS and name not in owned:
+        return f'lane-{SHARED_BUILD_OWNERS[name]}-of-8'
+    return None
+
+
 class DiskPressure(Exception):
     """Stop before a single large recipe can fill the shared runner filesystem."""
 
@@ -146,11 +158,10 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
             if name not in selected:
                 continue
             entry = ledger["recipes"][name]
-            if (lane and lane.endswith('-of-8') and name in SHARED_BUILD_OWNERS
-                    and name not in owned and entry['status'] != 'built'):
+            shared_wait = shared_build_wait(name, lane, owned)
+            if shared_wait and entry['status'] != 'built':
                 if entry['status'] not in ('failed', 'interrupted'):
-                    entry.update(status='deferred-shared-build',
-                                 shared_build_lane=f'lane-{SHARED_BUILD_OWNERS[name]}-of-8')
+                    entry.update(status='deferred-shared-build', shared_build_lane=shared_wait)
                 continue
             status = next_status({**recipe, "name": name}, ledger["recipes"], retry_failed)
             if status != "ready":

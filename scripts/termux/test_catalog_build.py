@@ -10,6 +10,14 @@ from catalog_graph import order_and_cycles
 
 
 class GraphTests(unittest.TestCase):
+    def test_focused_swift_wait_does_not_take_independent_lane_work(self):
+        self.assertEqual('focused-swift',builder.shared_build_wait('swift','lane-5-of-8',{'swift','app'}))
+        self.assertIsNone(builder.shared_build_wait('app','lane-5-of-8',{'swift','app'}))
+        self.assertIsNone(builder.shared_build_wait('swift',None,{'swift'}))
+        self.assertIsNone(builder.shared_build_wait('swift','lane-1-of-4',{'swift'}))
+        self.assertEqual('lane-3-of-8',builder.shared_build_wait('qt6-qtdeclarative','lane-5-of-8',set()))
+        self.assertIsNone(builder.shared_build_wait('qt6-qtdeclarative','lane-3-of-8',{'qt6-qtdeclarative'}))
+
     @unittest.skipUnless(os.name == 'posix', 'Linux isolated lane runner')
     def test_shared_dependency_waits_for_seed_while_independent_work_continues(self):
         with tempfile.TemporaryDirectory() as temporary:
