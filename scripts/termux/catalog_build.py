@@ -227,6 +227,13 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                         announce(ledger, "halt")
                         return 75
                     continue
+            if code:
+                from build_scratch import configure_diagnostics
+                try:
+                    configure_diagnostics(Path.home() / '.termux-build', name,
+                        state_dir.parent / 'artifacts' / f'configure-{name}.log')
+                except (OSError, ValueError) as error:
+                    print('TERMI_DIAGNOSTIC_WARNING ' + str(error), flush=True)
             entry.update(status="built" if code == 0 else "failed", exit_code=code, ended=time.time())
             save(ledger_path, ledger)
             announce(ledger, "recipe-complete", name)

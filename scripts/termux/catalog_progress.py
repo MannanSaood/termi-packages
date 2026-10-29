@@ -127,6 +127,13 @@ def selected_event(state, names, recipe, status, code=None):
             entry["attempts"] += 1
         if code is not None:
             entry["exit_code"] = code
+        if status == 'failed':
+            from build_scratch import configure_diagnostics
+            try:
+                configure_diagnostics(Path.home() / '.termux-build', recipe,
+                    state.parent / 'artifacts' / f'configure-{recipe}.log')
+            except (OSError, ValueError) as error:
+                print('TERMI_DIAGNOSTIC_WARNING ' + str(error), flush=True)
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(ledger))
     temporary.replace(path)

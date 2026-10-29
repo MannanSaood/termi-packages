@@ -12,6 +12,38 @@ import shutil
 import stat
 
 
+def configure_diagnostics(top, name, output):
+    """Retain bounded original configure logs before failed scratch is removed."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", name):
+        raise ValueError('Invalid diagnostic recipe')
+    top = Path(top)
+    if top.is_symlink():
+        raise ValueError('Diagnostic source must not be a symlink')
+    recipe = top / name
+    pieces = []
+    for relative in ['src/config.log', 'build/config.log', 'build/CMakeFiles/CMakeConfigureLog.yaml']:
+        path = recipe / relative
+        chain = [path, *path.parents]
+        if any(item.is_symlink() for item in chain[:chain.index(top) + 1]) or not path.is_file():
+            continue
+        size = path.stat().st_size
+        with path.open('rb') as stream:
+            body = stream.read(512 * 1024)
+            if size > len(body):
+                if size > 1024 * 1024:
+                    body += b'\nTERMI CONFIGURE LOG MIDDLE OMITTED\n'
+                stream.seek(max(512 * 1024, size - 512 * 1024))
+                body += stream.read(512 * 1024)
+        pieces.append(('\nTERMI CONFIGURE DIAGNOSTIC: ' + relative + '\n').encode() + body)
+    if pieces:
+        output = Path(output)
+        if output.is_symlink() or any(parent.is_symlink() for parent in output.parents):
+            raise ValueError('Diagnostic output must not be a symlink')
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b''.join(pieces))
+    return len(pieces)
+
+
 def clean(top, name, discard_sources=False):
     if os.name != "posix" or not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", name):
         raise ValueError("Scratch cleanup requires a Linux builder recipe")

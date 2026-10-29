@@ -179,6 +179,10 @@ jobs:
         run: |
           python3 - <<'PY'
           import os, pathlib, subprocess, shutil, tarfile
+          import sys
+          sys.path.insert(0, 'scripts/termux')
+          from reclaim_bundles import reclaim
+          bundles=[]
           paths=list(pathlib.Path('build').glob('*.log'))+list(pathlib.Path('build').glob('*.json'))
           artifacts=pathlib.Path('build/candidate/artifacts')
           if artifacts.exists(): paths += [p for p in artifacts.iterdir() if p.suffix in ('.deb','.json','.log')]
@@ -194,6 +198,7 @@ jobs:
                 if bundle is None or size+path.stat().st_size > 512*1024**2:
                   if bundle: bundle.close()
                   target=pathlib.Path('build')/f'packages-{number:04d}.tar'; number+=1
+                  bundles.append(target)
                   bundle=tarfile.open(target,'w'); paths.append(target); size=0
                 bundle.add(path,arcname=path.name,recursive=False); size+=path.stat().st_size
             finally:
@@ -210,12 +215,16 @@ jobs:
             subprocess.run(['gh','release','create',tag,*map(str,paths[offset:offset+850]),'--repo',os.environ['GITHUB_REPOSITORY'],
               '--title',tag,'--notes','Unsigned source-build candidates and diagnostics. Not an approved app or APT release.',
               '--prerelease','--latest=false'],check=True)
+          # Every upload above succeeded. Drop only disposable tar copies;
+          # original package files and all remote assets remain intact.
+          print('Reclaimed published bundles:', reclaim(pathlib.Path('build'), bundles))
           PY
       - name: Preserve catalog or interrupted build as streamed release checkpoint
         if: always() && (inputs.mode == 'full-catalog' || (failure() && inputs.mode == 'packages'))
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           if [ -f build/candidate/container-id.txt ]; then
             python3 scripts/termux/checkpoint.py save --container "$(cat build/candidate/container-id.txt)" \
               --repository "$GITHUB_REPOSITORY" --tag "checkpoint-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
