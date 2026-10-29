@@ -307,6 +307,52 @@ p.write_text(s.replace(old,new))
 TERMI_ALSA_SAMPLE_FORMAT
 '''))
 
+    # Pinned LGI recipes currently have no patch files. Keep applying real
+    # patches, but do not redirect stdin from a literal unmatched glob.
+    def awesome_optional_lgi_patches(t):
+        anchor='\t\tfor patch in "$TERMUX_SCRIPTDIR/packages/'
+        lines=t.splitlines(keepends=True)
+        matches=[i for i,line in enumerate(lines) if line.startswith(anchor) and line.rstrip().endswith('/*.patch; do')]
+        assert len(matches)==1, 'Awesome host LGI patch loop changed'
+        lines.insert(matches[0]+1,'\t\t\t[[ -f "$patch" ]] || continue\n')
+        return ''.join(lines)
+    for name in ('awesome', 'awesome-luajit'):
+        change(name,awesome_optional_lgi_patches,tree='x11-packages')
+
+    # CMake's configure log identifies RAGEL_PROGRAM as the SVG generator.
+    # Keep a Linux host tool private; never execute the target-prefix Ragel.
+    change('inkscape',lambda t:hook(t,'termux_step_pre_configure','''\tif [[ "$TERMUX_ON_DEVICE_BUILD" == "false" ]]; then
+\t\tlocal termi_ragel=/usr/bin/ragel
+\t\tif [[ ! -x "$termi_ragel" ]]; then
+\t\t\ttermux_download_ubuntu_packages ragel
+\t\t\ttermi_ragel="$TERMUX_PKG_HOSTBUILD_DIR/ubuntu_packages/usr/bin/ragel"
+\t\tfi
+\t\t"$termi_ragel" -v
+\t\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DRAGEL_PROGRAM=$termi_ragel"
+\tfi'''),tree='x11-packages')
+
+    def yazi_aosp_proot(t):
+        anchor='\t\ttermux_setup_proot\n'
+        assert t.count(anchor)==1, 'Yazi proot setup anchor changed'
+        t=t.replace(anchor,anchor+r'''		local termi_yazi_proot_bin="$TERMUX_PKG_TMPDIR/termi-yazi-proot-bin"
+		mkdir -p "$termi_yazi_proot_bin"
+		python3 - "$(command -v termux-proot-run)" "$termi_yazi_proot_bin/termux-proot-run" "$TERMUX_PREFIX" <<'TERMI_YAZI_PROOT'
+from pathlib import Path
+import shlex, sys
+source, target, prefix=map(Path,sys.argv[1:])
+assert (prefix/'opt/aosp/bin/linker64').is_file(), 'Source-built Android linker missing'
+s=source.read_text()
+anchor='-R / "$@"'
+assert s.count(anchor)==1, 'Proot wrapper root anchor changed'
+s=s.replace(anchor,'-R / -b '+shlex.quote(str(prefix/'opt/aosp')+':/system')+' "$@"')
+target.write_text(s)
+target.chmod(0o755)
+TERMI_YAZI_PROOT
+		export PATH="$termi_yazi_proot_bin:$PATH"
+''')
+        return t
+    change('yazi',yazi_aosp_proot)
+
     # These native failures show prefix C headers before implicit NDK libc++.
     # A compiler wrapper also precedes dependency-generated -I options.
     def matching_cxx(t, cmake=False):
@@ -377,7 +423,7 @@ TERMI_OPENSCAD_ASSERT
 \tchmod 755 "$termi_webkit_launcher"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_webkit_launcher"''')
         return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'krita', 'kf6-kimageformats'})
-    for name, tree in [(n, 'packages') for n in ['gegl', 'libavif', 'libopenmpt', 'libxapian', 'libraw', 'libglibmm-2.4', 'libglibmm-2.68', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['gtkmm4', 'krita', 'kf6-kimageformats', 'box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'audacious-plugins', 'mkvtoolnix', 'qscintilla-qt6', 'signond', 'leocad', 'signon-plugin-oauth2']]:
+    for name, tree in [(n, 'packages') for n in ['gegl', 'libavif', 'libopenmpt', 'libxapian', 'libraw', 'libglibmm-2.4', 'libglibmm-2.68', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['pavucontrol', 'ardour', 'gtkmm4', 'krita', 'kf6-kimageformats', 'box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'audacious-plugins', 'mkvtoolnix', 'qscintilla-qt6', 'signond', 'leocad', 'signon-plugin-oauth2']]:
         change(name, lambda t, name=name: configure_consumer(t,name),tree=tree)
 
     # Keep the legacy tokenizer's warning visible without treating the NDK's

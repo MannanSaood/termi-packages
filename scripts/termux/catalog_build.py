@@ -28,6 +28,8 @@ SHARED_BUILD_OWNERS = {
     "libatkmm-1.6": 4, "libxml++-2.6": 5, "libpangomm-1.4": 6, "gegl": 7,
     "gtkmm4": 1, "gtkmm3": 6, "gtkmm2": 7, "libvips": 4, "eom": 6, "libkiwix": 6,
     "kdegraphics-thumbnailers": 2,
+    "openjdk-21": 1, "openjdk-25": 3, "openjdk-17": 5, "gimp": 2,
+    "inkscape": 6, "kscreen": 3, "pavucontrol": 1, "gwenview": 4,
 }
 
 
