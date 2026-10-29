@@ -174,6 +174,27 @@ TERMI_PYQT_EVENTS'''),tree='x11-packages')
 		test -x "$termi_discount/build/markdown"
 		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DMARKDOWN=$termi_discount/build/markdown"
 	fi'''),tree='x11-packages')
+    def awscli_proot(t):
+        anchor='" termux_setup_proot\n'
+        assert t.count(anchor)==1, 'AWS CLI proot setup anchor changed'
+        return t.replace(anchor,anchor+r'''	local termi_proot_bin="$TERMUX_PKG_TMPDIR/termi-proot-bin"
+	mkdir -p "$termi_proot_bin"
+	python3 - "$(command -v termux-proot-run)" "$termi_proot_bin/termux-proot-run" "$TERMUX_PREFIX" <<'TERMI_AWSCLI_PROOT'
+from pathlib import Path
+import shlex, sys
+source, target, prefix=map(Path,sys.argv[1:])
+assert (prefix/'opt/aosp/bin/linker64').is_file(), 'Source-built Android linker missing'
+s=source.read_text()
+anchor='-R / "$@"'
+assert s.count(anchor)==1, 'Proot wrapper root anchor changed'
+s=s.replace(anchor,'-R / -b '+shlex.quote(str(prefix/'opt/aosp')+':/system')+' "$@"')
+target.write_text(s)
+target.chmod(0o755)
+TERMI_AWSCLI_PROOT
+	export PATH="$termi_proot_bin:$PATH"
+''')
+    change('awscli',awscli_proot)
+
     change('strawberry',lambda t:hook(t,'termux_step_pre_configure',
         '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCCACHE_EXECUTABLE=OFF"'),tree='x11-packages')
     change('melonds',lambda t:hook(t,'termux_step_pre_configure',
@@ -252,8 +273,8 @@ TERMI_TELEGRAM_PROOT
 \tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_webkit_launcher"
 \tchmod 755 "$termi_webkit_launcher"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_webkit_launcher"''')
-        return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop'})
-    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'qscintilla-qt6', 'signond', 'leocad', 'signon-plugin-oauth2']]:
+        return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity'})
+    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'qscintilla-qt6', 'signond', 'leocad', 'signon-plugin-oauth2']]:
         change(name, lambda t, name=name: configure_consumer(t,name),tree=tree)
 
     # Keep the legacy tokenizer's warning visible without treating the NDK's
