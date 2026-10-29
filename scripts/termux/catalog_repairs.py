@@ -312,6 +312,17 @@ TERMI_TELEGRAM_PROOT
 ''')
         if name == 'openscad-x':
             t=hook(t,'termux_step_pre_configure','\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCCACHE_PATH=OFF -DEIGEN3_INCLUDE_DIR=$TERMUX_PREFIX/include/eigen3"')
+            # Geometry.h uses assert directly; current libc++ no longer
+            # provides that declaration through unrelated transitive headers.
+            t=hook(t,'termux_step_pre_configure',r'''	python3 - "$TERMUX_PKG_SRCDIR/src/Geometry.h" <<'TERMI_OPENSCAD_ASSERT'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+anchor='#include <stddef.h>'
+assert s.count(anchor)==1 and '#include <cassert>' not in s, 'OpenSCAD Geometry header changed'
+p.write_text(s.replace(anchor,anchor+'\n#include <cassert>'))
+TERMI_OPENSCAD_ASSERT
+''')
         if name == 'tenacity':
             t=hook(t,'termux_step_pre_configure','\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCCACHE_PROGRAM=OFF -DSCCACHE_PROGRAM=OFF -DCCACHE=OFF -DSCCACHE=OFF"')
         if name == 'opencv':
