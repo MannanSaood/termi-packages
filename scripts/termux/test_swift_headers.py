@@ -58,3 +58,30 @@ class SwiftHeadersTest(unittest.TestCase):
             self.assertEqual(module.read_text(),f'header "{path}/include/sys/stat.h"\nheader "{path}/include/fcntl.h"\nheader "SwiftAndroidNDK.h"\nheader "SwiftBionic.h"\nheader "missing.h"\n')
     def test_source_drift(self):
         with self.assertRaises(ValueError): swift_target_cxx_headers('changed')
+
+    @unittest.skipUnless(shutil.which('cmake'), 'CMake unavailable')
+    def test_testing_product_keeps_target_flags_and_host_unchanged(self):
+        recipe=swift_target_cxx_headers("termux_step_make() {\n\t--install-swift-driver --install-sourcekit-lsp\n}")
+        script=recipe.split("<<'TERMI_SWIFT_TESTING_IMPORTERS'\n")[1].split('\nTERMI_SWIFT_TESTING_IMPORTERS')[0]
+        anchor='project(SwiftTesting\n  LANGUAGES CXX Swift)'
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'CMakeLists.txt'
+            p.write_text(anchor+'\n')
+            subprocess.run([sys.executable,'-c',script,str(p),'/prefix','/source/android.modulemap'],check=True)
+            patched=p.read_text().replace(anchor,'')
+            # Evaluate the real generated conditional while avoiding unrelated
+            # compiler discovery. Existing target/sdk flags must survive.
+            for platform in ['Android','Linux']:
+                p.write_text(f'set(CMAKE_SYSTEM_NAME {platform})\nset(CMAKE_Swift_FLAGS "-target android26 -sdk /ndk")\n'+patched+'\nfile(WRITE "${CMAKE_CURRENT_LIST_DIR}/flags.txt" "${CMAKE_Swift_FLAGS}")\n')
+                subprocess.run(['cmake','-P',str(p)],check=True)
+                flags=(Path(tmp)/'flags.txt').read_text()
+                self.assertTrue(flags.startswith('-target android26 -sdk /ndk'))
+                if platform=='Android':
+                    self.assertIn('-Xcc -nostdlibinc',flags)
+                    self.assertIn('-Xcc -isystem/prefix/include',flags)
+                    self.assertIn('-Xcc -fmodule-map-file=/source/android.modulemap',flags)
+                else:
+                    self.assertEqual('-target android26 -sdk /ndk',flags)
+            p.write_text('project(Changed)')
+            failed=subprocess.run([sys.executable,'-c',script,str(p),'/prefix','/source/android.modulemap'],capture_output=True)
+            self.assertNotEqual(0,failed.returncode)

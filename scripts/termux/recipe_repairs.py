@@ -210,6 +210,19 @@ assert s.count(anchor)==1, 'Swift Foundation CMake entry changed'
 extra='\nif(CMAKE_SYSTEM_NAME STREQUAL "Android")\n  set(CMAKE_CXX_FLAGS "-nostdinc++ -I'+prefix+'/include/c++/v1 ${CMAKE_CXX_FLAGS}")\nendif()\n'
 p.write_text(s.replace(anchor,anchor+extra))
 TERMI_SWIFT_FOUNDATION
+	# Swift Testing is a Python build-support product and never receives the
+	# build-script-impl importer flags above. Keep its Bionic modules canonical too.
+	python3 - "$TERMUX_PKG_SRCDIR/swift-testing/CMakeLists.txt" "$TERMUX_PREFIX" "$TERMUX_PKG_SRCDIR/swift/stdlib/public/Platform/android.modulemap" <<'TERMI_SWIFT_TESTING_IMPORTERS'
+from pathlib import Path
+import re, sys
+p=Path(sys.argv[1]);s=p.read_text();prefix=sys.argv[2];modulemap=sys.argv[3]
+assert all(re.fullmatch(r'/[A-Za-z0-9_./-]+', v) for v in (prefix,modulemap)), 'Unexpected Swift Testing header path'
+anchor='project(SwiftTesting\n  LANGUAGES CXX Swift)'
+assert s.count(anchor)==1, 'Swift Testing CMake entry changed'
+flags='-Xfrontend -strict-implicit-module-context -Xcc -nostdinc++ -Xcc -nostdlibinc -Xcc -I'+prefix+'/include/c++/v1 -Xcc -isystem'+prefix+'/include -Xcc -isystem'+prefix+'/include/aarch64-linux-android -Xcc -fmodule-map-file='+modulemap
+extra='\nif(CMAKE_SYSTEM_NAME STREQUAL "Android")\n  string(APPEND CMAKE_Swift_FLAGS " '+flags+'")\nendif()\n'
+p.write_text(s.replace(anchor,anchor+extra))
+TERMI_SWIFT_TESTING_IMPORTERS
 """
     text = text.replace(anchor, anchor + setup + SWIFT_ANDROID_STAT_MODULE)
     end = "\t--install-swift-driver --install-sourcekit-lsp\n"
