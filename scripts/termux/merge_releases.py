@@ -70,7 +70,9 @@ def main():
             status=json.loads(run(['gh','run','view',run_id,'--repo',repository,'--json','status,conclusion,jobs']))
             build_log = None
             if proof.get('build_log_sha256'):
-                build_log = pinned(directory,'build.log',proof['build_log_sha256']).read_text()
+                # Native tools can print non-UTF8 source diagnostics. Verify
+                # the original bytes first; finish markers themselves are ASCII.
+                build_log = pinned(directory,'build.log',proof['build_log_sha256']).read_text(errors='replace')
             ledger=ledger_from_progress(plan,inventory,progress,receipt,proof['base_seed'],status,run_id,build_log)
             ledger['selected_proof_pins']=proof
             path=directory/'catalog-ledger.json';path.write_text(json.dumps(ledger,indent=2)+'\n')

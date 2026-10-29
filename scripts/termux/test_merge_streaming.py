@@ -47,7 +47,7 @@ class StreamingMergeTests(unittest.TestCase):
                        selected_progress=dict(progress_sha256=digest(directory/'progress.json'),
                            seed_provenance_sha256=digest(directory/'seed-provenance.json'),base_seed=base))
             if dependencies:
-                (directory/'build.log').write_text("termux - build of 'a' done\ntermux - build of 'b' done\n")
+                (directory/'build.log').write_bytes(b"non-UTF8 diagnostic: \xb7\ntermux - build of 'a' done\ntermux - build of 'b' done\n")
                 entry['selected_progress']['build_log_sha256']=digest(directory/'build.log')
             manifest=root/'manifest.json'
             manifest.write_text(json.dumps(dict(repository='MannanSaood/termi-packages',candidates=[entry],required_completed_recipes=['a','b'])))
