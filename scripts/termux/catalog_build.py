@@ -19,16 +19,23 @@ from catalog_graph import create_plan, digest
 
 # These currently dominate shared dependency rebuilds. Focused source jobs may
 # also produce them; other lanes wait for hash-verified outputs in the next seed.
-SHARED_BUILD_OWNERS = {"qt6-qtdeclarative": 3, "ldc": 7, "swift": 5, "flang": 7}
+SHARED_BUILD_OWNERS = {
+    "qt6-qtdeclarative": 3, "ldc": 7, "swift": 5, "flang": 7,
+    # Newly unblocked common libraries must be built once, then shared through
+    # the next verified seed, rather than rebuilt in every dependent prefix.
+    "libkdcraw": 0, "imagemagick": 1, "libpangomm-2.48": 1,
+    "kf6-kimageformats": 2, "libzim": 2, "openimageio": 3, "recoll": 3,
+    "libatkmm-1.6": 4, "libxml++-2.6": 5, "libpangomm-1.4": 6, "gegl": 7,
+}
 
 
 def shared_build_wait(name, lane, owned):
     if not lane or not lane.endswith('-of-8'):
         return None
-    # Swift is verified in its isolated focused job; lane 5 can still build
-    # independent roots while waiting for that candidate to enter the seed.
-    if name == 'swift':
-        return 'focused-swift'
+    # Focused repairs run in isolated jobs; lanes can still build independent
+    # roots while waiting for their candidates to enter the shared seed.
+    if name in ('swift', 'alsa-plugins'):
+        return 'focused-' + name
     if name in SHARED_BUILD_OWNERS and name not in owned:
         return f'lane-{SHARED_BUILD_OWNERS[name]}-of-8'
     return None

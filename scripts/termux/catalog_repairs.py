@@ -277,6 +277,23 @@ for name in ('Makefile.am', 'Makefile.in'):
     p.write_text(s.replace(old,'$(CC_FOR_BUILD) -o $@ $(AM_CFLAGS_FOR_BUILD)'))
 TERMI_BINUTILS_HOST'''))
 
+    # _GNU_SOURCE does not make glibc's program-name global exist on Bionic.
+    # Keep the JACK plugin and use its existing BSD-style fallback on Android.
+    change('alsa-plugins', lambda t:hook(t,'termux_step_pre_configure',r'''	python3 - "$TERMUX_PKG_SRCDIR/jack/pcm_jack.c" <<'TERMI_ALSA_PROGRAM_NAME'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+anchor='#if defined(_GNU_SOURCE)'
+assert s.count(anchor)==1, 'ALSA JACK program-name branch changed'
+assert s.count('#include <stdbool.h>')==1, 'ALSA JACK include anchor changed'
+s=s.replace(anchor,'#if defined(_GNU_SOURCE) && !defined(__ANDROID__)')
+s=s.replace('#include <stdbool.h>','#include <stdbool.h>\n#include <stdlib.h>')
+assert s.count('if (!pname[0])')==1, 'ALSA JACK empty-name fallback changed'
+s=s.replace('if (!pname[0])','if (!pname || !pname[0])')
+p.write_text(s)
+TERMI_ALSA_PROGRAM_NAME
+'''))
+
     # These native failures show prefix C headers before implicit NDK libc++.
     # A compiler wrapper also precedes dependency-generated -I options.
     def matching_cxx(t, cmake=False):

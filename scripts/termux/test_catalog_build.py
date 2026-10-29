@@ -18,6 +18,24 @@ class GraphTests(unittest.TestCase):
         self.assertEqual('lane-3-of-8',builder.shared_build_wait('qt6-qtdeclarative','lane-5-of-8',set()))
         self.assertIsNone(builder.shared_build_wait('qt6-qtdeclarative','lane-3-of-8',{'qt6-qtdeclarative'}))
 
+    def test_common_frontier_has_one_owner_across_eight_lanes(self):
+        names=['libkdcraw','imagemagick','libpangomm-2.48','kf6-kimageformats',
+               'libzim','openimageio','recoll','libatkmm-1.6','libxml++-2.6',
+               'libpangomm-1.4','gegl']
+        recipes={name:dict(dependencies=[]) for name in names}
+        recipes.update({f'app{i}':dict(dependencies=names) for i in range(8)})
+        counts={name:0 for name in names}
+        for lane in range(8):
+            label=f'lane-{lane}-of-8'
+            owned,selected=builder.lane_scope(recipes,label)
+            for name in names:
+                if name in selected and builder.shared_build_wait(name,label,owned) is None:
+                    self.assertIn(name,owned)
+                    counts[name]+=1
+        self.assertEqual(dict.fromkeys(names,1),counts)
+        self.assertEqual('focused-alsa-plugins',builder.shared_build_wait('alsa-plugins','lane-0-of-8',{'alsa-plugins'}))
+        self.assertIsNone(builder.shared_build_wait('alsa-plugins',None,{'alsa-plugins'}))
+
     @unittest.skipUnless(os.name == 'posix', 'Linux isolated lane runner')
     def test_shared_dependency_waits_for_seed_while_independent_work_continues(self):
         with tempfile.TemporaryDirectory() as temporary:
