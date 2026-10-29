@@ -17,6 +17,21 @@ def run(args, **kwargs):
     return subprocess.run(args, check=True, **kwargs)
 
 
+def attach_builder(container, timeout):
+    try:
+        return subprocess.run(['docker','start','--attach',container],timeout=timeout).returncode
+    except subprocess.TimeoutExpired:
+        # The catalog shell forwards TERM to its compiler supervisor, then
+        # exports its completed ledger/archives. Keep the build unsuccessful.
+        stopped=subprocess.run(['docker','kill','--signal=SIGTERM',container]).returncode
+        if stopped == 0:
+            try:
+                subprocess.run(['docker','wait',container],timeout=300,check=True)
+            except (subprocess.TimeoutExpired,subprocess.CalledProcessError):
+                print('Builder finalization grace expired; preserve diagnostics and checkpoint',flush=True)
+        return 124
+
+
 def input_identity(context):
     identity = hashlib.sha256()
     for path in sorted(p for p in context.rglob("*") if p.is_file()):
@@ -158,7 +173,7 @@ def main():
     result = None
     try:
         # No host filesystem, Docker socket, secrets or devices are mounted.
-        result = subprocess.run(["docker", "start", "--attach", container], timeout=args.timeout_seconds).returncode
+        result = attach_builder(container, args.timeout_seconds)
     finally:
         # Docker CLI interrupt need not terminate the attached process itself.
         run(["docker", "stop", "--time", "10", container])

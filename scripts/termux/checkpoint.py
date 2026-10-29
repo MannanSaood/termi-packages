@@ -5,6 +5,7 @@ No runtime signing authority. Checkpoints are untrusted until their manifest and
 build-input identities match explicit restore pins. Never extract on the host.
 """
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import gzip
 import hashlib
 import json
@@ -16,9 +17,11 @@ import tempfile
 
 
 class Parts:
-    def __init__(self, directory, upload, limit=1024**3):
+    def __init__(self, directory, upload, limit=1024**3, background=False):
         self.directory, self.upload, self.limit = directory, upload, limit
         self.records, self.stream, self.size = [], None, 0
+        self.executor = ThreadPoolExecutor(max_workers=1) if background else None
+        self.pending = None
 
     def write(self, data):
         count = len(data)
@@ -45,9 +48,27 @@ class Parts:
         if self.stream:
             self.stream.close()
             self.records.append(dict(file=self.path.name, bytes=self.size, sha256=self.hash.hexdigest()))
-            self.upload(self.path)
-            self.path.unlink()
+            if self.executor:
+                # At most one upload and one accumulating part: retain the
+                # existing 2GiB scratch bound and serial GitHub mutations.
+                if self.pending:
+                    self.pending.result()
+                self.pending = self.executor.submit(self.upload_part, self.path)
+            else:
+                self.upload_part(self.path)
             self.stream, self.size = None, 0
+
+    def upload_part(self, path):
+        self.upload(path)
+        path.unlink()
+
+    def wait_uploads(self):
+        if self.pending:
+            self.pending.result()
+
+    def shutdown(self):
+        if self.executor:
+            self.executor.shutdown(wait=True)
 
 
 def gh(repository, *arguments):
@@ -73,7 +94,7 @@ def save(container, repository, tag, identity):
         directory = Path(directory)
         if shutil.disk_usage(directory).free < 2 * 1024**3:
             raise ValueError("Checkpoint streaming needs2GiB free scratch space")
-        parts = Parts(directory, lambda path: gh(repository, "upload", tag, str(path)))
+        parts = Parts(directory, lambda path: gh(repository, "upload", tag, str(path)), background=True)
         process = subprocess.Popen(["docker", "export", container], stdout=subprocess.PIPE)
         try:
             with gzip.GzipFile(fileobj=parts, mode="wb", compresslevel=1, mtime=0) as compressed:
@@ -81,9 +102,11 @@ def save(container, repository, tag, identity):
             if process.wait() != 0:
                 raise ValueError("Container export failed; incomplete checkpoint is unusable")
             parts.finish()
+            parts.wait_uploads()
         finally:
             if process.poll() is None:
                 process.terminate(); process.wait()
+            parts.shutdown()
         manifest = directory / "checkpoint.json"
         manifest.write_text(json.dumps(dict(schema=1, input_identity=identity, parts=parts.records, environment=info["Config"].get("Env") or [],
                                             user="builder", workdir="/home/builder/termux-packages"), indent=2) + "\n")

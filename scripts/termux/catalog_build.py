@@ -244,6 +244,9 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
 
 
 def main():
+    def interrupted(signum, frame):
+        raise KeyboardInterrupt('Container requested catalog finalization')
+    signal.signal(signal.SIGTERM, interrupted)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--metadata", type=Path, required=True)
