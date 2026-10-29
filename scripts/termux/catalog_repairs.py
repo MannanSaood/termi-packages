@@ -168,7 +168,7 @@ TERMI_PYQT_EVENTS'''),tree='x11-packages')
 		tar -xzf "$termi_archive" --strip-components=1 -C "$termi_discount/src"
 		(
 			unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS AR LD RANLIB CMAKE_TOOLCHAIN_FILE CMAKE_PREFIX_PATH PKG_CONFIG_LIBDIR PKG_CONFIG_PATH
-			cmake -S "$termi_discount/src/cmake" -B "$termi_discount/build" -G "Unix Makefiles" -DCMAKE_C_COMPILER=/usr/bin/cc -DCMAKE_CXX_COMPILER=/usr/bin/c++ -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_SHARED_LIBS=OFF
+			cmake -S "$termi_discount/src/cmake" -B "$termi_discount/build" -G "Unix Makefiles" -DCMAKE_C_COMPILER=/usr/bin/cc -DCMAKE_CXX_COMPILER=/usr/bin/c++ -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS=-DMAX_RECURSION=200
 			cmake --build "$termi_discount/build" --target markdown -j "$TERMUX_PKG_MAKE_PROCESSES"
 		)
 		test -x "$termi_discount/build/markdown"
@@ -207,6 +207,10 @@ TERMI_BINUTILS_HOST'''))
         # Qt6's public dialect bits predate md4c 0.6's new default flags (one
         # collides with Qt's front-matter bit). Build Qt's matching bundled
         # source parser using its documented input; retain Markdown support.
+        if name == 'telegram-desktop':
+            anchor='-DTDE2E_INSTALL_INCLUDES=ON\n'
+            assert t.count(anchor)==1, 'Telegram libtd configure anchor changed'
+            t=t.replace(anchor,anchor+'-DCCACHE_FOUND=OFF\n')
         if name == 'opencv':
             t=hook(t,'termux_step_pre_configure','\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DENABLE_CCACHE=OFF"')
         if name == 'mixxx':
