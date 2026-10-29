@@ -292,6 +292,16 @@ assert s.count('if (!pname[0])')==1, 'ALSA JACK empty-name fallback changed'
 s=s.replace('if (!pname[0])','if (!pname || !pname[0])')
 p.write_text(s)
 TERMI_ALSA_PROGRAM_NAME
+	# Upstream ALSA FFmpeg 7.1+ compatibility; retain older FFmpeg.
+	python3 - "$TERMUX_PKG_SRCDIR/a52/pcm_a52.c" <<'TERMI_ALSA_SAMPLE_FORMAT'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+old='\trec->av_format = rec->codec->sample_fmts[0];'
+assert s.count(old)==1, 'ALSA A52 sample-format anchor changed'
+new='#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)\n\t{\n\t\tconst enum AVSampleFormat *sample_fmts = NULL;\n\t\terr = avcodec_get_supported_config(NULL, rec->codec,\n\t\t\t\t\t\t   AV_CODEC_CONFIG_SAMPLE_FORMAT,\n\t\t\t\t\t\t   0, (const void **)&sample_fmts,\n\t\t\t\t\t\t   NULL);\n\t\tif (err < 0 || !sample_fmts) {\n\t\t\terr = -EINVAL;\n\t\t\tgoto error;\n\t\t}\n\t\trec->av_format = sample_fmts[0];\n\t}\n#else\n\trec->av_format = rec->codec->sample_fmts[0];\n#endif'
+p.write_text(s.replace(old,new))
+TERMI_ALSA_SAMPLE_FORMAT
 '''))
 
     # These native failures show prefix C headers before implicit NDK libc++.
@@ -363,8 +373,8 @@ TERMI_OPENSCAD_ASSERT
 \tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_webkit_launcher"
 \tchmod 755 "$termi_webkit_launcher"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_webkit_launcher"''')
-        return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x'})
-    for name, tree in [(n, 'packages') for n in ['libavif', 'libopenmpt', 'libxapian', 'libraw', 'libglibmm-2.4', 'libglibmm-2.68', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'audacious-plugins', 'mkvtoolnix', 'qscintilla-qt6', 'signond', 'leocad', 'signon-plugin-oauth2']]:
+        return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'krita', 'kf6-kimageformats'})
+    for name, tree in [(n, 'packages') for n in ['gegl', 'libavif', 'libopenmpt', 'libxapian', 'libraw', 'libglibmm-2.4', 'libglibmm-2.68', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['krita', 'kf6-kimageformats', 'box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'audacious-plugins', 'mkvtoolnix', 'qscintilla-qt6', 'signond', 'leocad', 'signon-plugin-oauth2']]:
         change(name, lambda t, name=name: configure_consumer(t,name),tree=tree)
 
     # Keep the legacy tokenizer's warning visible without treating the NDK's
