@@ -165,6 +165,8 @@ function termi_swift_cxx_launcher_option() {
 }
 # Main compiler configuration precedes the Android standard-library build.
 # Keep its original compiler target/resource directory; only fix imports.
+# Prefix C headers are system paths so source/build LLVM headers keep priority.
+# The matching libc++ stays a user path, before the NDK C++ headers.
 function termi_swift_main_importer_flags() {
     case "$1" in android-*) printf '%s' @TERMI_IMPORTER_FLAGS@;; esac
 }
@@ -175,7 +177,7 @@ function termi_swift_importer_flags() {
     termi_swift_main_importer_flags "$1"
     common_swift_flags
 }
-'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted ')).replace('@TERMI_CXX_LAUNCHER@', shlex.quote('-DCMAKE_CXX_COMPILER_LAUNCHER='+str(launcher))).replace('@TERMI_IMPORTER_FLAGS@',shlex.quote('-Xfrontend -strict-implicit-module-context -Xcc -nostdinc++ -Xcc -nostdlibinc -Xcc -I'+sys.argv[2]+'/include/c++/v1 -Xcc -I'+sys.argv[2]+'/include -Xcc -I'+sys.argv[2]+'/include/aarch64-linux-android -Xcc -fmodule-map-file='+modulemap+' ')).replace('@TERMI_RUNTIME_IMPORTER@',shlex.quote('-DSWIFT_RUNTIME_SWIFT_COMPILE_FLAGS:STRING=-Xfrontend;-strict-implicit-module-context;-Xcc;-nostdinc++;-Xcc;-nostdlibinc;-Xcc;-I'+sys.argv[2]+'/include/c++/v1;-Xcc;-I'+sys.argv[2]+'/include;-Xcc;-I'+sys.argv[2]+'/include/aarch64-linux-android;-Xcc;-fmodule-map-file='+modulemap))
+'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted ')).replace('@TERMI_CXX_LAUNCHER@', shlex.quote('-DCMAKE_CXX_COMPILER_LAUNCHER='+str(launcher))).replace('@TERMI_IMPORTER_FLAGS@',shlex.quote('-Xfrontend -strict-implicit-module-context -Xcc -nostdinc++ -Xcc -nostdlibinc -Xcc -I'+sys.argv[2]+'/include/c++/v1 -Xcc -isystem'+sys.argv[2]+'/include -Xcc -isystem'+sys.argv[2]+'/include/aarch64-linux-android -Xcc -fmodule-map-file='+modulemap+' ')).replace('@TERMI_RUNTIME_IMPORTER@',shlex.quote('-DSWIFT_RUNTIME_SWIFT_COMPILE_FLAGS:STRING=-Xfrontend;-strict-implicit-module-context;-Xcc;-nostdinc++;-Xcc;-nostdlibinc;-Xcc;-I'+sys.argv[2]+'/include/c++/v1;-Xcc;-isystem'+sys.argv[2]+'/include;-Xcc;-isystem'+sys.argv[2]+'/include/aarch64-linux-android;-Xcc;-fmodule-map-file='+modulemap))
 assert s.count('function swift_c_flags() {') == 1
 s = s.replace('function swift_c_flags() {', helper + '\nfunction swift_c_flags() {')
 swift_flags='-DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"'
