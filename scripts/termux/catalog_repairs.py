@@ -255,6 +255,9 @@ for name in ('gradient.h','gradient.c','area.c'):
 TERMI_TINT2_SIZE'''),tree='x11-packages')
     change('strawberry',lambda t:hook(t,'termux_step_pre_configure',
         '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCCACHE_EXECUTABLE=OFF"'),tree='x11-packages')
+    # The target ccache is an Android executable, not a Linux build launcher.
+    change('openimageio',lambda t:hook(t,'termux_step_pre_configure',
+        '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DUSE_CCACHE=OFF"'),tree='x11-packages')
     change('melonds',lambda t:hook(t,'termux_step_pre_configure',
         '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DUSE_CCACHE=OFF"'),tree='x11-packages')
     change('ktextaddons',lambda t:hook(t,'termux_step_pre_configure',
@@ -374,7 +377,7 @@ TERMI_OPENSCAD_ASSERT
 \tchmod 755 "$termi_webkit_launcher"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_webkit_launcher"''')
         return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'krita', 'kf6-kimageformats'})
-    for name, tree in [(n, 'packages') for n in ['gegl', 'libavif', 'libopenmpt', 'libxapian', 'libraw', 'libglibmm-2.4', 'libglibmm-2.68', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['krita', 'kf6-kimageformats', 'box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'audacious-plugins', 'mkvtoolnix', 'qscintilla-qt6', 'signond', 'leocad', 'signon-plugin-oauth2']]:
+    for name, tree in [(n, 'packages') for n in ['gegl', 'libavif', 'libopenmpt', 'libxapian', 'libraw', 'libglibmm-2.4', 'libglibmm-2.68', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['gtkmm4', 'krita', 'kf6-kimageformats', 'box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'audacious-plugins', 'mkvtoolnix', 'qscintilla-qt6', 'signond', 'leocad', 'signon-plugin-oauth2']]:
         change(name, lambda t, name=name: configure_consumer(t,name),tree=tree)
 
     # Keep the legacy tokenizer's warning visible without treating the NDK's
