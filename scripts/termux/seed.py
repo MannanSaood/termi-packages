@@ -152,6 +152,63 @@ def prepare(raw, context, new_graph, output, inventory_hash, ledger_hash, graph_
     print(json.dumps(dict(reused_recipes=len(allowed), reused_archives=len(records), invalidated_recipes=len(invalid))), flush=True)
 
 
+def stage_output_archives(context):
+    """Put each verified archive in its final image location only once.
+
+    Used before hashing both workflow and builder contexts. Metadata stays in
+    seed/, while Docker copies archives directly to the retained output pool.
+    This avoids a second full writable-layer copy during native seed import.
+    """
+    context = Path(context)
+    seed = context / 'seed'
+    if not (seed / 'seed.json').is_file():
+        return 0
+    receipt = json.loads((seed / 'seed.json').read_text())
+    pool, output = seed / 'pool', context / 'seed-output'
+    if output.exists() or output.is_symlink() or pool.is_symlink():
+        raise ValueError('Seed output staging requires a new regular directory')
+    records = receipt['packages']
+    files, names = set(), set()
+    for record in records:
+        original = record['original_file']
+        if not re.fullmatch(r'[A-Za-z0-9%+:._~-]+\.deb', original) or original in names:
+            raise ValueError('Unsafe or duplicate staged seed output filename')
+        names.add(original)
+        path = pool / record['file']
+        if path.parent != pool or path.is_symlink() or digest(path) != record['sha256']:
+            raise ValueError('Staged source-built seed bytes changed')
+        files.add(path)
+    if set(pool.iterdir()) != files:
+        raise ValueError('Unlisted seed staging files')
+    dockerfile = context / 'Dockerfile'
+    source = dockerfile.read_text()
+    anchor = 'COPY --chown=builder:builder seed/ /home/builder/seed/\n'
+    if source.count(anchor) != 1:
+        raise ValueError('Seed Docker copy anchor changed')
+    total = sum(path.stat().st_size for path in files)
+    output.mkdir()
+    for record in records:
+        (pool / record['file']).replace(output / record['original_file'])
+    pool.rmdir()
+    dockerfile.write_text(source.replace(anchor, anchor +
+        'COPY --chown=builder:builder seed-output/ /home/builder/termux-packages/output/\n'),
+        encoding='utf-8', newline='\n')
+    print(f'TERMI_PRELOADED_SEED_ARCHIVES {len(records)} bytes={total}', flush=True)
+    return total
+
+
+def verified_archive(seed, root, record):
+    original = record['original_file']
+    if not re.fullmatch(r'[A-Za-z0-9%+:._~-]+\.deb', original):
+        raise ValueError('Unsafe seed output filename')
+    path = seed / 'pool' / record['file']
+    if not path.exists() and not path.is_symlink():
+        path = root / 'output' / original
+    if path.is_symlink() or digest(path) != record['sha256']:
+        raise ValueError('Source-built seed bytes changed')
+    return path
+
+
 def resolve_payload_alias(path, readlink=os.readlink):
     """Resolve package links without following the builder's /system shim.
 
@@ -280,10 +337,10 @@ def install(seed, root, metadata, artifacts):
     markers = Path("/data/data/.built-packages")
     markers.mkdir(parents=True, exist_ok=True)
     versions = {}
+    preloaded = 0
     for record in expected:
-        path = seed / "pool" / record["file"]
-        if path.is_symlink() or digest(path) != record["sha256"]:
-            raise ValueError("Source-built seed bytes changed")
+        path = verified_archive(seed, root, record)
+        preloaded += path == root / 'output' / record['original_file']
         fields = subprocess.check_output(["dpkg-deb", "-f", str(path), "Package", "Version", "Architecture"], text=True)
         control = dict(line.split(": ", 1) for line in fields.strip().splitlines())
         original = dict(line.split(": ", 1) for line in record["control"].strip().splitlines())
@@ -294,7 +351,7 @@ def install(seed, root, metadata, artifacts):
         raise ValueError("Ambiguous seed parent version")
     (root / "output").mkdir(exist_ok=True)
     for record in expected:
-        path = seed / "pool" / record["file"]
+        path = verified_archive(seed, root, record)
         try:
             unpack(path, prefix)
         except (ValueError, OSError, tarfile.TarError) as error:
@@ -302,7 +359,9 @@ def install(seed, root, metadata, artifacts):
         original = record["original_file"]
         if Path(original).name != original or "/" in original or "\\" in original:
             raise ValueError("Unsafe seed output filename")
-        shutil.copyfile(path, root / "output" / original)
+        destination = root / "output" / original
+        if path != destination:
+            shutil.copyfile(path, destination)
         control = dict(line.split(": ", 1) for line in record["control"].strip().splitlines())
         if not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", control["Package"]):
             raise ValueError("Unsafe seed marker name")
@@ -315,9 +374,10 @@ def install(seed, root, metadata, artifacts):
         status="PASS", recipes=len(allowed), archives=len(expected), aliases_checked=aliases,
         new_graph_identity=new["identity"], inventory_sha256=receipt["inventory_sha256"],
         ledger_sha256=receipt["ledger_sha256"], plan_sha256=receipt["graph_sha256"],
+        preloaded_archives=preloaded,
         maintainer_scripts_executed=False), indent=2) + "\n")
     (artifacts / "seed-provenance.json").write_text(json.dumps(receipt, indent=2) + "\n")
-    print(f"TERMI_SOURCE_SEED recipes={len(allowed)} archives={len(expected)}; no maintainer scripts executed", flush=True)
+    print(f"TERMI_SOURCE_SEED recipes={len(allowed)} archives={len(expected)} preloaded={preloaded}; no maintainer scripts executed", flush=True)
 
 
 def main():

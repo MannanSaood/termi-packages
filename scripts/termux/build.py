@@ -48,7 +48,7 @@ def reclaim_workflow_archives(workspace, context, seed_dir):
     Keep metadata and SHA pins. The image and output pool retain actual packages.
     """
     boundary = workspace.resolve() / "build"
-    targets = [context / "seed/pool"] + ([seed_dir] if seed_dir else [])
+    targets = [context / "seed/pool", context / "seed-output"] + ([seed_dir] if seed_dir else [])
     archives = []
     for target in targets:
         if not target.resolve().is_relative_to(boundary) or target.resolve() == boundary:
@@ -135,6 +135,9 @@ def main():
         from seed import prepare as prepare_seed
         prepare_seed(args.seed_dir.resolve(), output / "context", args.seed_graph.resolve(), output / "context/seed",
                      args.seed_inventory_sha256, args.seed_ledger_sha256, args.seed_plan_sha256)
+    if args.reclaim_workflow_inputs and args.seed_dir:
+        from seed import stage_output_archives
+        stage_output_archives(output / "context")
     identity = input_identity(output / "context")
     (output / "build-input-identity.txt").write_text(identity + "\n")
     if args.cache_image:

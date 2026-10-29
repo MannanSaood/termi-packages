@@ -121,6 +121,8 @@ jobs:
           prepare(pathlib.Path('build/seed-raw'),pathlib.Path('build/context'),pathlib.Path('build/catalog-plan.json'),
                   pathlib.Path('build/context/seed'),os.environ['SEED_INVENTORY'],os.environ['SEED_LEDGER'],os.environ['SEED_PLAN'])
           from build import input_identity
+          from seed import stage_output_archives
+          stage_output_archives(pathlib.Path('build/context'))
           pathlib.Path('build/input-identity.txt').write_text(input_identity(pathlib.Path('build/context'))+'\n')
           PY
       - name: Restore explicit verified checkpoint
