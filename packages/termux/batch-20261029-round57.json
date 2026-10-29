@@ -2976,7 +2976,16 @@
       "tag": "candidate-40964620991-1-0",
       "inventory_sha256": "2f0fe525fd6659f43fa1013aa8d3adb4c73e80b3269dd8a4ee8b6a247006d0e8",
       "plan_sha256": "ed31cc5707d99f37caca3b33618d26b5ba10894a7ed0bba9ca67c619c8d153c5",
-      "selected_success": true
+      "selected_progress": {
+        "progress_sha256": "b734ed7c8247ea368800032ff6989cdefdb7d85ea57be67fb7d49eacb1072531",
+        "seed_provenance_sha256": "5afaf7ae15791fd9e15e28e55bb533cc8a6e364ffff82bab1d8614defde5348a",
+        "build_log_sha256": "7b090569fa43684f50cf36f1ad04190f53146a9bd0f5a0cba83004188e39d903",
+        "base_seed": {
+          "inventory": "23696df33cccc01021ebb3093d2eea7c682b99cddcd85139f13d6433ada27b13",
+          "ledger": "8558553eefb071224a8805e3da6a6a6ea14b5982eb389732815f26d66a7a7a97",
+          "plan": "f9138a085aa6dc49910d87e32deb46eaca5b9198a5d10d951b60b3d3e6f25433"
+        }
+      }
     },
     {
       "tag": "candidate-40964703079-1-0",
