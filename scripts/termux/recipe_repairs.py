@@ -150,6 +150,7 @@ old = '-DCMAKE_CXX_FLAGS="$(swift_c_flags ${host}) ${cross_c_flags}"'
 assert s.count(old) == 1, 'Swift C++ flag anchor changed'
 replacement = ('-DCMAKE_CXX_FLAGS="$(termi_swift_cxx_flags ${host}) ${cross_c_flags}" $(termi_swift_cxx_launcher_option ${host})'
                + ' -DCMAKE_Swift_FLAGS:STRING="$(termi_swift_main_importer_flags ${host})" $(termi_swift_runtime_importer_option ${host})')
+modulemap=(p.parent.parent/'stdlib/public/Platform/android.modulemap').as_posix()
 launcher=Path(sys.argv[3])
 assert not any(c.isspace() for c in str(launcher)), 'Swift launcher path must not contain whitespace'
 launcher.write_text('#!/bin/bash\ncompiler="$1"\nshift\nexec "$compiler" -nostdinc++ -I'+shlex.quote(sys.argv[2]+'/include/c++/v1')+' "$@" -Wno-error=variadic-macro-arguments-omitted -Wno-error=gnu-include-next\n')
@@ -174,7 +175,7 @@ function termi_swift_importer_flags() {
     termi_swift_main_importer_flags "$1"
     common_swift_flags
 }
-'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted ')).replace('@TERMI_CXX_LAUNCHER@', shlex.quote('-DCMAKE_CXX_COMPILER_LAUNCHER='+str(launcher))).replace('@TERMI_IMPORTER_FLAGS@',shlex.quote('-Xcc -nostdinc++ -Xcc -nostdlibinc -Xcc -I'+sys.argv[2]+'/include/c++/v1 -Xcc -I'+sys.argv[2]+'/include -Xcc -I'+sys.argv[2]+'/include/aarch64-linux-android ')).replace('@TERMI_RUNTIME_IMPORTER@',shlex.quote('-DSWIFT_RUNTIME_SWIFT_COMPILE_FLAGS:STRING=-Xcc;-nostdinc++;-Xcc;-nostdlibinc;-Xcc;-I'+sys.argv[2]+'/include/c++/v1;-Xcc;-I'+sys.argv[2]+'/include;-Xcc;-I'+sys.argv[2]+'/include/aarch64-linux-android'))
+'''.replace('@TERMI_CXX_FLAGS@', shlex.quote('-nostdinc++ -I' + sys.argv[2] + '/include/c++/v1 -Wno-error=variadic-macro-arguments-omitted ')).replace('@TERMI_CXX_LAUNCHER@', shlex.quote('-DCMAKE_CXX_COMPILER_LAUNCHER='+str(launcher))).replace('@TERMI_IMPORTER_FLAGS@',shlex.quote('-Xcc -nostdinc++ -Xcc -nostdlibinc -Xcc -I'+sys.argv[2]+'/include/c++/v1 -Xcc -I'+sys.argv[2]+'/include -Xcc -I'+sys.argv[2]+'/include/aarch64-linux-android -Xcc -fmodule-map-file='+modulemap+' ')).replace('@TERMI_RUNTIME_IMPORTER@',shlex.quote('-DSWIFT_RUNTIME_SWIFT_COMPILE_FLAGS:STRING=-Xcc;-nostdinc++;-Xcc;-nostdlibinc;-Xcc;-I'+sys.argv[2]+'/include/c++/v1;-Xcc;-I'+sys.argv[2]+'/include;-Xcc;-I'+sys.argv[2]+'/include/aarch64-linux-android;-Xcc;-fmodule-map-file='+modulemap))
 assert s.count('function swift_c_flags() {') == 1
 s = s.replace('function swift_c_flags() {', helper + '\nfunction swift_c_flags() {')
 swift_flags='-DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"'
