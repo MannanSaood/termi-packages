@@ -235,6 +235,41 @@ assert s.count(anchor)==1, 'llbuild CMake entry changed'
 extra='\nif(CMAKE_SYSTEM_NAME STREQUAL "Android")\n  set(CMAKE_CXX_FLAGS "-nostdinc++ -I'+prefix+'/include/c++/v1 ${CMAKE_CXX_FLAGS}")\nendif()\n'
 p.write_text(s.replace(anchor,anchor+extra))
 TERMI_SWIFT_LLBUILD_CXX
+
+	# SwiftPM invokes Swift's native package builder using a destination JSON,
+	# independently of llbuild's CMake flags. Fix that Android-only generator.
+	python3 - "$TERMUX_PKG_SRCDIR/swift/utils/swift_build_support/swift_build_support/targets.py" "$TERMUX_PREFIX" "$TERMUX_PKG_SRCDIR/swift/stdlib/public/Platform/android.modulemap" <<'TERMI_SWIFTPM_DESTINATION'
+from pathlib import Path
+import re, sys
+p=Path(sys.argv[1]);s=p.read_text();prefix=sys.argv[2];modulemap=sys.argv[3]
+assert all(re.fullmatch(r'/[A-Za-z0-9_./-]+',v) for v in (prefix,modulemap)), 'Unexpected SwiftPM header path'
+anchor="        with open(config_file, 'w') as f:"
+assert s.count(anchor)==1, 'SwiftPM Android destination writer changed'
+extra='''        # Keep C headers as system paths, with matching libc++ first.
+        import json as termi_json
+        termi_destination = termi_json.loads(spm_json)
+        termi_prefix = @PREFIX@
+        termi_modulemap = @MODULEMAP@
+        termi_c_include = '-I' + termi_prefix + '/include'
+        termi_destination['extra-cc-flags'] = [
+            '-isystem' + termi_prefix + '/include' if flag == termi_c_include else flag
+            for flag in termi_destination['extra-cc-flags']]
+        termi_destination['extra-cpp-flags'] = [
+            '-nostdinc++', '-I' + termi_prefix + '/include/c++/v1'
+        ] + termi_destination['extra-cpp-flags']
+        termi_destination['extra-swiftc-flags'] = [
+            '-Xfrontend', '-strict-implicit-module-context',
+            '-Xcc', '-nostdinc++', '-Xcc', '-nostdlibinc',
+            '-Xcc', '-I' + termi_prefix + '/include/c++/v1',
+            '-Xcc', '-isystem' + termi_prefix + '/include',
+            '-Xcc', '-isystem' + termi_prefix + '/include/aarch64-linux-android',
+            '-Xcc', '-fmodule-map-file=' + termi_modulemap
+        ] + ['-isystem' + termi_prefix + '/include' if flag == termi_c_include else flag
+             for flag in termi_destination['extra-swiftc-flags']]
+        spm_json = termi_json.dumps(termi_destination, indent=2)
+'''.replace('@PREFIX@',repr(prefix)).replace('@MODULEMAP@',repr(modulemap))
+p.write_text(s.replace(anchor,extra+anchor))
+TERMI_SWIFTPM_DESTINATION
 """
     text = text.replace(anchor, anchor + setup + SWIFT_ANDROID_STAT_MODULE)
     end = "\t--install-swift-driver --install-sourcekit-lsp\n"

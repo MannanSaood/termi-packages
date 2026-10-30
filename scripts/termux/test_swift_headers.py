@@ -101,3 +101,36 @@ class SwiftHeadersTest(unittest.TestCase):
             p.write_text('project(Changed)')
             failed=subprocess.run([sys.executable,'-c',script,str(p),'/prefix','/source/android.modulemap'],capture_output=True)
             self.assertNotEqual(0,failed.returncode)
+
+    def test_swiftpm_destination_uses_matching_cxx_without_changing_sdk_or_links(self):
+        import json
+        import types
+        recipe=swift_target_cxx_headers("termux_step_make() {\n\t--install-swift-driver --install-sourcekit-lsp\n}")
+        script=recipe.split("<<'TERMI_SWIFTPM_DESTINATION'\n")[1].split('\nTERMI_SWIFTPM_DESTINATION')[0]
+        fixture=Path(__file__).with_name('fixtures')/'swift-android-destination.py'
+        source=fixture.read_text()
+        # Preserve upstream indentation and execute the actual JSON writer.
+        wrapped='class AndroidPlatform:\n'+''.join('    '+line+'\n' for line in source.splitlines())
+        args=types.SimpleNamespace(android_arch='aarch64',android_api_level=26,cross_compile_deps_path='/prefix-parent')
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'targets.py';p.write_text(wrapped)
+            before={};exec(compile(wrapped,str(p),'exec'),dict(os=os),before)
+            old=before['AndroidPlatform']();old.ndk_toolchain_path=lambda _: '/ndk'
+            old_dir=Path(tmp)/'before';old_dir.mkdir()
+            original=json.loads(Path(old.swiftpm_config(args,str(old_dir),'/host','/resources')).read_text())
+            subprocess.run([sys.executable,'-c',script,str(p),'/prefix-parent/usr','/src/android.modulemap'],check=True)
+            after={};exec(compile(p.read_text(),str(p),'exec'),dict(os=os),after)
+            new=after['AndroidPlatform']();new.ndk_toolchain_path=lambda _: '/ndk'
+            new_dir=Path(tmp)/'after';new_dir.mkdir()
+            updated=json.loads(Path(new.swiftpm_config(args,str(new_dir),'/host','/resources')).read_text())
+            for key in ['target','sdk','toolchain-bin-dir','version']:
+                self.assertEqual(original[key],updated[key])
+            self.assertEqual(['-fPIC','-isystem/prefix-parent/usr/include'],updated['extra-cc-flags'])
+            self.assertEqual(['-nostdinc++','-I/prefix-parent/usr/include/c++/v1',*original['extra-cpp-flags']],updated['extra-cpp-flags'])
+            self.assertIn('-fmodule-map-file=/src/android.modulemap',updated['extra-swiftc-flags'])
+            self.assertIn('-resource-dir',updated['extra-swiftc-flags'])
+            self.assertIn('/resources',updated['extra-swiftc-flags'])
+            self.assertIn('-L/prefix-parent/usr/lib',updated['extra-swiftc-flags'])
+            p.write_text('changed source')
+            failed=subprocess.run([sys.executable,'-c',script,str(p),'/prefix-parent/usr','/src/android.modulemap'],capture_output=True)
+            self.assertNotEqual(0,failed.returncode)
