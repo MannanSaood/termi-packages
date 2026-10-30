@@ -1,6 +1,21 @@
 """Repairs grounded in the first completed four-lane catalog failure logs."""
 import re
 
+NTL_GMP_DIAGNOSTICS = r'''from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+anchor = '   if (!CheckGMP()) {\n'
+assert s.count(anchor) == 1, 'NTL GMP probe anchor changed'
+# DoConfig redirects compiler errors into this file, then hides it on failure.
+# Keep the original probe and fatal error; expose a bounded diagnostic only.
+s = s.replace(anchor, anchor + '      print STDERR "TERMI_NTL_GMP_PROBE_LOG\\n";\n'
+              + '      system("tail -c 65536 OneCompilerOutput.log >&2");\n')
+p.write_text(s)
+'''
+
+NTL_GMP_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/src/DoConfig\" <<'TERMI_NTL_GMP_DIAGNOSTICS'\n" + NTL_GMP_DIAGNOSTICS + "TERMI_NTL_GMP_DIAGNOSTICS\n"
+
 AWS_PRIVATE_CRYPTO = r"""
 	local termi_crypto_cc="$TERMUX_PKG_TMPDIR/termi-aws-crypto-cc"
 	python3 - "$CC" "$termi_crypto_cc" <<'TERMI_AWS_CRYPTO_CC'
@@ -630,6 +645,7 @@ TERMI_QEMU_RWF'''))
             -q "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/qemu-$TERMUX_ARCH"
             -R / -b "$TERMUX_PREFIX/opt/aosp:/system"
             /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH= ANDROID_ROOT=/system ANDROID_DATA=/data)'''))
+    change('libntl',lambda t:hook(t,'termux_step_pre_configure',NTL_GMP_SETUP))
 
     def btop(t):
         start=t.index('\tprintf ')
