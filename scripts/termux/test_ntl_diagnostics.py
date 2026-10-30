@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -7,12 +8,15 @@ import unittest
 
 from catalog_repairs import NTL_GMP_DIAGNOSTICS
 from catalog_repairs import apply as apply_catalog_repairs
+from catalog_repairs import NTL_CXX_HEADERS
 from prepare import replace_once
+
+BASH = 'C:/Program Files/Git/bin/bash.exe' if os.name == 'nt' else shutil.which('bash')
 
 
 class NtlDiagnosticsTest(unittest.TestCase):
     def test_recipe_is_patched_once_and_keeps_loader_and_diagnostics(self):
-        original = ('TERMUX_PKG_VERSION="11.6.0"\ntermux_step_pre_configure() {\n'
+        original = ('TERMUX_PKG_VERSION="11.6.0"\nTERMUX_PKG_DEPENDS="libgf2x, libgmp"\ntermux_step_pre_configure() {\n'
                     '\ttermux_proot_run=(termux-proot-run env LD_PRELOAD= LD_LIBRARY_PATH=)\n}\n')
         with tempfile.TemporaryDirectory() as tmp:
             recipe = Path(tmp) / 'build.sh'
@@ -33,6 +37,15 @@ class NtlDiagnosticsTest(unittest.TestCase):
             self.assertIn('/opt/aosp:/system', prepared)
             self.assertIn('TERMI_NTL_GMP_PROBE_LOG', prepared)
             self.assertEqual(1, prepared.count("<<'TERMI_NTL_GMP_DIAGNOSTICS'"))
+            self.assertIn('TERMUX_PKG_DEPENDS="libgf2x, libgmp, libc++"', prepared)
+            self.assertIn('-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1', prepared)
+
+    @unittest.skipUnless(BASH, 'Bash required')
+    def test_matching_cxx_headers_keep_existing_compiler_flags(self):
+        result = subprocess.run([BASH, '-c', 'TERMUX_PREFIX=/prefix; CXXFLAGS="-Oz -pthread";\n'
+                                 + NTL_CXX_HEADERS + '\nprintf "%s" "$CXXFLAGS"'],
+                                capture_output=True, text=True, check=True)
+        self.assertEqual('-Oz -pthread -nostdinc++ -I/prefix/include/c++/v1', result.stdout)
 
     @unittest.skipUnless(shutil.which('perl') and shutil.which('tail'), 'Perl and tail required')
     def test_failure_exposes_bounded_compiler_log_and_still_fails(self):

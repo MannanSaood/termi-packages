@@ -15,6 +15,7 @@ p.write_text(s)
 '''
 
 NTL_GMP_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/src/DoConfig\" <<'TERMI_NTL_GMP_DIAGNOSTICS'\n" + NTL_GMP_DIAGNOSTICS + "TERMI_NTL_GMP_DIAGNOSTICS\n"
+NTL_CXX_HEADERS = '\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"\n'
 
 OCTAVE_FORTRAN_LINK = r'''
 	export F77="$FC"
@@ -681,12 +682,14 @@ TERMI_QEMU_RWF'''))
     # QEMU needs the loader and libc from our own source-built AOSP package.
     # Bind them inside proot; never install or mutate the builder's /system.
     change('libntl',lambda t:hook(t.replace(
+        'TERMUX_PKG_DEPENDS="libgf2x, libgmp"',
+        'TERMUX_PKG_DEPENDS="libgf2x, libgmp, libc++"').replace(
         'termux_proot_run=(termux-proot-run env LD_PRELOAD= LD_LIBRARY_PATH=)',
         '''termux_proot_run=("$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/proot"
             -q "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/qemu-$TERMUX_ARCH"
             -R / -b "$TERMUX_PREFIX/opt/aosp:/system"
             /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH= ANDROID_ROOT=/system ANDROID_DATA=/data)'''),
-        'termux_step_pre_configure',NTL_GMP_SETUP))
+        'termux_step_pre_configure',NTL_CXX_HEADERS + NTL_GMP_SETUP))
 
     def btop(t):
         start=t.index('\tprintf ')
