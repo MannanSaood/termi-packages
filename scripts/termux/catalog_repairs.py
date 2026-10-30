@@ -50,6 +50,22 @@ p.write_text(s)
 
 OCTAVE_EPSILON_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_OCTAVE_EPSILON'\n" + OCTAVE_EPSILON_REPAIR + "TERMI_OCTAVE_EPSILON\n"
 
+PROJ_EPSILON_REPAIR = r'''from pathlib import Path
+import sys
+p = Path(sys.argv[1]) / 'src/projections/gnom.cpp'
+s = p.read_text()
+anchor = '0.01 * sqrt(DBL_EPSILON)'
+assert s.count(anchor) == 1 and s.count('DBL_EPSILON') == 1, 'PROJ gnomonic epsilon changed'
+assert s.count('#include <math.h>') == 1, 'PROJ gnomonic headers changed'
+# Preserve the double-precision convergence threshold when Android's C header
+# chain does not expose DBL_EPSILON to this C++ translation unit.
+s = s.replace('#include <math.h>', '#include <math.h>\n#include <limits>')
+s = s.replace(anchor, '0.01 * sqrt(std::numeric_limits<double>::epsilon())')
+p.write_text(s)
+'''
+
+PROJ_EPSILON_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_PROJ_EPSILON'\n" + PROJ_EPSILON_REPAIR + "TERMI_PROJ_EPSILON\n"
+
 
 def octave_fortran_recipe(text, runtime):
     # CMake options belong to the runtime's subshell, not Octave's configure.
@@ -164,6 +180,7 @@ _termi_ldc_host_xml() {
 
 
 def apply(change, hook, prepared):
+    change('proj', lambda t: hook(t, 'termux_step_pre_configure', PROJ_EPSILON_SETUP))
     # These recipes compile a Linux host helper after an Android target build.
     # Keep target include paths out of GCC and preserve the target environment.
     def tcc_host_environment(t):
