@@ -98,12 +98,44 @@ def apply(change, hook, prepared):
     def tcc_host_environment(t):
         anchor='\t\tunset CC CFLAGS LDFLAGS\n'
         assert t.count(anchor)==1, 'TCC host environment anchor changed'
-        return t.replace(anchor,'''\t\tunset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
+        t=t.replace(anchor,'''\t\tunset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
 \t\texport CC=/usr/bin/gcc CFLAGS="-O2 -std=gnu11"
+''')
+        return hook(t,'termux_step_pre_configure','''
+\t# TinyCC predates the NDK's required versioned-target macro. Define the
+\t# configured SDK in its own predefined header, keeping explicit overrides.
+\tpython3 - "$TERMUX_PKG_SRCDIR/include/tccdefs.h" "$TERMUX_PKG_API_LEVEL" <<'TERMI_TCC_ANDROID_API'
+from pathlib import Path
+import re, sys
+p=Path(sys.argv[1]);s=p.read_text();api=sys.argv[2]
+assert re.fullmatch(r'[0-9]+',api) and 21<=int(api)<=10000, 'Invalid TinyCC Android API'
+anchor='#elif defined __ANDROID__'
+assert s.count(anchor)==1, 'TinyCC Android predefined header changed'
+extra="""
+#ifndef __ANDROID_MIN_SDK_VERSION__
+# ifdef __ANDROID_API__
+#  define __ANDROID_MIN_SDK_VERSION__ __ANDROID_API__
+# else
+#  define __ANDROID_MIN_SDK_VERSION__ @API@
+# endif
+#endif
+#ifndef __ANDROID_API__
+# define __ANDROID_API__ __ANDROID_MIN_SDK_VERSION__
+#endif
+""".replace('@API@',api)
+p.write_text(s.replace(anchor,anchor+extra))
+TERMI_TCC_ANDROID_API
 ''')
     change('tcc',tcc_host_environment)
 
     def sftpgo_host_documentation(t):
+        setup='\ttermux_setup_golang\n'
+        assert t.count(setup)==1, 'SFTPGo Go setup changed'
+        # Both target compilation and native doc generation populate Go's
+        # cache. Keep it in bounded recipe scratch, reclaimed before export.
+        t=t.replace(setup,setup+'''\texport GOCACHE="$TERMUX_PKG_TMPDIR/termi-go-cache"
+\tmkdir -p "$GOCACHE"
+''')
         anchor='\t# borrowed from packages/gh\n\tunset GOOS GOARCH CGO_LDFLAGS\n\tunset CC CXX CFLAGS CXXFLAGS LDFLAGS\n'
         end='\n\t# for sftpgo.db\n'
         assert t.count(anchor)==1 and t.count(end)==1, 'SFTPGo host documentation anchors changed'
