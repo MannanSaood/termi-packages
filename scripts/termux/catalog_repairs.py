@@ -101,6 +101,13 @@ def apply(change, hook, prepared):
         t=t.replace(anchor,'''\t\tunset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
 \t\texport CC=/usr/bin/gcc CFLAGS="-O2 -std=gnu11"
 ''')
+        runtime='\tmake -j ${TERMUX_PKG_MAKE_PROCESSES} libtcc1.a\n'
+        assert t.count(runtime)==1, 'TCC runtime bootstrap command changed'
+        # The Linux-hosted helper targets Android headers but has Linux builtins.
+        # Pass versioned Android context to this runtime build explicitly.
+        t=t.replace(runtime, '\tmake -j ${TERMUX_PKG_MAKE_PROCESSES} libtcc1.a '+
+            '"XFLAGS=-B.. -I.. -D__ANDROID__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL '+
+            '-D__ANDROID_MIN_SDK_VERSION__=$TERMUX_PKG_API_LEVEL"\n')
         return hook(t,'termux_step_pre_configure','''
 \t# TinyCC predates the NDK's required versioned-target macro. Define the
 \t# configured SDK in its own predefined header, keeping explicit overrides.
@@ -123,6 +130,8 @@ extra="""
 # define __ANDROID_API__ __ANDROID_MIN_SDK_VERSION__
 #endif
 """.replace('@API@',api)
+# conftest.c embeds only lines indented >=4 into generated tccdefs_.h.
+extra="\\n"+"\\n".join("    "+line for line in extra.strip().splitlines())+"\\n"
 p.write_text(s.replace(anchor,anchor+extra))
 TERMI_TCC_ANDROID_API
 ''')

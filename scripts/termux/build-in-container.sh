@@ -109,8 +109,13 @@ elif [ "$mode" = packages ]; then
             batch_result=1
             # Keep checking independent requested roots and preserve successful
             # outputs even when a later requested root fails.
-            python3 /home/builder/build_scratch.py --top "$HOME/.termux-build" --recipe "$root"
         fi
+        # Completed focused recipes need the same scratch reclamation as catalog
+        # recipes. Keep installed prefix, host tools, logs and every .deb intact.
+        # Previously only failed roots were cleaned, retaining successful Go
+        # object/module caches until publication and checkpoint export ran out.
+        python3 /home/builder/build_scratch.py --top "$HOME/.termux-build" --recipe "$root"
+        df -Pk /home/builder/artifacts
     done
 elif [ "$mode" = catalog ]; then
     # Explicit owner-approved expansion; dependencies are source-built and the
