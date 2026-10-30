@@ -223,6 +223,18 @@ flags='-Xfrontend -strict-implicit-module-context -Xcc -nostdinc++ -Xcc -nostdli
 extra='\nif(CMAKE_SYSTEM_NAME STREQUAL "Android")\n  string(APPEND CMAKE_Swift_FLAGS " '+flags+'")\nendif()\n'
 p.write_text(s.replace(anchor,anchor+extra))
 TERMI_SWIFT_TESTING_IMPORTERS
+	# llbuild has its own cross-CXX configure block, outside the main compiler
+	# launcher. Keep GoogleTest and the runtime on the same libc++ header order.
+	python3 - "$TERMUX_PKG_SRCDIR/llbuild/CMakeLists.txt" "$TERMUX_PREFIX" <<'TERMI_SWIFT_LLBUILD_CXX'
+from pathlib import Path
+import re, sys
+p=Path(sys.argv[1]);s=p.read_text();prefix=sys.argv[2]
+assert re.fullmatch(r'/[A-Za-z0-9_./-]+',prefix), 'Unexpected llbuild prefix'
+anchor='project(llbuild LANGUAGES CXX)'
+assert s.count(anchor)==1, 'llbuild CMake entry changed'
+extra='\nif(CMAKE_SYSTEM_NAME STREQUAL "Android")\n  set(CMAKE_CXX_FLAGS "-nostdinc++ -I'+prefix+'/include/c++/v1 ${CMAKE_CXX_FLAGS}")\nendif()\n'
+p.write_text(s.replace(anchor,anchor+extra))
+TERMI_SWIFT_LLBUILD_CXX
 """
     text = text.replace(anchor, anchor + setup + SWIFT_ANDROID_STAT_MODULE)
     end = "\t--install-swift-driver --install-sourcekit-lsp\n"

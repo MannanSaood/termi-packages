@@ -60,6 +60,22 @@ class SwiftHeadersTest(unittest.TestCase):
         with self.assertRaises(ValueError): swift_target_cxx_headers('changed')
 
     @unittest.skipUnless(shutil.which('cmake'), 'CMake unavailable')
+    def test_llbuild_matching_headers_precede_existing_cross_flags(self):
+        recipe=swift_target_cxx_headers("termux_step_make() {\n\t--install-swift-driver --install-sourcekit-lsp\n}")
+        script=recipe.split("<<'TERMI_SWIFT_LLBUILD_CXX'\n")[1].split('\nTERMI_SWIFT_LLBUILD_CXX')[0]
+        anchor='project(llbuild LANGUAGES CXX)'
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'CMakeLists.txt';p.write_text(anchor+'\noption(BUILD_TESTING "Build tests" ON)\n')
+            subprocess.run([sys.executable,'-c',script,str(p),'/prefix'],check=True)
+            patched=p.read_text().replace(anchor,'')
+            for platform in ['Android','Linux']:
+                old='--target=aarch64-linux-android26 -isystem/prefix/include/c++/v1 -isystem/prefix/include'
+                p.write_text(f'set(CMAKE_SYSTEM_NAME {platform})\nset(CMAKE_CXX_FLAGS "{old}")\n'+patched+'\nfile(WRITE "${CMAKE_CURRENT_LIST_DIR}/flags.txt" "${CMAKE_CXX_FLAGS}")\nif(NOT BUILD_TESTING)\n message(FATAL_ERROR "Tests disabled")\nendif()\n')
+                subprocess.run(['cmake','-P',str(p)],check=True)
+                flags=(Path(tmp)/'flags.txt').read_text()
+                self.assertEqual(('-nostdinc++ -I/prefix/include/c++/v1 '+old) if platform=='Android' else old,flags)
+
+    @unittest.skipUnless(shutil.which('cmake'), 'CMake unavailable')
     def test_testing_product_keeps_target_flags_and_host_unchanged(self):
         recipe=swift_target_cxx_headers("termux_step_make() {\n\t--install-swift-driver --install-sourcekit-lsp\n}")
         script=recipe.split("<<'TERMI_SWIFT_TESTING_IMPORTERS'\n")[1].split('\nTERMI_SWIFT_TESTING_IMPORTERS')[0]
