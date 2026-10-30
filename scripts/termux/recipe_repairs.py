@@ -134,6 +134,37 @@ TERMI_SWIFT_STAT_MODULE
 '''
 
 
+FORTRAN_DRIVER = r'''from pathlib import Path
+import shlex, sys
+host,output,toolchain,target,arch=sys.argv[1:]
+assert arch in ('aarch64','x86_64'), 'Unsupported Fortran runtime architecture'
+linker=Path(toolchain)/'bin/ld.lld'
+assert linker.is_file(), 'Missing Android NDK linker'
+body=r"""#!/bin/bash
+set -euo pipefail
+args=()
+static_openmp=0
+for argument in "$@"; do
+    if [[ "$argument" == -static-openmp ]]; then
+        static_openmp=1
+    else
+        args+=("$argument")
+    fi
+done
+if (( static_openmp )); then
+    [[ -f @OPENMP@ ]] || { echo 'Missing Android static OpenMP runtime' >&2; exit 2; }
+    # Append after caller objects: archive symbol resolution is order-sensitive.
+    args+=(@OPENMP@)
+fi
+exec @FLANG@ --target=@TARGET@ --sysroot=@SYSROOT@ -fuse-ld=@LINKER@ "${args[@]}"
+"""
+for key,value in dict(FLANG=(Path(host)/'bin/flang-new').as_posix(),TARGET=target,
+        SYSROOT=(Path(toolchain)/'sysroot').as_posix(),LINKER=linker.as_posix(),
+        OPENMP=(Path(toolchain)/'lib/clang/21/lib/linux'/arch/'libomp.a').as_posix()).items():
+    body=body.replace('@'+key+'@',shlex.quote(value))
+Path(output).write_text(body)'''
+
+
 def swift_target_cxx_headers(text):
     anchor = 'termux_step_make() {'
     if text.count(anchor) != 1:
@@ -472,7 +503,9 @@ def apply(patch, original):
 \t# matching official LLVM archive supplies only the Linux-host frontend.
 \tcp -a "$TERMUX_STANDALONE_TOOLCHAIN/lib/clang/21/lib/." "$host/lib/clang/21/lib/"
 \tlocal wrapper="$work/termi-flang"
-\tprintf '#!/bin/sh\\nexec "%s/bin/flang-new" --target=%s%s --sysroot="%s/sysroot" "$@"\\n' "$host" "$TERMUX_HOST_PLATFORM" "$TERMUX_PKG_API_LEVEL" "$TERMUX_STANDALONE_TOOLCHAIN" > "$wrapper"
+\tpython3 - "$host" "$wrapper" "$TERMUX_STANDALONE_TOOLCHAIN" "${TERMUX_HOST_PLATFORM}${TERMUX_PKG_API_LEVEL}" "$TERMUX_ARCH" <<'TERMI_FORTRAN_DRIVER'
+@TERMI_FORTRAN_DRIVER@
+TERMI_FORTRAN_DRIVER
 \tchmod 755 "$wrapper"
 \texport FC="$wrapper" FCFLAGS="--target=${TERMUX_HOST_PLATFORM}${TERMUX_PKG_API_LEVEL} -fPIC"
 \t(
@@ -489,7 +522,7 @@ def apply(patch, original):
 \tLDFLAGS+=" -L$work/runtime-build/flang-rt/lib"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_Fortran_COMPILER=$wrapper -DCMAKE_Fortran_FLAGS=-fPIC -DCMAKE_POSITION_INDEPENDENT_CODE=ON"
 \tinstall -Dm600 "$source/LICENSE.TXT" "$TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/llvm-runtime-LICENSE.TXT"
-'''))
+'''.replace('@TERMI_FORTRAN_DRIVER@',FORTRAN_DRIVER)))
     for package in ["gcal", "recutils"]:
         change(package,lambda t:hook(t.replace('ac_cv_header_spawn_h=no','ac_cv_header_spawn_h=yes'),
             "termux_step_pre_configure",'''\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" ac_cv_func_posix_spawn=yes ac_cv_func_posix_spawnp=yes"
