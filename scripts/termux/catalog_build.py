@@ -38,7 +38,7 @@ def shared_build_wait(name, lane, owned):
         return None
     # Focused repairs run in isolated jobs; lanes can still build independent
     # roots while waiting for their candidates to enter the shared seed.
-    if name in ('swift', 'alsa-plugins', 'kf6-kimageformats', 'gegl'):
+    if name in ('swift', 'alsa-plugins', 'kf6-kimageformats', 'gegl', 'tcc', 'sftpgo'):
         return 'focused-' + name
     if name in SHARED_BUILD_OWNERS and name not in owned:
         return f'lane-{SHARED_BUILD_OWNERS[name]}-of-8'

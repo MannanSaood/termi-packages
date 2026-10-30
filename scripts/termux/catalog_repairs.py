@@ -93,6 +93,31 @@ _termi_ldc_host_xml() {
 
 
 def apply(change, hook, prepared):
+    # These recipes compile a Linux host helper after an Android target build.
+    # Keep target include paths out of GCC and preserve the target environment.
+    def tcc_host_environment(t):
+        anchor='\t\tunset CC CFLAGS LDFLAGS\n'
+        assert t.count(anchor)==1, 'TCC host environment anchor changed'
+        return t.replace(anchor,'''\t\tunset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
+\t\texport CC=/usr/bin/gcc CFLAGS="-O2 -std=gnu11"
+''')
+    change('tcc',tcc_host_environment)
+
+    def sftpgo_host_documentation(t):
+        anchor='\t# borrowed from packages/gh\n\tunset GOOS GOARCH CGO_LDFLAGS\n\tunset CC CXX CFLAGS CXXFLAGS LDFLAGS\n'
+        end='\n\t# for sftpgo.db\n'
+        assert t.count(anchor)==1 and t.count(end)==1, 'SFTPGo host documentation anchors changed'
+        clean='''\t# Documentation needs a Linux executable, with native CGO dependencies.
+\t(
+\tunset GOOS GOARCH GOARM GOARM64 GO386
+\tunset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
+\tunset CGO_CFLAGS CGO_CPPFLAGS CGO_CXXFLAGS CGO_LDFLAGS
+\tunset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
+\texport CC=/usr/bin/gcc CXX=/usr/bin/g++
+'''
+        return t.replace(anchor,clean).replace(end,'\n\t)\n'+end)
+    change('sftpgo',sftpgo_host_documentation)
+
     # The pinned development version is rejected by this recipe's own stable
     # release policy. Use the latest supported upstream source, keeping the guard.
     def mate_utils_supported_source(t):

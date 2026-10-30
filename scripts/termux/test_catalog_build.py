@@ -15,6 +15,10 @@ class GraphTests(unittest.TestCase):
         self.assertIsNone(builder.shared_build_wait('app','lane-5-of-8',{'swift','app'}))
         self.assertIsNone(builder.shared_build_wait('swift',None,{'swift'}))
         self.assertIsNone(builder.shared_build_wait('swift','lane-1-of-4',{'swift'}))
+        for name in ['tcc','sftpgo']:
+            self.assertEqual('focused-'+name,builder.shared_build_wait(name,'lane-1-of-8',{name}))
+            self.assertIsNone(builder.shared_build_wait(name,None,{name}))
+            self.assertIsNone(builder.shared_build_wait(name,'lane-1-of-4',{name}))
         self.assertEqual('lane-3-of-8',builder.shared_build_wait('qt6-qtdeclarative','lane-5-of-8',set()))
         self.assertIsNone(builder.shared_build_wait('qt6-qtdeclarative','lane-3-of-8',{'qt6-qtdeclarative'}))
 
