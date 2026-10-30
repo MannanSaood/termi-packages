@@ -53,6 +53,10 @@ def shared_build_wait(name, lane, owned):
 class DiskPressure(Exception):
     """Stop before a single large recipe can fill the shared runner filesystem."""
 
+    def __init__(self, message, free_bytes=None):
+        super().__init__(message)
+        self.free_bytes = free_bytes
+
 
 def guarded_wait(process, root, timeout, minimum_free_gib):
     if not minimum_free_gib:
@@ -60,8 +64,9 @@ def guarded_wait(process, root, timeout, minimum_free_gib):
     deadline = time.monotonic() + timeout
     floor = minimum_free_gib * 1024**3
     while True:
-        if shutil.disk_usage(root).free < floor:
-            raise DiskPressure("Insufficient disk during recipe compilation")
+        free_bytes = shutil.disk_usage(root).free
+        if free_bytes < floor:
+            raise DiskPressure("Insufficient disk during recipe compilation", free_bytes=free_bytes)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise subprocess.TimeoutExpired(process.args, timeout)
@@ -220,7 +225,7 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                         from build_scratch import clean
                         from catalog_progress import tail
                         entry.update(reason=str(error), compile_resume_available=False, exit_code=75,
-                                     disk_free_bytes_at_stop=shutil.disk_usage(root).free,
+                                     disk_free_bytes_at_stop=error.free_bytes,
                                      log_tail_at_stop=tail(state_dir / "logs" / f"{name}-{entry['attempts']}.log"))
                         print("TERMI_RESOURCE_STOP " + json.dumps(dict(recipe=name,
                               free_bytes=entry["disk_free_bytes_at_stop"],

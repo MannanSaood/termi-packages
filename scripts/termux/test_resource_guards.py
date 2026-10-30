@@ -56,14 +56,16 @@ class ResourceGuards(unittest.TestCase):
             entry=ledger['recipes']['resource-fixture']
             self.assertEqual('interrupted',entry['status'])
             self.assertFalse(entry['compile_resume_available'])
+            self.assertEqual(7*1024**3,entry['disk_free_bytes_at_stop'])
 
     def test_single_large_recipe_is_stopped_when_free_space_drops(self):
         process = Mock(args=['compiler'])
         process.wait.side_effect = [subprocess.TimeoutExpired('compiler', 5), 0]
         with patch('catalog_build.shutil.disk_usage', side_effect=[
                 SimpleNamespace(free=20*1024**3), SimpleNamespace(free=15*1024**3)]):
-            with self.assertRaises(DiskPressure):
+            with self.assertRaises(DiskPressure) as stopped:
                 guarded_wait(process, Path('.'), 100, 16)
+            self.assertEqual(15*1024**3,stopped.exception.free_bytes)
         self.assertEqual(1, process.wait.call_count)
 
     def test_completed_recipe_returns_actual_exit_code(self):
