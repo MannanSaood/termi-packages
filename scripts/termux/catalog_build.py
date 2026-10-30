@@ -30,6 +30,9 @@ SHARED_BUILD_OWNERS = {
     "kdegraphics-thumbnailers": 2,
     "openjdk-21": 1, "openjdk-25": 3, "openjdk-17": 5, "gimp": 2,
     "inkscape": 6, "kscreen": 3, "pavucontrol": 1, "gwenview": 4, "mate-utils": 6,
+    # PROJ now unblocks these independent recipes. Build each once, spread
+    # across idle lanes; dependents adopt the next verified shared seed.
+    "librttopo": 0, "libgeotiff": 1, "osm2pgsql": 5,
 }
 
 

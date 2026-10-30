@@ -33,7 +33,8 @@ class GraphTests(unittest.TestCase):
         names=['libkdcraw','imagemagick','libpangomm-2.48','kf6-kimageformats',
                'libzim','openimageio','recoll','libatkmm-1.6','libxml++-2.6',
                'libpangomm-1.4','gegl','gtkmm4','gtkmm3','gtkmm2','libvips','eom','libkiwix','kdegraphics-thumbnailers','openjdk-21','openjdk-25','openjdk-17',
-               'gimp','inkscape','kscreen','pavucontrol','gwenview','mate-utils']
+               'gimp','inkscape','kscreen','pavucontrol','gwenview','mate-utils',
+               'librttopo','libgeotiff','osm2pgsql']
         recipes={name:dict(dependencies=[]) for name in names}
         recipes.update({f'app{i}':dict(dependencies=names) for i in range(8)})
         counts={name:0 for name in names}
@@ -51,6 +52,32 @@ class GraphTests(unittest.TestCase):
             self.assertIsNone(builder.shared_build_wait(name,'lane-2-of-4',{name}))
         self.assertEqual('focused-alsa-plugins',builder.shared_build_wait('alsa-plugins','lane-0-of-8',{'alsa-plugins'}))
         self.assertIsNone(builder.shared_build_wait('alsa-plugins',None,{'alsa-plugins'}))
+
+    def test_proj_frontier_spreads_independent_roots_without_rebuilding_shared_dependencies(self):
+        roots = ['librttopo', 'libgeotiff', 'osm2pgsql']
+        recipes = {'proj': dict(dependencies=[])}
+        recipes.update({name: dict(dependencies=['proj']) for name in roots})
+        recipes.update({f'consumer-{i}': dict(dependencies=roots) for i in range(8)})
+        states = {name: dict(status='built' if name == 'proj' else 'pending') for name in recipes}
+        claims = {}
+        for lane in range(8):
+            label = f'lane-{lane}-of-8'
+            owned, selected = builder.lane_scope(recipes, label)
+            ready = {name for name in selected if builder.shared_build_wait(name, label, owned) is None
+                     and builder.next_status(dict(name=name, **recipes[name]), states, False) == 'ready'}
+            if ready:
+                claims[lane] = ready
+        self.assertEqual({0: {'librttopo'}, 1: {'libgeotiff'}, 5: {'osm2pgsql'}}, claims)
+        for name in roots:
+            states[name]['status'] = 'built'
+        consumers = []
+        for lane in range(8):
+            label = f'lane-{lane}-of-8'
+            owned, selected = builder.lane_scope(recipes, label)
+            consumers += [name for name in selected if builder.shared_build_wait(name, label, owned) is None
+                          and builder.next_status(dict(name=name, **recipes[name]), states, False) == 'ready']
+        self.assertEqual({f'consumer-{i}' for i in range(8)}, set(consumers))
+        self.assertEqual(8, len(consumers))
 
     @unittest.skipUnless(os.name == 'posix', 'Linux isolated lane runner')
     def test_shared_dependency_waits_for_seed_while_independent_work_continues(self):
