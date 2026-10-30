@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import unittest
 
-from catalog_repairs import octave_fortran_recipe, OCTAVE_CONFIG_DIAGNOSTICS
+from catalog_repairs import octave_fortran_recipe, OCTAVE_CONFIG_DIAGNOSTICS, OCTAVE_EPSILON_REPAIR
 
 
 RUNTIME = '''\tlocal work="$TERMUX_PKG_TMPDIR/termi-fortran"
@@ -32,6 +32,25 @@ BASH = 'C:/Program Files/Git/bin/bash.exe' if os.name == 'nt' else shutil.which(
 
 
 class OctaveFortranTest(unittest.TestCase):
+    def test_epsilon_repair_uses_typed_value_in_cpp_and_retains_c_macro(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / 'liboctave/external/Faddeeva/Faddeeva.cc'
+            source.parent.mkdir(parents=True)
+            source.write_text('#if defined(__cplusplus)\n#  include <limits>\n#else\n#  include <float.h>\n#endif\n'
+                              'double epsilon = DBL_EPSILON;\ndouble lower = DBL_EPSILON;\ndouble upper = DBL_EPSILON;\n// relerr != DBL_EPSILON\n')
+            namespace = {'__name__': '__main__'}
+            from unittest.mock import patch
+            import sys
+            with patch.object(sys, 'argv', ['inject', str(root)]):
+                exec(OCTAVE_EPSILON_REPAIR, namespace)
+            changed = source.read_text()
+            self.assertIn('(std::numeric_limits<double>::epsilon())', changed)
+            self.assertIn('#  define TERMI_FADDEEVA_EPSILON DBL_EPSILON', changed)
+            self.assertEqual(3, changed.count('= TERMI_FADDEEVA_EPSILON;'))
+            with patch.object(sys, 'argv', ['inject', str(root)]), self.assertRaises(AssertionError):
+                exec(OCTAVE_EPSILON_REPAIR, {})
+
     def test_source_runtime_replaces_legacy_archives_without_changing_features(self):
         text = octave_fortran_recipe(RECIPE, RUNTIME)
         self.assertNotIn('libFortranRuntime.a', text)

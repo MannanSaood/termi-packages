@@ -352,7 +352,7 @@ PY
     (output / "assemble_bootstrap.py").write_bytes((ROOT / "scripts/termux/assemble_bootstrap.py").read_bytes())
     (output / "patch_go_exec.py").write_bytes((ROOT / "scripts/termux/patch_go_exec.py").read_bytes())
     (output / "seed").mkdir()
-    for name in ["catalog_graph.py", "catalog_build.py", "catalog_progress.py", "seed.py", "build_scratch.py"]:
+    for name in ["catalog_graph.py", "catalog_build.py", "catalog_progress.py", "seed.py", "build_scratch.py", "selected_guard.py"]:
         (output / name).write_bytes((ROOT / "scripts/termux" / name).read_bytes())
     (output / "Dockerfile").write_text(
         f'FROM {lock["builder_image"]}\n'
@@ -360,7 +360,7 @@ PY
         'ADD --chown=builder:builder source.tar /home/builder/termux-packages/\n'
         'COPY --chown=builder:builder overlay/ /home/builder/termux-packages/\n'
           'RUN rm -- ' + ' '.join('/home/builder/termux-packages/packages/lrzsz/' + n for n in obsolete_lrzsz) + '\n'
-        'COPY --chown=builder:builder build-in-container.sh collect_artifacts.py assemble_bootstrap.py patch_go_exec.py catalog_graph.py catalog_build.py catalog_progress.py seed.py build_scratch.py upstream.lock.json patches.json source.json /home/builder/\n'
+        'COPY --chown=builder:builder build-in-container.sh collect_artifacts.py assemble_bootstrap.py patch_go_exec.py catalog_graph.py catalog_build.py catalog_progress.py seed.py build_scratch.py selected_guard.py upstream.lock.json patches.json source.json /home/builder/\n'
         'COPY --chown=builder:builder seed/ /home/builder/seed/\n'
         # Windows checkout permissions are not executable-bit authority.
         'RUN find /home/builder/termux-packages -name "*.sh" -exec chmod u+x {} +\n'

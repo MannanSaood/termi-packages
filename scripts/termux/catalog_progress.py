@@ -130,6 +130,12 @@ def selected_event(state, names, recipe, status, code=None):
             entry["attempts"] += 1
         if code is not None:
             entry["exit_code"] = code
+        if status == 'interrupted':
+            interruption = json.loads((state / 'selected-interruption.json').read_text())
+            if interruption.get('exit_code') != code or interruption.get('status') != status:
+                raise ValueError('Focused interruption evidence differs')
+            entry.update(interruption)
+            ledger['halt'] = interruption['reason']
         if status == 'failed':
             from build_scratch import configure_diagnostics
             try:
@@ -148,7 +154,7 @@ def main():
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--selected", nargs="+")
     parser.add_argument("--recipe")
-    parser.add_argument("--status", choices=["pending", "running", "built", "failed"])
+    parser.add_argument("--status", choices=["pending", "running", "built", "failed", "interrupted"])
     parser.add_argument("--exit-code", type=int)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()

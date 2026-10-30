@@ -10,14 +10,24 @@ REQUIRED = {
     "Preserve catalog or interrupted build as streamed release checkpoint",
 }
 
-def verify(run, title):
+def verify(run, title, checkpoint_verified=False):
     if run.get("status") != "completed" or run.get("displayTitle") != title:
         raise ValueError("Prior same-lane run is not completed")
     jobs = run.get("jobs", [])
     if len(jobs) != 1:
         raise ValueError("Unexpected prior job structure")
-    steps = {s["name"]: s.get("conclusion") for s in jobs[0].get("steps", [])}
-    if any(steps.get(name) != "success" for name in REQUIRED):
+    steps = {s["name"]: s for s in jobs[0].get("steps", [])}
+    def saved(name):
+        step = steps.get(name, {})
+        if step.get('conclusion') == 'success':
+            return True
+        # GitHub can return a completed job with a stale in-progress export
+        # step. Accept the actual complete hash-checked checkpoint instead of
+        # inventing a successful step. Explicit failures/skips stay rejected.
+        return (checkpoint_verified and jobs[0].get('status') == 'completed'
+                and name == 'Preserve catalog or interrupted build as streamed release checkpoint'
+                and step.get('status') == 'in_progress' and not step.get('conclusion'))
+    if not all(saved(name) for name in REQUIRED):
         raise ValueError("Prior candidate/checkpoint export did not succeed; retain outputs and investigate")
 
 
@@ -63,6 +73,6 @@ if __name__ == "__main__":
     data = json.loads(subprocess.check_output([
         "gh", "run", "view", run_id, "--repo", "MannanSaood/termi-packages",
         "--json", "status,displayTitle,jobs"], text=True))
-    verify(data, os.environ["EXPECTED_TITLE"])
     verify_remote_checkpoint(run_id)
+    verify(data, os.environ["EXPECTED_TITLE"], checkpoint_verified=True)
     print("Prior candidate and checkpoint exports verified")

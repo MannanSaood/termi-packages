@@ -78,7 +78,7 @@ def main():
     parser.add_argument("--packages", nargs="+", help="Pinned upstream recipes to source-build for Termi")
     parser.add_argument("--jobs", type=int, choices=range(1, 9), default=2, help="Bounded compiler workers / container CPU limit")
     parser.add_argument("--memory-gib", type=int, choices=range(2, 17), default=4)
-    parser.add_argument("--timeout-seconds", type=int, default=7200, help="Build deadline; a full repository needs a persistent long-running builder")
+    parser.add_argument("--timeout-seconds", type=int, help="Build deadline; focused batches default to18600seconds, other modes7200")
     parser.add_argument("--cache-image", help="Explicit locally restored, manifest-pinned Termi checkpoint image")
     parser.add_argument("--continue-recipe", help="Explicitly resume a recipe already stopped during make or later")
     parser.add_argument("--full-recipes", action="store_true", help="Retain all recipe features for an individual catalog batch")
@@ -93,6 +93,8 @@ def main():
     parser.add_argument("--seed-plan-sha256")
     parser.add_argument("--reclaim-workflow-inputs", action="store_true")
     args = parser.parse_args()
+    if args.timeout_seconds is None:
+        args.timeout_seconds = 18600 if args.mode == 'packages' else 7200
     if args.reclaim_workflow_inputs and (os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"
             or not os.environ.get("GITHUB_WORKSPACE")):
         parser.error("Input cleanup is restricted to explicit disposable GitHub-hosted builds")
@@ -108,7 +110,7 @@ def main():
         parser.error("Seed adoption requires the new graph and explicit inventory/ledger/plan hashes")
     if not 60 <= args.catalog_budget_seconds <= 604800 or args.catalog_minimum_free_gib < 8:
         parser.error("Catalog batches require at least60seconds and8GiB disk headroom")
-    if args.mode == "full-catalog" and args.catalog_budget_seconds + 600 > args.timeout_seconds:
+    if args.mode in ("full-catalog", "packages") and args.catalog_budget_seconds + 600 > args.timeout_seconds:
         parser.error("Reserve at least600seconds after the catalog batch for artifact export")
     if args.mode == "packages":
         if not args.packages or len(args.packages) > 128 or any(not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", name) for name in args.packages):
@@ -132,9 +134,10 @@ def main():
         raise SystemExit("Output already exists; use a new build directory")
     prepare(args.upstream.resolve(), output / "context", lock, full_catalog=args.mode == "full-catalog" or args.full_recipes)
     if args.seed_dir:
-        from seed import prepare as prepare_seed
+        from seed import prepare as prepare_seed, dependency_roots
         prepare_seed(args.seed_dir.resolve(), output / "context", args.seed_graph.resolve(), output / "context/seed",
-                     args.seed_inventory_sha256, args.seed_ledger_sha256, args.seed_plan_sha256)
+                     args.seed_inventory_sha256, args.seed_ledger_sha256, args.seed_plan_sha256,
+                     dependency_roots(args.mode, args.packages or []))
     if args.reclaim_workflow_inputs and args.seed_dir:
         from seed import stage_output_archives
         stage_output_archives(output / "context")

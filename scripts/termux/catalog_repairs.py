@@ -34,6 +34,22 @@ termux_step_configure_autotools_failure_hook() {
 }
 '''
 
+OCTAVE_EPSILON_REPAIR = r'''from pathlib import Path
+import sys
+p = Path(sys.argv[1]) / 'liboctave/external/Faddeeva/Faddeeva.cc'
+s = p.read_text()
+assert s.count('DBL_EPSILON') == 4, 'Faddeeva epsilon sites/comment changed'
+assert s.count('#  include <limits>') == 1 and s.count('#  include <float.h>') == 1, 'Faddeeva header branches changed'
+# The Android/gnulib C++ header chain does not expose DBL_EPSILON here.
+# Use the standard typed value in C++; retain the original C99 macro branch.
+s = s.replace('DBL_EPSILON', 'TERMI_FADDEEVA_EPSILON')
+s = s.replace('#  include <limits>', '#  include <limits>\n#  define TERMI_FADDEEVA_EPSILON (std::numeric_limits<double>::epsilon())')
+s = s.replace('#  include <float.h>', '#  include <float.h>\n#  define TERMI_FADDEEVA_EPSILON DBL_EPSILON')
+p.write_text(s)
+'''
+
+OCTAVE_EPSILON_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_OCTAVE_EPSILON'\n" + OCTAVE_EPSILON_REPAIR + "TERMI_OCTAVE_EPSILON\n"
+
 
 def octave_fortran_recipe(text, runtime):
     # CMake options belong to the runtime's subshell, not Octave's configure.
@@ -45,7 +61,7 @@ def octave_fortran_recipe(text, runtime):
     assert len(matches) == 1, 'Octave legacy runtime setup changed'
     old = matches[0].group()
     assert 'libFortranRuntime.a' in old and 'libFortranDecimal.a' in old
-    text = text[:matches[0].start()] + runtime + OCTAVE_FORTRAN_LINK + text[matches[0].end():]
+    text = text[:matches[0].start()] + OCTAVE_EPSILON_SETUP + runtime + OCTAVE_FORTRAN_LINK + text[matches[0].end():]
     def dependencies(match):
         names = match[1].split(', ')
         names += [n for n in ['libc++', 'libandroid-execinfo'] if n not in names]

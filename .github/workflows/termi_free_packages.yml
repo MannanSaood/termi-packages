@@ -107,6 +107,8 @@ jobs:
           SEED_INVENTORY: ${{ inputs.seed_inventory_sha256 }}
           SEED_LEDGER: ${{ inputs.seed_ledger_sha256 }}
           SEED_PLAN: ${{ inputs.seed_plan_sha256 }}
+          BUILD_MODE: ${{ inputs.mode }}
+          RECIPES: ${{ inputs.recipes }}
         run: |
           python3 - <<'PY'
           import os, pathlib, re, subprocess, sys
@@ -117,9 +119,10 @@ jobs:
           sys.path.insert(0,'scripts/termux')
           from seed_download import download
           download(tag,pathlib.Path('build/seed-raw'))
-          from seed import prepare
+          from seed import prepare, dependency_roots
           prepare(pathlib.Path('build/seed-raw'),pathlib.Path('build/context'),pathlib.Path('build/catalog-plan.json'),
-                  pathlib.Path('build/context/seed'),os.environ['SEED_INVENTORY'],os.environ['SEED_LEDGER'],os.environ['SEED_PLAN'])
+                  pathlib.Path('build/context/seed'),os.environ['SEED_INVENTORY'],os.environ['SEED_LEDGER'],os.environ['SEED_PLAN'],
+                  dependency_roots(os.environ['BUILD_MODE'],os.environ['RECIPES'].split()))
           from build import input_identity
           from seed import stage_output_archives
           stage_output_archives(pathlib.Path('build/context'))

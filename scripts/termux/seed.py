@@ -119,7 +119,31 @@ def expand_bundles(raw, inventory):
                     temporary.unlink(missing_ok=True)
 
 
-def prepare(raw, context, new_graph, output, inventory_hash, ledger_hash, graph_hash):
+def dependency_roots(mode, requested):
+    # Swift's enormous source/objects need a small fresh prefix. The full seed
+    # remains published and pinned; only this isolated builder imports a subset.
+    return ['swift'] if mode == 'packages' and list(requested) == ['swift'] else []
+
+
+def selected_recipes(plan, allowed, roots):
+    if not roots:
+        return allowed
+    closure = set(roots)
+    pending = list(roots)
+    while pending:
+        name = pending.pop()
+        if name not in plan['recipes']:
+            raise ValueError('Unknown dependency seed root')
+        for dependency in plan['recipes'][name]['dependencies']:
+            if dependency not in closure:
+                closure.add(dependency)
+                pending.append(dependency)
+    if not closure - set(roots) <= allowed:
+        raise ValueError('Dependency seed requires every compatible completed dependency')
+    return closure & allowed
+
+
+def prepare(raw, context, new_graph, output, inventory_hash, ledger_hash, graph_hash, roots=None):
     inventory_path = pinned(raw, "inventory.json", inventory_hash)
     ledger_path = pinned(raw, "catalog-ledger.json", ledger_hash)
     graph_path = pinned(raw, "catalog-plan.json", graph_hash)
@@ -130,6 +154,7 @@ def prepare(raw, context, new_graph, output, inventory_hash, ledger_hash, graph_
         if json.loads((context / name).read_text()) != new["configuration"][key]:
             raise ValueError("New seed plan does not match the prepared source context")
     allowed, invalid = compatibility(old, new, ledger)
+    allowed = selected_recipes(new, allowed, roots)
     records = [r for r in inventory["packages"] if r["recipe"] in allowed]
     present = {r["recipe"] for r in records}
     if allowed != present:
@@ -148,6 +173,8 @@ def prepare(raw, context, new_graph, output, inventory_hash, ledger_hash, graph_
     receipt = dict(schema=1, inventory_sha256=inventory_hash, ledger_sha256=ledger_hash, graph_sha256=graph_hash,
                    new_graph_identity=new["identity"], recipes=sorted(allowed), invalidated=sorted(invalid),
                    packages=records, failures=compatible_failures(old, new, ledger), status="source-build-cache-not-runtime-approval")
+    if roots:
+        receipt['dependency_roots'] = sorted(roots)
     (output / "seed.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(dict(reused_recipes=len(allowed), reused_archives=len(records), invalidated_recipes=len(invalid))), flush=True)
 
@@ -312,7 +339,7 @@ def validate_prefix_aliases(prefix):
     return aliases
 
 
-def install(seed, root, metadata, artifacts):
+def install(seed, root, metadata, artifacts, roots=None):
     from catalog_graph import create_plan
     load = lambda name: json.loads((metadata / name).read_text())
     new = create_plan(root, load("upstream.lock.json"), load("source.json"), load("patches.json"))
@@ -321,6 +348,9 @@ def install(seed, root, metadata, artifacts):
     ledger = json.loads(pinned(seed, "old-ledger.json", receipt["ledger_sha256"]).read_text())
     inventory = json.loads(pinned(seed, "old-inventory.json", receipt["inventory_sha256"]).read_text())
     allowed, _ = compatibility(old, new, ledger)
+    if receipt.get('dependency_roots', []) != sorted(roots or []):
+        raise ValueError('Dependency seed roots differ from requested build')
+    allowed = selected_recipes(new, allowed, roots)
     expected = [r for r in inventory["packages"] if r["recipe"] in allowed]
     if receipt["new_graph_identity"] != new["identity"] or receipt["packages"] != expected or set(receipt["recipes"]) != allowed:
         raise ValueError("Source-cache receipt changed or source compatibility differs")
@@ -386,8 +416,11 @@ def main():
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--metadata", type=Path, required=True)
     parser.add_argument("--artifacts", type=Path, required=True)
+    parser.add_argument('--mode', default='full-catalog')
+    parser.add_argument('--requested', nargs='*', default=[])
     args = parser.parse_args()
-    install(args.seed, args.root, args.metadata, args.artifacts)
+    install(args.seed, args.root, args.metadata, args.artifacts,
+            dependency_roots(args.mode, args.requested))
 
 
 if __name__ == "__main__":

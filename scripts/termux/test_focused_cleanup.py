@@ -16,12 +16,16 @@ class FocusedCleanupTest(unittest.TestCase):
         loop=loop.replace('./build-package.sh','fake_build').replace('"/home/builder/catalog-state/logs/$root-$attempt.log"','/dev/null')
         loop=loop.replace('if [ -f "$tree/$root/build.sh" ]; then','if [ "$tree" = packages ]; then')
         setup='''set -euo pipefail
-jobs=2;batch_result=0;HOME=/fixture
+jobs=2;batch_result=0;HOME=/fixture;selected_start=$SECONDS;selected_pid=
 fake_build() { [[ "${@: -1}" != */bad ]]; }
 python3() {
  case "$1" in
  -c) echo 1;;
  */build_scratch.py) echo "cleanup:${@: -1}" >> "$TRACE";;
+ */selected_guard.py)
+ while [[ "$1" != -- ]]; do shift; done
+ shift
+ "$@";;
  */catalog_progress.py)
  if [[ "$*" == *'--status built'* ]]; then echo built >> "$TRACE"; fi
  if [[ "$*" == *'--status failed'* ]]; then echo failed >> "$TRACE"; fi;;

@@ -34,7 +34,7 @@ exec > >(tee /home/builder/artifacts/build.log) 2>&1
 printf 'TERMI_BUILD_START mode=%s prefix=%s arch=aarch64 api=26\n' "$mode" "$TERMUX_PREFIX"
 if [ -f /home/builder/seed/seed.json ]; then
     python3 /home/builder/seed.py --seed /home/builder/seed --root "$PWD" --metadata /home/builder \
-        --artifacts /home/builder/artifacts
+        --artifacts /home/builder/artifacts --mode "$mode" --requested "$@"
 fi
 if [ "$mode" = seed-check ]; then
     test -s /home/builder/artifacts/seed-validation.json
@@ -78,6 +78,15 @@ if [ "$mode" = full-catalog ]; then
     if [ "$result" -ne 0 ]; then exit "$result"; fi
 elif [ "$mode" = packages ]; then
     batch_result=0
+    selected_start=$SECONDS
+    selected_pid=
+    stop_selected() {
+        if [ -n "$selected_pid" ]; then
+            kill -TERM "$selected_pid" 2>/dev/null || true
+            wait "$selected_pid" || true
+        fi
+    }
+    trap stop_selected TERM INT
     if python3 -c 'import json,sys; sys.exit(json.load(open("/home/builder/source.json")).get("catalog_scope") != "full-catalog")'; then
         if [ ! -f /home/builder/artifacts/catalog-plan.json ]; then
             python3 /home/builder/catalog_graph.py --root "$PWD" --metadata /home/builder \
@@ -98,13 +107,24 @@ elif [ "$mode" = packages ]; then
         result=0
         continuation=()
         if [ "${TERMI_CONTINUE_RECIPE:-}" = "$root" ]; then continuation+=(-c); fi
-        ./build-package.sh -a aarch64 "${continuation[@]}" -j "$jobs" "$recipe" \
-            > >(tee "/home/builder/catalog-state/logs/$root-$attempt.log") 2>&1 || result=$?
+        python3 /home/builder/selected_guard.py --root /home/builder/artifacts \
+            --evidence /home/builder/catalog-state/selected-interruption.json \
+            --seconds "$((${TERMI_CATALOG_BUDGET:-18000} - SECONDS + selected_start))" \
+            --minimum-free-gib "${TERMI_CATALOG_MINIMUM_FREE_GIB:-16}" \
+            -- ./build-package.sh -a aarch64 "${continuation[@]}" -j "$jobs" "$recipe" \
+            > >(tee "/home/builder/catalog-state/logs/$root-$attempt.log") 2>&1 &
+        selected_pid=$!
+        wait "$selected_pid" || result=$?
+        selected_pid=
         status=built
         if [ "$result" -ne 0 ]; then status=failed; fi
+        if [ -f /home/builder/catalog-state/selected-interruption.json ]; then status=interrupted; fi
         python3 /home/builder/catalog_progress.py --root "$PWD" --state /home/builder/catalog-state \
             --selected "$@" --recipe "$root" --status "$status" --exit-code "$result" \
             --output /home/builder/artifacts/progress.json
+        # Retain interrupted compiler trees for the explicit verified checkpoint.
+        # Stop the batch so another root cannot consume the export reserve.
+        if [ "$status" = interrupted ]; then batch_result=$result; break; fi
         if [ "$result" -ne 0 ]; then
             batch_result=1
             # Keep checking independent requested roots and preserve successful
@@ -117,6 +137,7 @@ elif [ "$mode" = packages ]; then
         python3 /home/builder/build_scratch.py --top "$HOME/.termux-build" --recipe "$root"
         df -Pk /home/builder/artifacts
     done
+    trap - TERM INT
 elif [ "$mode" = catalog ]; then
     # Explicit owner-approved expansion; dependencies are source-built and the
     # published runtime closure is selected separately from build-only outputs.
