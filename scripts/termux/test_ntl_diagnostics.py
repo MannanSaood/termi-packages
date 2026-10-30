@@ -6,9 +6,34 @@ import tempfile
 import unittest
 
 from catalog_repairs import NTL_GMP_DIAGNOSTICS
+from catalog_repairs import apply as apply_catalog_repairs
+from prepare import replace_once
 
 
 class NtlDiagnosticsTest(unittest.TestCase):
+    def test_recipe_is_patched_once_and_keeps_loader_and_diagnostics(self):
+        original = ('TERMUX_PKG_VERSION="11.6.0"\ntermux_step_pre_configure() {\n'
+                    '\ttermux_proot_run=(termux-proot-run env LD_PRELOAD= LD_LIBRARY_PATH=)\n}\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            recipe = Path(tmp) / 'build.sh'
+            recipe.write_text(original)
+            calls = []
+            def change(name, edit, tree='packages'):
+                if name == 'libntl':
+                    calls.append(name)
+                    # Exercise the real preparation contract: callbacks always
+                    # read the immutable upstream recipe, and patch a live file.
+                    replace_once(recipe, original, edit(original))
+            def hook(text, name, body):
+                return text.replace(name + '() {', name + '() {\n' + body)
+            apply_catalog_repairs(change, hook,
+                                  {'arpack-ng': 'termux_step_pre_configure() {\nfixture runtime\n}'})
+            self.assertEqual(['libntl'], calls)
+            prepared = recipe.read_text()
+            self.assertIn('/opt/aosp:/system', prepared)
+            self.assertIn('TERMI_NTL_GMP_PROBE_LOG', prepared)
+            self.assertEqual(1, prepared.count("<<'TERMI_NTL_GMP_DIAGNOSTICS'"))
+
     @unittest.skipUnless(shutil.which('perl') and shutil.which('tail'), 'Perl and tail required')
     def test_failure_exposes_bounded_compiler_log_and_still_fails(self):
         with tempfile.TemporaryDirectory() as tmp:

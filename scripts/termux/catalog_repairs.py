@@ -16,6 +16,45 @@ p.write_text(s)
 
 NTL_GMP_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/src/DoConfig\" <<'TERMI_NTL_GMP_DIAGNOSTICS'\n" + NTL_GMP_DIAGNOSTICS + "TERMI_NTL_GMP_DIAGNOSTICS\n"
 
+OCTAVE_FORTRAN_LINK = r'''
+	export F77="$FC"
+	# Autoconf links a C main against the Fortran runtime directly. Use this
+	# attempt's source-built PIC archive and its Android C++/backtrace providers.
+	export ac_cv_f77_libs="$work/runtime-build/flang-rt/lib/libflang_rt.runtime.a -Wl,--push-state,--no-as-needed -lc++ -landroid-execinfo -Wl,--pop-state -lm"
+'''
+
+OCTAVE_CONFIG_DIAGNOSTICS = r'''
+termux_step_configure_autotools_failure_hook() {
+	if [ -f "$TERMUX_PKG_SRCDIR/config.log" ]; then
+		printf '%s\n' TERMI_OCTAVE_CONFIG_LOG >&2
+		tail -c 65536 "$TERMUX_PKG_SRCDIR/config.log" >&2
+	fi
+	false
+}
+'''
+
+
+def octave_fortran_recipe(text, runtime):
+    # CMake options belong to the runtime's subshell, not Octave's configure.
+    runtime, count = re.subn(r'^\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS\+=.*CMAKE_Fortran_COMPILER.*\n?',
+                            '', runtime, flags=re.M)
+    assert count == 1, 'Fortran runtime outer CMake options changed'
+    pattern = r'\ttermux_setup_flang\n.*?\texport ac_cv_f77_libs="[^\n]*"\n'
+    matches = list(re.finditer(pattern, text, re.S))
+    assert len(matches) == 1, 'Octave legacy runtime setup changed'
+    old = matches[0].group()
+    assert 'libFortranRuntime.a' in old and 'libFortranDecimal.a' in old
+    text = text[:matches[0].start()] + runtime + OCTAVE_FORTRAN_LINK + text[matches[0].end():]
+    def dependencies(match):
+        names = match[1].split(', ')
+        names += [n for n in ['libc++', 'libandroid-execinfo'] if n not in names]
+        return 'TERMUX_PKG_DEPENDS="' + ', '.join(names) + '"'
+    text, count = re.subn(r'^TERMUX_PKG_DEPENDS="([^"]*)"$', dependencies, text, flags=re.M)
+    assert count == 1, 'Octave dependency declaration changed'
+    assert text.count('TERMUX_PKG_LICENSE="GPL-3.0"') == 1
+    return text.replace('TERMUX_PKG_LICENSE="GPL-3.0"',
+                        'TERMUX_PKG_LICENSE="GPL-3.0, Apache-2.0"') + OCTAVE_CONFIG_DIAGNOSTICS
+
 AWS_PRIVATE_CRYPTO = r"""
 	local termi_crypto_cc="$TERMUX_PKG_TMPDIR/termi-aws-crypto-cc"
 	python3 - "$CC" "$termi_crypto_cc" <<'TERMI_AWS_CRYPTO_CC'
@@ -626,6 +665,8 @@ TERMI_QEMU_RWF'''))
         'export OBJCXXFLAGS="$CXXFLAGS --target=$target"','export OBJCXXFLAGS="$CXXFLAGS $CPPFLAGS -nostdinc++ --target=$target"'))
 
     runtime=re.search(r'termux_step_pre_configure\(\) \{\n(.*?)\n\}',prepared['arpack-ng'],re.S).group(1)
+    change('octave',lambda t:octave_fortran_recipe(t,runtime))
+    change('octave-x',lambda t:octave_fortran_recipe(t,runtime),tree='x11-packages')
     change('suitesparse',lambda t:t.replace('libandroid-complex-math, libgmp, libmpfr, libopenblas', 'libandroid-complex-math, libgmp, libmpfr, libopenblas, libandroid-execinfo').replace('TERMUX_PKG_LICENSE="GPL-3.0"',
         'TERMUX_PKG_LICENSE="GPL-3.0, Apache-2.0"').replace('\ttermux_setup_flang',
         '\tCXXFLAGS+=" -nostdinc++"\n'+runtime))
@@ -639,13 +680,13 @@ TERMI_QEMU_RWF'''))
 
     # QEMU needs the loader and libc from our own source-built AOSP package.
     # Bind them inside proot; never install or mutate the builder's /system.
-    change('libntl',lambda t:t.replace(
+    change('libntl',lambda t:hook(t.replace(
         'termux_proot_run=(termux-proot-run env LD_PRELOAD= LD_LIBRARY_PATH=)',
         '''termux_proot_run=("$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/proot"
             -q "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/qemu-$TERMUX_ARCH"
             -R / -b "$TERMUX_PREFIX/opt/aosp:/system"
-            /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH= ANDROID_ROOT=/system ANDROID_DATA=/data)'''))
-    change('libntl',lambda t:hook(t,'termux_step_pre_configure',NTL_GMP_SETUP))
+            /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH= ANDROID_ROOT=/system ANDROID_DATA=/data)'''),
+        'termux_step_pre_configure',NTL_GMP_SETUP))
 
     def btop(t):
         start=t.index('\tprintf ')
