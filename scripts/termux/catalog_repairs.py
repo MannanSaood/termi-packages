@@ -611,7 +611,7 @@ TERMI_QEMU_RWF'''))
         'export OBJCXXFLAGS="$CXXFLAGS --target=$target"','export OBJCXXFLAGS="$CXXFLAGS $CPPFLAGS -nostdinc++ --target=$target"'))
 
     runtime=re.search(r'termux_step_pre_configure\(\) \{\n(.*?)\n\}',prepared['arpack-ng'],re.S).group(1)
-    change('suitesparse',lambda t:t.replace('TERMUX_PKG_LICENSE="GPL-3.0"',
+    change('suitesparse',lambda t:t.replace('libandroid-complex-math, libgmp, libmpfr, libopenblas', 'libandroid-complex-math, libgmp, libmpfr, libopenblas, libandroid-execinfo').replace('TERMUX_PKG_LICENSE="GPL-3.0"',
         'TERMUX_PKG_LICENSE="GPL-3.0, Apache-2.0"').replace('\ttermux_setup_flang',
         '\tCXXFLAGS+=" -nostdinc++"\n'+runtime))
     change('stag',lambda t:hook(t,'termux_step_pre_configure',

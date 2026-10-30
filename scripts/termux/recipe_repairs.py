@@ -194,7 +194,9 @@ body=r"""#!/bin/bash
 set -euo pipefail
 args=()
 static_openmp=0
+linking=1
 for argument in "$@"; do
+    case "$argument" in -c|-E|-S|-fsyntax-only|--version|-dumpversion) linking=0;; esac
     if [[ "$argument" == -static-openmp ]]; then
         static_openmp=1
     else
@@ -206,9 +208,17 @@ if (( static_openmp )); then
     # Append after caller objects: archive symbol resolution is order-sensitive.
     args+=(@OPENMP@)
 fi
+# Flang adds its static runtime after user arguments. Keep the source-built
+# Android backtrace DSO alive until those runtime references are resolved.
+if (( linking )); then
+    # Prefer this attempt's PIC runtime over an older archive in the seed prefix.
+    args=(-L@RUNTIME@ "${args[@]}")
+    args+=(-Wl,--push-state,--no-as-needed -landroid-execinfo -Wl,--pop-state)
+fi
 exec @FLANG@ --target=@TARGET@ --sysroot=@SYSROOT@ -fuse-ld=@LINKER@ "${args[@]}"
 """
 for key,value in dict(FLANG=(Path(host)/'bin/flang-new').as_posix(),TARGET=target,
+        RUNTIME=(Path(output).parent/'runtime-build/flang-rt/lib').as_posix(),
         SYSROOT=(Path(toolchain)/'sysroot').as_posix(),LINKER=linker.as_posix(),
         OPENMP=(Path(toolchain)/'lib/clang/21/lib/linux'/arch/'libomp.a').as_posix()).items():
     body=body.replace('@'+key+'@',shlex.quote(value))
@@ -534,7 +544,7 @@ def apply(patch, original):
         'unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS\n\texport CC=gcc CXX=g++ PKG_CONFIG=/usr/bin/pkg-config'))
     # Source-build a PIC runtime with its matching official LLVM HOST compiler.
     # Never link the old non-PIC Android archives from the Termux toolchain.
-    change("arpack-ng",lambda t:t.replace('TERMUX_PKG_LICENSE="BSD"','TERMUX_PKG_LICENSE="BSD, Apache-2.0"').replace(
+    change("arpack-ng",lambda t:t.replace('TERMUX_PKG_DEPENDS="libopenblas"','TERMUX_PKG_DEPENDS="libopenblas, libandroid-execinfo"').replace('TERMUX_PKG_LICENSE="BSD"','TERMUX_PKG_LICENSE="BSD, Apache-2.0"').replace(
         '\ttermux_setup_flang', '''\ttermux_setup_cmake
 \ttermux_setup_ninja
 \tlocal version=21.1.8

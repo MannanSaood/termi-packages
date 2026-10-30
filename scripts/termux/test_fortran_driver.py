@@ -30,7 +30,11 @@ class FortranDriverTest(unittest.TestCase):
             self.assertEqual(base+compile_args,compiled.stdout.splitlines())
             args=['-L/prefix/lib','-fopenmp','-static-openmp','-Wl,--as-needed','out.o','-o','program']
             linked=invoke(args);self.assertEqual(0,linked.returncode,linked.stderr)
-            self.assertEqual(base+[a for a in args if a!='-static-openmp']+[omp.as_posix()],linked.stdout.splitlines())
+            self.assertEqual(base+['-L'+(root/'runtime-build/flang-rt/lib').as_posix()]+[a for a in args if a!='-static-openmp']+[omp.as_posix(),'-Wl,--push-state,--no-as-needed','-landroid-execinfo','-Wl,--pop-state'],linked.stdout.splitlines())
+            # Ordinary links need the backtrace DSO too, even without OpenMP.
+            plain=invoke(['-Wl,--as-needed','out.o','-o','program'])
+            self.assertEqual(base+['-L'+(root/'runtime-build/flang-rt/lib').as_posix(),'-Wl,--as-needed','out.o','-o','program',
+                '-Wl,--push-state,--no-as-needed','-landroid-execinfo','-Wl,--pop-state'],plain.stdout.splitlines())
             omp.unlink();missing=invoke(args)
             self.assertEqual(2,missing.returncode)
             self.assertIn('Missing Android static OpenMP runtime',missing.stderr)
