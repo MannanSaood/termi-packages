@@ -62,6 +62,14 @@ assert s.count('#include <math.h>') == 1, 'PROJ gnomonic headers changed'
 s = s.replace('#include <math.h>', '#include <math.h>\n#include <limits>')
 s = s.replace(anchor, '0.01 * sqrt(std::numeric_limits<double>::epsilon())')
 p.write_text(s)
+p = Path(sys.argv[1]) / 'src/apps/proj_strtod.cpp'
+s = p.read_text()
+assert s.count('#include <limits>') == 1, 'PROJ converter limits header changed'
+for old, new in [('DBL_MIN_EXP', 'std::numeric_limits<double>::min_exponent'),
+                 ('DBL_MAX_EXP', 'std::numeric_limits<double>::max_exponent')]:
+    assert s.count(old) == 1, 'PROJ converter exponent bounds changed'
+    s = s.replace(old, new)
+p.write_text(s)
 '''
 
 PROJ_EPSILON_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_PROJ_EPSILON'\n" + PROJ_EPSILON_REPAIR + "TERMI_PROJ_EPSILON\n"
