@@ -135,6 +135,9 @@ def main():
                         value["build_exit_code"] = process.returncode
                     asset_due = time.monotonic() >= next_assets or process.poll() is not None
                     publish(args.repository, args.tag, directory, value, assets=asset_due)
+                    # A recovered live-report timeout must not turn a successful
+                    # compiler and final publication into a failed build job.
+                    failures = 0
                     if asset_due:
                         next_assets = time.monotonic() + max(300, args.interval * 5)
                     print("TERMI_LIVE " + json.dumps({k: v for k, v in value.items() if k not in ("failures", "current_log_tail", "completed_recipes", "owned_roots")}), flush=True)

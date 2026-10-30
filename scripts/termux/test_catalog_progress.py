@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -12,6 +13,31 @@ import publish_progress
 
 
 class ProgressTests(unittest.TestCase):
+    def test_reporting_recovery_preserves_native_exit_and_final_publication_failures(self):
+        class Builder:
+            returncode = None
+            def poll(self): return self.returncode
+            def wait(self, timeout=None): self.returncode = native_exit; return native_exit
+
+        for native_exit, reports, expected in [
+            (0, [subprocess.TimeoutExpired('gh', 60), None], 0),
+            (0, [None, subprocess.TimeoutExpired('gh', 60)], 1),
+            (7, [subprocess.TimeoutExpired('gh', 60), None], 7),
+        ]:
+            with self.subTest(native_exit=native_exit, expected=expected), tempfile.TemporaryDirectory() as tmp:
+                args=['publish_progress.py','--repository','owner/public','--tag','progress-1-1','--build-dir',str(Path(tmp)/'build'),'--','compiler']
+                with patch.object(sys,'argv',args), \
+                        patch.object(publish_progress.subprocess,'check_output',return_value=b'{"visibility":"PUBLIC"}'), \
+                        patch.object(publish_progress,'gh'), \
+                        patch.object(publish_progress.subprocess,'Popen',return_value=Builder()), \
+                        patch.object(publish_progress,'capture',return_value=None), \
+                        patch.object(publish_progress,'publish',side_effect=reports) as report, \
+                        patch.object(publish_progress.time,'monotonic',return_value=1000), \
+                        self.assertRaises(SystemExit) as result:
+                    publish_progress.main()
+                self.assertEqual(expected,result.exception.code)
+                self.assertEqual(2,report.call_count)
+
     def test_late_compile_failure_survives_early_configure_probe_errors(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'compile.log'
