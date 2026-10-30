@@ -5,7 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from recipe_repairs import FORTRAN_DRIVER, FORTRAN_HOST_EXTRACTOR
+from recipe_repairs import FORTRAN_DRIVER, FORTRAN_HOST_EXTRACTOR, FORTRAN_SOURCE_EXTRACTOR
 
 
 BASH='C:/Program Files/Git/bin/bash.exe' if os.name=='nt' else shutil.which('bash')
@@ -68,3 +68,19 @@ class FortranDriverTest(unittest.TestCase):
             failed=subprocess.run([sys.executable,'-c',FORTRAN_HOST_EXTRACTOR,str(archive),str(out),'LLVM-21.1.8-Linux-X64'],capture_output=True)
             self.assertNotEqual(0,failed.returncode)
             self.assertFalse((root/'escape').exists())
+
+    def test_source_extraction_keeps_full_runtime_inputs_and_omits_unrelated_compilers(self):
+        import io
+        import tarfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);archive=root/'source.tar.xz';name='llvm-project-21.1.8.src'
+            kept=['LICENSE.TXT','runtimes/CMakeLists.txt','flang-rt/CMakeLists.txt','flang-rt/lib/runtime/time-intrinsic.cpp','flang/lib/Common/Fortran.cpp','flang/include/flang/Runtime/header.h','llvm/cmake/modules/AddLLVM.cmake','llvm/include/llvm/Support/header.h','llvm/CMakeLists.txt','cmake/Modules/helper.cmake','third-party/benchmark/helper','compiler-rt/include/header.h','libcxx/include/vector']
+            omitted=['clang/lib/AST/Decl.cpp','mlir/lib/IR/Value.cpp','lldb/source/Core.cpp','llvm/lib/CodeGen/Target.cpp','llvm/test/CodeGen/test.ll']
+            with tarfile.open(archive,'w:xz') as t:
+                for path in kept+omitted:
+                    body=path.encode();m=tarfile.TarInfo(name+'/'+path);m.size=len(body);t.addfile(m,io.BytesIO(body))
+            out=root/'out';out.mkdir()
+            result=subprocess.run([sys.executable,'-c',FORTRAN_SOURCE_EXTRACTOR,str(archive),str(out),name],check=True,capture_output=True,text=True)
+            self.assertIn('TERMI_FORTRAN_SOURCE_EXTRACTION',result.stdout)
+            for path in kept:self.assertEqual(path.encode(),(out/name/path).read_bytes())
+            for path in omitted:self.assertFalse((out/name/path).exists())

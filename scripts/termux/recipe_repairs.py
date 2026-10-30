@@ -134,6 +134,31 @@ TERMI_SWIFT_STAT_MODULE
 '''
 
 
+FORTRAN_SOURCE_EXTRACTOR = r"""from pathlib import Path, PurePosixPath
+import json, sys, tarfile
+archive,work,root=sys.argv[1:]
+projects={'flang','flang-rt','runtimes','cmake','third-party','compiler-rt','libc','libcxx','libcxxabi','libunwind','llvm'}
+llvm_unused={'lib','tools','test','unittests','bindings','benchmarks','docs','examples'}
+kept=skipped=0
+with tarfile.open(archive,'r:xz') as source:
+    for member in source:
+        parts=PurePosixPath(member.name).parts
+        if not parts or parts[0]!=root or '..' in parts or '\\' in member.name:
+            raise ValueError('Unexpected official LLVM source archive path')
+        omit=len(parts)>1 and parts[1] not in projects and len(parts)>2
+        omit=omit or (len(parts)>2 and parts[1]=='llvm' and parts[2] in llvm_unused)
+        if omit:
+            skipped+=member.size
+            continue
+        source.extract(member,work,filter='data')
+        kept+=member.size
+base=Path(work)/root
+for required in ['LICENSE.TXT','runtimes/CMakeLists.txt','flang-rt/CMakeLists.txt','llvm/cmake/modules/AddLLVM.cmake']:
+    assert (base/required).is_file(), 'Required runtime source missing: '+required
+print('TERMI_FORTRAN_SOURCE_EXTRACTION '+json.dumps(dict(kept_bytes=kept,skipped_bytes=skipped)),flush=True)
+"""
+
+
 FORTRAN_HOST_EXTRACTOR = r"""from pathlib import Path, PurePosixPath
 import json, sys, tarfile
 archive,work,root=sys.argv[1:]
@@ -517,7 +542,9 @@ def apply(patch, original):
 \tmkdir -p "$work"
 \ttermux_download "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/llvm-project-$version.src.tar.xz" "$work/source.tar.xz" 4633a23617fa31a3ea51242586ea7fb1da7140e426bd62fc164261fe036aa142
 \ttermux_download "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-Linux-X64.tar.xz" "$work/host.tar.xz" b3b7f2801d15d50736acea3c73982994d025b01c2f035b91ae3b49d1b575732b
-\ttar -xf "$work/source.tar.xz" -C "$work"
+\tpython3 - "$work/source.tar.xz" "$work" "llvm-project-$version.src" <<'TERMI_FORTRAN_SOURCE_EXTRACT'
+@TERMI_FORTRAN_SOURCE_EXTRACTOR@
+TERMI_FORTRAN_SOURCE_EXTRACT
 \tpython3 - "$work/host.tar.xz" "$work" "LLVM-$version-Linux-X64" <<'TERMI_FORTRAN_HOST_EXTRACT'
 @TERMI_FORTRAN_HOST_EXTRACTOR@
 TERMI_FORTRAN_HOST_EXTRACT
@@ -553,7 +580,7 @@ TERMI_FORTRAN_DRIVER
 \tLDFLAGS+=" -L$work/runtime-build/flang-rt/lib"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_Fortran_COMPILER=$wrapper -DCMAKE_Fortran_FLAGS=-fPIC -DCMAKE_POSITION_INDEPENDENT_CODE=ON"
 \tinstall -Dm600 "$source/LICENSE.TXT" "$TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/llvm-runtime-LICENSE.TXT"
-'''.replace('@TERMI_FORTRAN_DRIVER@',FORTRAN_DRIVER).replace('@TERMI_FORTRAN_HOST_EXTRACTOR@',FORTRAN_HOST_EXTRACTOR)))
+'''.replace('@TERMI_FORTRAN_DRIVER@',FORTRAN_DRIVER).replace('@TERMI_FORTRAN_HOST_EXTRACTOR@',FORTRAN_HOST_EXTRACTOR).replace('@TERMI_FORTRAN_SOURCE_EXTRACTOR@',FORTRAN_SOURCE_EXTRACTOR)))
     for package in ["gcal", "recutils"]:
         change(package,lambda t:hook(t.replace('ac_cv_header_spawn_h=no','ac_cv_header_spawn_h=yes'),
             "termux_step_pre_configure",'''\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" ac_cv_func_posix_spawn=yes ac_cv_func_posix_spawnp=yes"

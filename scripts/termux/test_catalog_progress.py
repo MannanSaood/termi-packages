@@ -13,6 +13,20 @@ import publish_progress
 
 
 class ProgressTests(unittest.TestCase):
+
+    def test_new_failure_log_survives_many_cached_failures(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);state=root/'state';(state/'logs').mkdir(parents=True);(root/'output').mkdir()
+            recipes={'arpack-ng':dict(status='interrupted',attempts=1,exit_code=75,ended=200)}
+            recipes.update({f'cached-{i}':dict(status='failed',attempts=1,exit_code=1,ended=100) for i in range(150)})
+            (state/'ledger.json').write_text(json.dumps(dict(recipes=recipes)))
+            (state/'logs/arpack-ng-1.log').write_text('LLVM extraction stage reached disk guard')
+            snapshot=catalog_progress.snapshot(root,state)
+            self.assertEqual(100,len(snapshot['failures']))
+            self.assertEqual('arpack-ng',snapshot['failures'][-1]['recipe'])
+            self.assertIn('LLVM extraction stage',snapshot['failures'][-1]['tail'])
+            self.assertEqual(51,snapshot['omitted_failure_logs'])
+
     def test_reporting_recovery_preserves_native_exit_and_final_publication_failures(self):
         class Builder:
             returncode = None

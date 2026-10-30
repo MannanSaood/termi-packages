@@ -218,7 +218,13 @@ def build(root, metadata, state_dir, jobs=2, minimum_free_gib=80, timeout=86400,
                     entry.update(status="interrupted", exit_code=124, ended=time.time())
                     if isinstance(error, DiskPressure):
                         from build_scratch import clean
-                        entry.update(reason=str(error), compile_resume_available=False, exit_code=75)
+                        from catalog_progress import tail
+                        entry.update(reason=str(error), compile_resume_available=False, exit_code=75,
+                                     disk_free_bytes_at_stop=shutil.disk_usage(root).free,
+                                     log_tail_at_stop=tail(state_dir / "logs" / f"{name}-{entry['attempts']}.log"))
+                        print("TERMI_RESOURCE_STOP " + json.dumps(dict(recipe=name,
+                              free_bytes=entry["disk_free_bytes_at_stop"],
+                              tail=entry["log_tail_at_stop"])), flush=True)
                         try:
                             entry["discarded_scratch"] = clean(Path.home() / ".termux-build", name,
                                 discard_sources=os.environ.get("TERMI_RECLAIM_RECIPE_CACHE") == "1")

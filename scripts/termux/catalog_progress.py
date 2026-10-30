@@ -75,6 +75,9 @@ def snapshot(root, state):
         log = state / "logs" / f"{name}-{entry.get('attempts', 1)}.log"
         failures.append(dict(recipe=name, status=entry["status"], exit_code=entry.get("exit_code"),
                              log=log.name, tail=failure_excerpt(log)))
+    # Prefer diagnostics from this run over cached old entries with no log.
+    # Keep the newest actual failures in the bounded published tail.
+    failures.sort(key=lambda item: (bool(item['tail']), recipes[item['recipe']].get('ended',0)))
     # Count binary outputs with readable Debian control archives. This is a
     # candidate-file count, distinct from completed parent recipes or approval.
     cache_path = state / "deb-count-cache.json"
