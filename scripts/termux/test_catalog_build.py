@@ -10,6 +10,13 @@ from catalog_graph import order_and_cycles
 
 
 class GraphTests(unittest.TestCase):
+    def test_suitesparse_dependency_build_has_one_active_owner(self):
+        for lane in range(8):
+            result=builder.shared_build_wait('suitesparse',f'lane-{lane}-of-8',{'suitesparse'})
+            self.assertEqual(None if lane==4 else 'lane-4-of-8',result)
+        self.assertIsNone(builder.shared_build_wait('suitesparse',None,{'suitesparse'}))
+        self.assertIsNone(builder.shared_build_wait('suitesparse','lane-1-of-4',{'suitesparse'}))
+
     def test_focused_swift_wait_does_not_take_independent_lane_work(self):
         self.assertEqual('focused-swift',builder.shared_build_wait('swift','lane-5-of-8',{'swift','app'}))
         self.assertIsNone(builder.shared_build_wait('app','lane-5-of-8',{'swift','app'}))

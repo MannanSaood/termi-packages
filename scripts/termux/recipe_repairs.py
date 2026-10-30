@@ -134,6 +134,31 @@ TERMI_SWIFT_STAT_MODULE
 '''
 
 
+FORTRAN_HOST_EXTRACTOR = r"""from pathlib import Path, PurePosixPath
+import json, sys, tarfile
+archive,work,root=sys.argv[1:]
+kept=skipped=0
+with tarfile.open(archive, 'r:xz') as source:
+    for member in source:
+        parts=PurePosixPath(member.name).parts
+        if not parts or parts[0]!=root or '..' in parts or '\\' in member.name:
+            raise ValueError('Unexpected official LLVM host archive path')
+        # Flang needs its driver, shared libraries, headers, modules and compiler
+        # resources. Other host executables and LLVM static development archives
+        # are not used to compile this source-built Android Fortran runtime.
+        omit=(len(parts)>2 and parts[1]=='bin' and not parts[2].startswith('flang'))
+        omit=omit or (len(parts)>2 and parts[1]=='lib' and parts[2]!='clang' and member.name.endswith('.a'))
+        if omit:
+            skipped+=member.size
+            continue
+        source.extract(member,work,filter='data')
+        kept+=member.size
+host=Path(work)/root
+assert (host/'bin/flang-new').is_file(), 'Official host Flang driver missing'
+print('TERMI_FORTRAN_HOST_EXTRACTION '+json.dumps(dict(kept_bytes=kept,skipped_bytes=skipped)),flush=True)
+"""
+
+
 FORTRAN_DRIVER = r'''from pathlib import Path
 import shlex, sys
 host,output,toolchain,target,arch=sys.argv[1:]
@@ -493,8 +518,14 @@ def apply(patch, original):
 \ttermux_download "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/llvm-project-$version.src.tar.xz" "$work/source.tar.xz" 4633a23617fa31a3ea51242586ea7fb1da7140e426bd62fc164261fe036aa142
 \ttermux_download "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-Linux-X64.tar.xz" "$work/host.tar.xz" b3b7f2801d15d50736acea3c73982994d025b01c2f035b91ae3b49d1b575732b
 \ttar -xf "$work/source.tar.xz" -C "$work"
-\ttar -xf "$work/host.tar.xz" -C "$work"
+\tpython3 - "$work/host.tar.xz" "$work" "LLVM-$version-Linux-X64" <<'TERMI_FORTRAN_HOST_EXTRACT'
+@TERMI_FORTRAN_HOST_EXTRACTOR@
+TERMI_FORTRAN_HOST_EXTRACT
+\t# Both verified compressed inputs are now duplicated by their extracted
+\t# recipe scratch; no completed .deb, prefix or checkpoint is removed.
+\trm -- "$work/host.tar.xz" "$work/source.tar.xz"
 \tlocal host="$work/LLVM-$version-Linux-X64"
+\t"$host/bin/flang-new" --version
 \tlocal source="$work/llvm-project-$version.src"
 \t# NDK timespec_get is API29; the identical TIME_UTC clock is available
 \t# through clock_gettime(CLOCK_REALTIME) on our existing API26 minimum.
@@ -522,7 +553,7 @@ TERMI_FORTRAN_DRIVER
 \tLDFLAGS+=" -L$work/runtime-build/flang-rt/lib"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_Fortran_COMPILER=$wrapper -DCMAKE_Fortran_FLAGS=-fPIC -DCMAKE_POSITION_INDEPENDENT_CODE=ON"
 \tinstall -Dm600 "$source/LICENSE.TXT" "$TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/llvm-runtime-LICENSE.TXT"
-'''.replace('@TERMI_FORTRAN_DRIVER@',FORTRAN_DRIVER)))
+'''.replace('@TERMI_FORTRAN_DRIVER@',FORTRAN_DRIVER).replace('@TERMI_FORTRAN_HOST_EXTRACTOR@',FORTRAN_HOST_EXTRACTOR)))
     for package in ["gcal", "recutils"]:
         change(package,lambda t:hook(t.replace('ac_cv_header_spawn_h=no','ac_cv_header_spawn_h=yes'),
             "termux_step_pre_configure",'''\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" ac_cv_func_posix_spawn=yes ac_cv_func_posix_spawnp=yes"

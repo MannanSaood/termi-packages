@@ -36,6 +36,11 @@ SHARED_BUILD_OWNERS = {
 def shared_build_wait(name, lane, owned):
     if not lane or not lane.endswith('-of-8'):
         return None
+    # Lane4 already owns the active SuiteSparse dependency build. Route future
+    # prefixes to that shared result, including its hash-root owner in lane1.
+    # Lane4 selects SuiteSparse through its own dependent roots.
+    if name == 'suitesparse' and lane != 'lane-4-of-8':
+        return 'lane-4-of-8'
     # Focused repairs run in isolated jobs; lanes can still build independent
     # roots while waiting for their candidates to enter the shared seed.
     if name in ('swift', 'alsa-plugins', 'kf6-kimageformats', 'gegl', 'tcc', 'sftpgo'):
