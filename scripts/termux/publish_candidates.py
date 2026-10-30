@@ -1,6 +1,9 @@
 """Upload metadata first, then one bounded package bundle at a time."""
 from pathlib import Path
 import os
+import json
+from contextlib import nullcontext
+from container_artifacts import stream, member_name, inventory, HashReader
 import shutil
 import subprocess
 import tarfile
@@ -15,6 +18,9 @@ def publish(build, repository, run_id, attempt, bundle_limit=512*1024**2):
     if artifacts.exists():
         metadata += sorted(p for p in artifacts.iterdir() if p.suffix in ('.json', '.log'))
     debs = sorted(artifacts.glob('*.deb'))
+    marker=build/'candidate/stream-artifacts.json'
+    expected=inventory(artifacts/'inventory.json') if marker.exists() else None
+    container=json.loads(marker.read_text())['container'] if expected is not None else None
     upload = build / 'release-upload'
     upload.mkdir()
     # Original metadata and Debian files stay intact, including on upload error.
@@ -54,22 +60,44 @@ def publish(build, repository, run_id, attempt, bundle_limit=512*1024**2):
     archive = None
     size = 0
     try:
-        for deb in debs:
-            if archive is not None and size + deb.stat().st_size > bundle_limit:
-                archive.close()
-                archive = None
-                send_bundle(target)
-            if archive is None:
-                target = build / f'packages-{number:04d}.tar'
-                number += 1
-                archive = tarfile.open(target, 'x')
-                size = 0
-            # Retain scratch for the runner and its checkpoint exporter. This
-            # does not relax the separate 16GiB compilation reserve.
-            if shutil.disk_usage(build).free < 2*1024**3 + deb.stat().st_size + 1024**2:
-                raise ValueError('Insufficient scratch for bounded candidate publication')
-            archive.add(deb, arcname=deb.name, recursive=False)
-            size += deb.stat().st_size
+        with stream(container) if container else nullcontext(None) as source_archive:
+            entries=source_archive if container else debs
+            seen=set()
+            for deb in entries:
+                if container:
+                    name=member_name(deb)
+                    if name is None or not name.endswith('.deb'):
+                        continue
+                    if name not in expected or name in seen:
+                        raise ValueError('Unexpected or duplicate streamed archive')
+                    seen.add(name)
+                    length=deb.size
+                else:
+                    name=deb.name;length=deb.stat().st_size
+                if archive is not None and size + length > bundle_limit:
+                    archive.close()
+                    archive = None
+                    send_bundle(target)
+                if archive is None:
+                    target = build / f'packages-{number:04d}.tar'
+                    number += 1
+                    archive = tarfile.open(target, 'x')
+                    size = 0
+                # Retain scratch for the runner and its checkpoint exporter. This
+                # does not relax the separate 16GiB compilation reserve.
+                if shutil.disk_usage(build).free < 2*1024**3 + length + 1024**2:
+                    raise ValueError('Insufficient scratch for bounded candidate publication')
+                if container:
+                    reader=HashReader(source_archive.extractfile(deb))
+                    member=tarfile.TarInfo(name);member.size=length
+                    archive.addfile(member,reader)
+                    if reader.hash.hexdigest()!=expected[name]:
+                        raise ValueError('Streamed archive SHA256 mismatch: '+name)
+                else:
+                    archive.add(deb, arcname=name, recursive=False)
+                size += length
+            if container and seen!=set(expected):
+                raise ValueError('Stream omitted inventoried archives')
         if archive is not None:
             archive.close()
             archive = None

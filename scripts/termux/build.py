@@ -182,7 +182,16 @@ def main():
         run(["docker", "stop", "--time", "10", container])
         state = json.loads(subprocess.check_output(["docker", "inspect", container], text=True))[0]["State"]
         (output / "container-state.json").write_text(json.dumps(state, indent=2) + "\n")
-        copied = subprocess.run(["docker", "cp", container + ":/home/builder/artifacts/.", str(artifacts)]).returncode
+        if args.reclaim_workflow_inputs and args.mode in ("packages", "full-catalog"):
+            from container_artifacts import metadata
+            # The retained container remains the authoritative immutable pool.
+            # Copy only bounded metadata; the publisher streams verified archives.
+            metadata(container, artifacts)
+            if (artifacts / "inventory.json").is_file():
+                (output / "stream-artifacts.json").write_text(json.dumps({"container": container}))
+            copied = 0
+        else:
+            copied = subprocess.run(["docker", "cp", container + ":/home/builder/artifacts/.", str(artifacts)]).returncode
         # Keep package containers until workflow publication/checkpoint completes.
         # A successful compile can still suffer an upload failure.
         if copied == 0 and result == 0 and state["ExitCode"] == 0 and args.mode not in ("full-catalog", "packages"):

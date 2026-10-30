@@ -106,7 +106,7 @@ def apply(change, hook, prepared):
         # The Linux-hosted helper targets Android headers but has Linux builtins.
         # Pass versioned Android context to this runtime build explicitly.
         t=t.replace(runtime, '\tmake -j ${TERMUX_PKG_MAKE_PROCESSES} libtcc1.a '+
-            '"XFLAGS=-B.. -I.. -D__ANDROID__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL '+
+            '"XFLAGS=-B.. -I../include -I.. -D__ANDROID__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL '+
             '-D__ANDROID_MIN_SDK_VERSION__=$TERMUX_PKG_API_LEVEL"\n')
         return hook(t,'termux_step_pre_configure','''
 \t# TinyCC predates the NDK's required versioned-target macro. Define the
