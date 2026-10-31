@@ -993,7 +993,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         assert t.count(old) == 1, 'Caja extensions build prerequisites changed'
         # libcaja-extension's GTK/TIFF and atspi chains require these private
         # .pc providers even when configure requests a shared consumer.
-        return t.replace(old, old.replace('"autoconf-archive,', '"libdeflate, libxres, autoconf-archive,'))
+        return t.replace(old, old.replace('"autoconf-archive,', '"libdeflate, libxres, libdrm, liborc, autoconf-archive,'))
     change('caja-extensions', caja_pkgconfig_prerequisites, tree='x11-packages')
 
     # Replace global-state strtok with the equivalent per-invocation state.
