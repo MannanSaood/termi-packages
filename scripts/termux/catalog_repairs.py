@@ -343,9 +343,9 @@ def redland_build_prerequisites(text):
 def libreoffice_build_prerequisites(text):
     anchor = 'TERMUX_PKG_BUILD_DEPENDS="ant, boost-headers, cppunit, gtk3, kf6-kconfig, kf6-kcoreaddons, kf6-ki18n, kf6-kio, kf6-kwindowsystem, qt6-qtbase, qt6-qtbase-cross-tools, qt6-qtmultimedia, postgresql, openjdk-21, openjdk-21-x, unixodbc, mariadb, libc++"'
     assert text.count(anchor) == 1, 'LibreOffice build prerequisites changed'
-    # GTK's retained pkg-config closure needs libdeflate through libtiff and
-    # XRes through at-spi2. Import both completed source-built providers.
-    return text.replace(anchor, anchor.replace('"ant,', '"libdeflate, libxres, ant,'))
+    # Retained pkg-config metadata needs libdeflate through libtiff, XRes
+    # through at-spi2, and ORC through GStreamer's video/audio modules.
+    return text.replace(anchor, anchor.replace('"ant,', '"libdeflate, libxres, liborc, ant,'))
 
 
 def apply(change, hook, prepared):
