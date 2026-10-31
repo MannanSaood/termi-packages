@@ -277,6 +277,32 @@ p.write_text(s)
 TERMI_ERLANG_EI
 '''))
 
+    def postgis_metadata_provider(t):
+        assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'PostGIS build prerequisites changed'
+        return t + '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate"\n'
+    change('postgis', postgis_metadata_provider)
+
+    def mapserver_aosp_proot(t):
+        anchor='\ttermux_setup_proot\n'
+        assert t.count(anchor)==1, 'MapServer proot setup anchor changed'
+        return t.replace(anchor, anchor+r'''	local termi_mapserver_proot_bin="$TERMUX_PKG_TMPDIR/termi-mapserver-proot-bin"
+	mkdir -p "$termi_mapserver_proot_bin"
+	python3 - "$(command -v termux-proot-run)" "$termi_mapserver_proot_bin/termux-proot-run" "$TERMUX_PREFIX" <<'TERMI_MAPSERVER_PROOT'
+from pathlib import Path
+import shlex, sys
+source, target, prefix=map(Path,sys.argv[1:])
+assert (prefix/'opt/aosp/bin/linker64').is_file(), 'Source-built Android linker missing'
+s=source.read_text()
+anchor='-R / "$@"'
+assert s.count(anchor)==1, 'Proot wrapper root anchor changed'
+s=s.replace(anchor,'-R / -b '+shlex.quote(str(prefix/'opt/aosp')+':/system')+' "$@"')
+target.write_text(s)
+target.chmod(0o755)
+TERMI_MAPSERVER_PROOT
+	export PATH="$termi_mapserver_proot_bin:$PATH"
+''')
+    change('mapserver', mapserver_aosp_proot)
+
     def apache_semaphore_provider(t):
         dependency = 'TERMUX_PKG_DEPENDS="apr, apr-util, libandroid-support, '
         link = '\tLDFLAGS="$LDFLAGS -lapr-1 -laprutil-1"'
