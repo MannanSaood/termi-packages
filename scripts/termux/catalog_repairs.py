@@ -332,7 +332,16 @@ def netcdf_build_prerequisites(text):
     return text.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="zstd"\n' + anchor)
 
 
+def redland_build_prerequisites(text):
+    anchor = 'TERMUX_PKG_AUTO_UPDATE=true'
+    assert text.count(anchor) == 1 and 'TERMUX_PKG_BUILD_DEPENDS=' not in text, 'Redland build prerequisites changed'
+    # Rasqal's retained libtool metadata names libmpfr.la. The focused build
+    # must import the completed MPFR provider, including its static metadata.
+    return text.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libmpfr"\n' + anchor)
+
+
 def apply(change, hook, prepared):
+    change('redland', redland_build_prerequisites)
     change('proj', lambda t: hook(t, 'termux_step_pre_configure', PROJ_EPSILON_SETUP))
     # Two libc++ wrapper trees share include guards. Their include_next chain
     # can stop before Clang's float.h, hiding the macros Boost uses to select
