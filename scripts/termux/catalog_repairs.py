@@ -224,6 +224,14 @@ def neatvnc_build_prerequisites(text):
     return text.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="zstd"\n' + anchor)
 
 
+def netcdf_build_prerequisites(text):
+    anchor = 'TERMUX_PKG_BUILD_IN_SRC=true'
+    assert text.count(anchor) == 1 and 'TERMUX_PKG_BUILD_DEPENDS=' not in text, 'netcdf build prerequisites changed'
+    # The seeded curl link metadata references -lzstd when NetCDF links its
+    # utilities. Import the completed source provider into the focused seed.
+    return text.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="zstd"\n' + anchor)
+
+
 def apply(change, hook, prepared):
     change('proj', lambda t: hook(t, 'termux_step_pre_configure', PROJ_EPSILON_SETUP))
     # Two libc++ wrapper trees share include guards. Their include_next chain
@@ -952,9 +960,16 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 
     # Bionic's inttypes headers expose PTHREAD_ONCE_INIT through pthread_types
     # without the function declaration, selecting the pthread branch anyway.
-    change('netcdf-c', lambda t: hook(t, 'termux_step_pre_configure',
+    change('netcdf-c', lambda t: hook(netcdf_build_prerequisites(t), 'termux_step_pre_configure',
         '\tpython3 - "$TERMUX_PKG_SRCDIR/libdispatch/dcrc64.c" <<\'TERMI_NETCDF_PTHREAD\'\n'
         + NETCDF_PTHREAD_PATCH + 'TERMI_NETCDF_PTHREAD'))
+
+    def samba_stable_source(t):
+        old = 'TERMUX_PKG_SRCURL=https://download.samba.org/pub/samba/samba-${TERMUX_PKG_VERSION}.tar.gz'
+        assert t.count(old) == 1, 'Samba source URL contract changed'
+        # The identical hash-pinned release lives in the official stable tree.
+        return t.replace(old, old.replace('/pub/samba/samba-', '/pub/samba/stable/samba-'))
+    change('samba', samba_stable_source)
 
     # Replace global-state strtok with the equivalent per-invocation state.
     # Android's declaration is deprecated, and upstream enables -Werror.
