@@ -36,6 +36,7 @@ SHARED_BUILD_OWNERS = {
     # Repaired shared C++ prerequisites: compile each in one idle prefix,
     # then seed dependent lanes with its verified source output.
     "libprotobuf-c": 0, "libvigra": 4,
+    "php": 1, "enblend": 6,
 }
 
 
