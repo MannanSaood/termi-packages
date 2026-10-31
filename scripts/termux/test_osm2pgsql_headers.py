@@ -25,7 +25,8 @@ class FloatingHeadersTest(unittest.TestCase):
             if name == recipe:
                 result = transform(source)
                 self.assertTrue(result.startswith(source))
-                self.assertEqual(observed, [(source, 'termux_step_pre_configure',
+                prepared_source = source + ('\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n' if recipe == 'xerces-c' else '')
+                self.assertEqual(observed, [(prepared_source, 'termux_step_pre_configure',
                     '\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"\n')])
                 self.assertNotIn('#define', result)
                 raise Captured

@@ -248,8 +248,15 @@ def apply(change, hook, prepared):
     # Two libc++ wrapper trees share include guards. Their include_next chain
     # can stop before Clang's float.h, hiding the macros Boost uses to select
     # floating-point types. Use the seeded libc++ tree consistently.
+    def xerces_header_provider(t):
+        # libc++ ships only its runtime. The focused seed must also import
+        # the completed NDK sysroot that supplies include/c++/v1/new, etc.
+        assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'Xerces build prerequisites changed'
+        return t + '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n'
     for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c'):
-        change(name, lambda t: hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS))
+        change(name, lambda t, name=name: hook(
+            xerces_header_provider(t) if name == 'xerces-c' else t,
+            'termux_step_pre_configure', NTL_CXX_HEADERS))
     def apache_semaphore_provider(t):
         dependency = 'TERMUX_PKG_DEPENDS="apr, apr-util, libandroid-support, '
         link = '\tLDFLAGS="$LDFLAGS -lapr-1 -laprutil-1"'
