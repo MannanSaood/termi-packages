@@ -187,6 +187,26 @@ _termi_ldc_host_xml() {
 '''
 
 
+NEATVNC_ALLOCATION_PATCH = r'''from pathlib import Path
+import sys
+p=Path(sys.argv[1]); s=p.read_text()
+old = """\tbuffer->addr = aligned_alloc(alignment, aligned_size);
+\tif (!buffer->addr) {
+\t\tfree(buffer);
+\t\treturn NULL;
+\t}"""
+new = """\tint allocation_error = posix_memalign(&buffer->addr, alignment, aligned_size);
+\tif (allocation_error || !buffer->addr) {
+\t\tfree(buffer);
+\t\tif (allocation_error)
+\t\t\terrno = allocation_error;
+\t\treturn NULL;
+\t}"""
+assert s.count(old)==1 and s.count('#include <stdlib.h>')==1, 'neatvnc allocation contract changed'
+p.write_text(s.replace('#include <stdlib.h>', '#include <stdlib.h>\n#include <errno.h>').replace(old,new))
+'''
+
+
 def apply(change, hook, prepared):
     change('proj', lambda t: hook(t, 'termux_step_pre_configure', PROJ_EPSILON_SETUP))
     # Two libc++ wrapper trees share include guards. Their include_next chain
@@ -906,6 +926,12 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \tchmod 755 "$termi_arrow_cxx"''').replace(
         '-C cmake.args="-DCMAKE_PREFIX_PATH=$TERMUX_PREFIX/lib/cmake"',
         '-C cmake.args="-DCMAKE_CXX_COMPILER=$termi_arrow_cxx" \\\n\t\t-C cmake.args="-DCMAKE_PREFIX_PATH=$TERMUX_PREFIX/lib/cmake"'))
+
+    # aligned_alloc starts at Android API 28; posix_memalign is available at
+    # our API 26 floor. Preserve alignment, rounded size and failure cleanup.
+    change('libneatvnc', lambda t: hook(t, 'termux_step_pre_configure',
+        '\tpython3 - "$TERMUX_PKG_SRCDIR/src/buffer.c" <<\'TERMI_NEATVNC_ALLOC\'\n'
+        + NEATVNC_ALLOCATION_PATCH + 'TERMI_NEATVNC_ALLOC'), tree='x11-packages')
 
     # Replace global-state strtok with the equivalent per-invocation state.
     # Android's declaration is deprecated, and upstream enables -Werror.
