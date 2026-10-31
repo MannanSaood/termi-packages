@@ -12,7 +12,7 @@ class ApacheSemaphoreTest(unittest.TestCase):
         class Captured(Exception):
             pass
         result = []
-        def change(name, transform):
+        def change(name, transform, tree='packages'):
             if name == 'apache2':
                 result.append(transform(text))
                 raise Captured

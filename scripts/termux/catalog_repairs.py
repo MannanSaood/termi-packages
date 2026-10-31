@@ -284,6 +284,7 @@ TERMI_ERLANG_EI
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'PostGIS build prerequisites changed'
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate"\n'
     change('postgis', postgis_metadata_provider)
+    change('ibus-libpinyin', postgis_metadata_provider, tree='x11-packages')
 
     def mapserver_aosp_proot(t):
         anchor='\ttermux_setup_proot\n'

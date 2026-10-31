@@ -16,7 +16,7 @@ class PhpPkgconfigTest(unittest.TestCase):
         class Captured(Exception):
             pass
         result = []
-        def change(name, transform):
+        def change(name, transform, tree='packages'):
             if name == 'php':
                 result.append(transform(text))
                 raise Captured
