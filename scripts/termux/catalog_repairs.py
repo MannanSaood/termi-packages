@@ -251,8 +251,9 @@ def apply(change, hook, prepared):
     def xerces_header_provider(t):
         # libc++ ships only its runtime. The focused seed must also import
         # the completed NDK sysroot that supplies include/c++/v1/new, etc.
+        # Curl link metadata also needs the completed zstd provider.
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'Xerces build prerequisites changed'
-        return t + '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n'
+        return t + '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, zstd"\n'
     for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c'):
         change(name, lambda t, name=name: hook(
             xerces_header_provider(t) if name == 'xerces-c' else t,
