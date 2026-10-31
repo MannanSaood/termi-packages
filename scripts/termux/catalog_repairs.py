@@ -35,6 +35,19 @@ p.write_text(s.replace(anchor, replacement))
 """
 LLAMA_VULKAN_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/ggml/src/ggml-vulkan/ggml-vulkan-buffers.cpp\" <<'TERMI_LLAMA_ALIGNED'\n" + LLAMA_VULKAN_ALLOCATION_PATCH + "TERMI_LLAMA_ALIGNED\n"
 
+OPENSC_TOKENIZER_PATCH = r"""from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+anchor = '\tif (strchr(profile->name, \'+\') != NULL) {\n\t\tchar\t*s;\n\n\t\ti = 0;\n\t\t(void) strtok(profile->name, "+");\n\t\twhile ((s = strtok(NULL, "+")) != NULL) {'
+assert s.count(anchor) == 1, 'OpenSC profile tokenization contract changed'
+replacement = anchor.replace('char\t*s;', 'char\t*s, *termi_profile_save = NULL;')
+replacement = replacement.replace('strtok(profile->name, "+")', 'strtok_r(profile->name, "+", &termi_profile_save)')
+replacement = replacement.replace('strtok(NULL, "+")', 'strtok_r(NULL, "+", &termi_profile_save)')
+p.write_text(s.replace(anchor, replacement))
+"""
+OPENSC_TOKENIZER_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/src/pkcs15init/pkcs15-lib.c\" <<'TERMI_OPENSC_PROFILE'\n" + OPENSC_TOKENIZER_PATCH + "TERMI_OPENSC_PROFILE\n"
+
 OCTAVE_FORTRAN_LINK = r'''
 	export F77="$FC"
 	# Autoconf links a C main against the Fortran runtime directly. Use this
@@ -275,9 +288,9 @@ def apply(change, hook, prepared):
     def focused_cxx_header_provider(t):
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'C++ header prerequisites changed'
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n'
-    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'libdevil'):
+    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'libdevil', 'codon'):
         change(name, lambda t, name=name: hook(
-            xerces_header_provider(t) if name == 'xerces-c' else focused_cxx_header_provider(t) if name in {'lnav', 'libpinyin', 'lensfun', 'libdevil'} else t,
+            xerces_header_provider(t) if name == 'xerces-c' else focused_cxx_header_provider(t) if name in {'lnav', 'libpinyin', 'lensfun', 'libdevil', 'codon'} else t,
             'termux_step_pre_configure', NTL_CXX_HEADERS))
     for name in ('dosbox-x', 'xmoto'):
         change(name, lambda t: hook(focused_cxx_header_provider(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
@@ -286,6 +299,7 @@ def apply(change, hook, prepared):
         assert t.count(anchor)==1, 'llama.cpp build prerequisites changed'
         return hook(t.replace(anchor,anchor.replace('="','="ndk-sysroot,',1).replace('ndk-sysroot,ocl','ndk-sysroot, ocl')), 'termux_step_pre_configure', NTL_CXX_HEADERS + LLAMA_VULKAN_SETUP)
     change('llama-cpp', llama_header_provider)
+    change('opensc', lambda t: hook(t, 'termux_step_pre_configure', OPENSC_TOKENIZER_SETUP))
     change('vitetris', lambda t: hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/src/netw/tty_socket.c" <<'TERMI_VITETRIS_TIME'
 from pathlib import Path
 import sys

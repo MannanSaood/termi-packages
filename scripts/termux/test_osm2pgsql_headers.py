@@ -5,7 +5,7 @@ import catalog_repairs
 
 class FloatingHeadersTest(unittest.TestCase):
     def test_single_scoped_header_order_repair_preserves_recipe(self):
-        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'darktable', 'rawtherapee', 'libdevil', 'dosbox-x', 'xmoto', 'llama-cpp'):
+        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'darktable', 'rawtherapee', 'libdevil', 'dosbox-x', 'xmoto', 'llama-cpp', 'codon'):
             with self.subTest(recipe=recipe):
                 self.check_recipe(recipe)
 
@@ -30,7 +30,7 @@ class FloatingHeadersTest(unittest.TestCase):
                 result = transform(source)
                 self.assertIn('TERMUX_PKG_DEPENDS="boost, libc++, proj"\n', result)
                 self.assertIn('TERMUX_PKG_EXTRA_CONFIGURE_ARGS="-DEXTERNAL_FMT=OFF"\n', result)
-                prepared_source = source + ('\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, zstd"\n' if recipe == 'xerces-c' else '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n' if recipe in {'lnav', 'libpinyin', 'lensfun', 'libdevil', 'dosbox-x', 'xmoto'} else '')
+                prepared_source = source + ('\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, zstd"\n' if recipe == 'xerces-c' else '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n' if recipe in {'lnav', 'libpinyin', 'lensfun', 'libdevil', 'dosbox-x', 'xmoto', 'codon'} else '')
                 if recipe == 'rawtherapee':
                     prepared_source += '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate, libxres"\n'
                 elif recipe == 'darktable':
