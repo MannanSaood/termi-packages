@@ -988,6 +988,14 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         '\tpython3 - "$TERMUX_PKG_SRCDIR" <<\'TERMI_WESTON_MEMFD\'\n'
         + WESTON_MEMFD_PATCH + 'TERMI_WESTON_MEMFD'), tree='x11-packages')
 
+    def caja_pkgconfig_prerequisites(t):
+        old = 'TERMUX_PKG_BUILD_DEPENDS="autoconf-archive, glib, mate-common, python, gst-plugins-base"'
+        assert t.count(old) == 1, 'Caja extensions build prerequisites changed'
+        # libcaja-extension -> GTK/TIFF requires libdeflate's private .pc
+        # metadata even when configure requests a shared-library consumer.
+        return t.replace(old, old.replace('"autoconf-archive,', '"libdeflate, autoconf-archive,'))
+    change('caja-extensions', caja_pkgconfig_prerequisites, tree='x11-packages')
+
     # Replace global-state strtok with the equivalent per-invocation state.
     # Android's declaration is deprecated, and upstream enables -Werror.
     change('xrdp', lambda t: hook(t, 'termux_step_pre_configure', '''\tpython3 - "$TERMUX_PKG_SRCDIR/common/string_calls.c" <<'TERMI_XRDP'
