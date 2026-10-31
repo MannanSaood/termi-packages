@@ -216,6 +216,17 @@ p.write_text(s.replace(old, '/* Termi: declare pthread_once explicitly for Andro
 '''
 
 
+WESTON_MEMFD_PATCH = r'''from pathlib import Path
+import sys
+root=Path(sys.argv[1])
+for name in ['shared/client-buffer-util.c', 'libweston/backend-pipewire/pipewire.c']:
+    p=root/name; s=p.read_text()
+    old='#if defined(__ANDROID__) && __ANDROID_API__ < 26'
+    assert s.count(old)==1 and '#define memfd_create(' in s, 'Weston memfd compatibility contract changed: '+name
+    p.write_text(s.replace(old, '#if defined(__ANDROID__) && __ANDROID_API__ < 30'))
+'''
+
+
 def neatvnc_build_prerequisites(text):
     anchor = 'TERMUX_PKG_AUTO_UPDATE=true'
     assert text.count(anchor) == 1 and 'TERMUX_PKG_BUILD_DEPENDS=' not in text, 'neatvnc build prerequisites changed'
@@ -970,6 +981,12 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         # The identical hash-pinned release lives in the official stable tree.
         return t.replace(old, old.replace('/pub/samba/samba-', '/pub/samba/stable/samba-'))
     change('samba', samba_stable_source)
+
+    # Bionic exposes memfd_create from API 30, not 26. Extend the two existing
+    # upstream Android syscall shims through API 29 without changing semantics.
+    change('weston', lambda t: hook(t, 'termux_step_pre_configure',
+        '\tpython3 - "$TERMUX_PKG_SRCDIR" <<\'TERMI_WESTON_MEMFD\'\n'
+        + WESTON_MEMFD_PATCH + 'TERMI_WESTON_MEMFD'), tree='x11-packages')
 
     # Replace global-state strtok with the equivalent per-invocation state.
     # Android's declaration is deprecated, and upstream enables -Werror.
