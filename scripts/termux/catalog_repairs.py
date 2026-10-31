@@ -48,6 +48,47 @@ p.write_text(s.replace(anchor, replacement))
 """
 OPENSC_TOKENIZER_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/src/pkcs15init/pkcs15-lib.c\" <<'TERMI_OPENSC_PROFILE'\n" + OPENSC_TOKENIZER_PATCH + "TERMI_OPENSC_PROFILE\n"
 
+OPENSC_PKCS11_TOKENIZER_PATCH = r'''from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+changes = {
+    'src/pkcs11/misc.c': [
+        ('char *create_slots_for_pins = NULL, *op, *tmp;', 'char *create_slots_for_pins = NULL, *op, *tmp, *termi_slots_save = NULL;'),
+        ('strtok(tmp, " ,")', 'strtok_r(tmp, " ,", &termi_slots_save)'),
+        ('strtok(NULL, " ,")', 'strtok_r(NULL, " ,", &termi_slots_save)'),
+    ],
+    'src/tools/pkcs11-tool.c': [
+        ('char *s = NULL;', 'char *s = NULL, *termi_mechanisms_save = NULL;'),
+        ('strtok(optarg, ",")', 'strtok_r(optarg, ",", &termi_mechanisms_save)'),
+        ('strtok(NULL, ",")', 'strtok_r(NULL, ",", &termi_mechanisms_save)'),
+    ],
+    'src/tools/pkcs11_uri.c': [
+        ('char *path, *query, *token;', 'char *path, *query, *token, *termi_uri_save = NULL;'),
+        ('strtok(path, "?")', 'strtok_r(path, "?", &termi_uri_save)'),
+        ('strtok(NULL, "?")', 'strtok_r(NULL, "?", &termi_uri_save)'),
+        ('strtok(path, ";")', 'strtok_r(path, ";", &termi_uri_save)'),
+        ('strtok(query, ";")', 'strtok_r(query, ";", &termi_uri_save)'),
+        ('strtok(NULL, ";")', 'strtok_r(NULL, ";", &termi_uri_save)'),
+    ],
+}
+# Validate every original anchor before writing any file. URI path/query scans
+# are sequential, just as in the original parser, and can share local state.
+outputs = {}
+for name, replacements in changes.items():
+    p = root / name
+    s = p.read_text()
+    assert 'termi_' not in s, 'OpenSC tokenizer repair already present'
+    for old, new in replacements:
+        expected = 2 if name.endswith('pkcs11_uri.c') and old == 'strtok(NULL, ";")' else 1
+        assert s.count(old) == expected, 'OpenSC tokenizer contract changed: ' + name + ': ' + old
+        s = s.replace(old, new)
+    assert 'strtok(' not in s, 'Unreviewed OpenSC tokenizer remains: ' + name
+    outputs[p] = s
+for p, s in outputs.items():
+    p.write_text(s)
+'''
+OPENSC_TOKENIZER_SETUP += "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_OPENSC_PKCS11'\n" + OPENSC_PKCS11_TOKENIZER_PATCH + "TERMI_OPENSC_PKCS11\n"
+
 OCTAVE_FORTRAN_LINK = r'''
 	export F77="$FC"
 	# Autoconf links a C main against the Fortran runtime directly. Use this
