@@ -357,6 +357,15 @@ def apply(change, hook, prepared):
         assert t.count(anchor) == 1, 'MangoHud build prerequisites changed'
         return hook(t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, dbus, libandroid-wordexp, nlohmann-json"'), 'termux_step_pre_configure', NTL_CXX_HEADERS)
     change('mangohud', mangohud_header_provider, tree='x11-packages')
+    for name, deps in (
+        ('krfb', 'extra-cmake-modules, kf6-kdoctools, libxdamage, plasma-wayland-protocols'),
+        ('okular', 'ebook-tools, extra-cmake-modules, kdegraphics-mobipocket'),
+    ):
+        def kde_header_provider(t, deps=deps):
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="' + deps + '"'
+            assert t.count(anchor) == 1, 'KDE consumer build prerequisites changed'
+            return hook(t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, ' + deps + '"'), 'termux_step_pre_configure', NTL_CXX_HEADERS)
+        change(name, kde_header_provider, tree='x11-packages')
     def llama_header_provider(t):
         anchor='TERMUX_PKG_BUILD_DEPENDS="ocl-icd, opencl-headers, spirv-headers, vulkan-headers"'
         assert t.count(anchor)==1, 'llama.cpp build prerequisites changed'
