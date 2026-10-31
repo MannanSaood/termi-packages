@@ -5,7 +5,7 @@ import catalog_repairs
 
 class FloatingHeadersTest(unittest.TestCase):
     def test_single_scoped_header_order_repair_preserves_recipe(self):
-        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun'):
+        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'darktable', 'rawtherapee'):
             with self.subTest(recipe=recipe):
                 self.check_recipe(recipe)
 
@@ -15,17 +15,23 @@ class FloatingHeadersTest(unittest.TestCase):
             pass
 
         source = 'TERMUX_PKG_DEPENDS="boost, libc++, proj"\nTERMUX_PKG_EXTRA_CONFIGURE_ARGS="-DEXTERNAL_FMT=OFF"\n'
+        if recipe == 'darktable':
+            source += 'TERMUX_PKG_BUILD_DEPENDS="libllvm-static"\n'
         observed = []
 
         def hook(text, name, body):
             observed.append((text, name, body))
             return text + name + '() {\n' + body + '}\n'
 
-        def change(name, transform):
+        def change(name, transform, tree='packages'):
             if name == recipe:
                 result = transform(source)
-                self.assertTrue(result.startswith(source))
+                self.assertTrue(result.startswith(source) if recipe != 'darktable' else 'libdeflate, libxres, libllvm-static' in result)
                 prepared_source = source + ('\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, zstd"\n' if recipe == 'xerces-c' else '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n' if recipe in {'lnav', 'libpinyin', 'lensfun'} else '')
+                if recipe == 'rawtherapee':
+                    prepared_source += '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate, libxres"\n'
+                elif recipe == 'darktable':
+                    prepared_source = source.replace('="libllvm-static"', '="libdeflate, libxres, libllvm-static"')
                 self.assertEqual(observed, [(prepared_source, 'termux_step_pre_configure',
                     '\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"\n')])
                 self.assertNotIn('#define', result)

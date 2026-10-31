@@ -297,12 +297,12 @@ TERMI_ERLANG_EI
     def gtk_metadata_provider(t):
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'GTK consumer build prerequisites changed'
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate, libxres"\n'
-    change('rawtherapee', gtk_metadata_provider, tree='x11-packages')
+    change('rawtherapee', lambda t: hook(gtk_metadata_provider(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
     def darktable_metadata_provider(t):
         anchor='TERMUX_PKG_BUILD_DEPENDS="libllvm-static"'
         assert t.count(anchor)==1, 'Darktable build prerequisites changed'
         return t.replace(anchor,'TERMUX_PKG_BUILD_DEPENDS="libdeflate, libxres, libllvm-static"')
-    change('darktable', darktable_metadata_provider, tree='x11-packages')
+    change('darktable', lambda t: hook(darktable_metadata_provider(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
 
     def mapserver_aosp_proot(t):
         anchor='\ttermux_setup_proot\n'
