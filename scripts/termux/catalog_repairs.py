@@ -350,8 +350,13 @@ def apply(change, hook, prepared):
         change(name, lambda t, name=name: hook(
             xerces_header_provider(t) if name == 'xerces-c' else focused_cxx_header_provider(t) if name in {'lnav', 'libpinyin', 'lensfun', 'libdevil', 'codon', 'steghide', 'taskwarrior', 'pkgfile'} else t,
             'termux_step_pre_configure', NTL_CXX_HEADERS + (STEGHIDE_FLAGS_SETUP if name == 'steghide' else '')))
-    for name in ('dosbox-x', 'xmoto'):
+    for name in ('dosbox-x', 'xmoto', 'glmark2'):
         change(name, lambda t: hook(focused_cxx_header_provider(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
+    def mangohud_header_provider(t):
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="dbus, libandroid-wordexp, nlohmann-json"'
+        assert t.count(anchor) == 1, 'MangoHud build prerequisites changed'
+        return hook(t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, dbus, libandroid-wordexp, nlohmann-json"'), 'termux_step_pre_configure', NTL_CXX_HEADERS)
+    change('mangohud', mangohud_header_provider, tree='x11-packages')
     def llama_header_provider(t):
         anchor='TERMUX_PKG_BUILD_DEPENDS="ocl-icd, opencl-headers, spirv-headers, vulkan-headers"'
         assert t.count(anchor)==1, 'llama.cpp build prerequisites changed'
