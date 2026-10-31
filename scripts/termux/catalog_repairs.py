@@ -248,7 +248,7 @@ def apply(change, hook, prepared):
     # Two libc++ wrapper trees share include guards. Their include_next chain
     # can stop before Clang's float.h, hiding the macros Boost uses to select
     # floating-point types. Use the seeded libc++ tree consistently.
-    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra'):
+    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c'):
         change(name, lambda t: hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS))
     def apache_semaphore_provider(t):
         dependency = 'TERMUX_PKG_DEPENDS="apr, apr-util, libandroid-support, '
