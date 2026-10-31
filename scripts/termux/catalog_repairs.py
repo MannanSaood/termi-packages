@@ -17,6 +17,24 @@ p.write_text(s)
 NTL_GMP_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/src/DoConfig\" <<'TERMI_NTL_GMP_DIAGNOSTICS'\n" + NTL_GMP_DIAGNOSTICS + "TERMI_NTL_GMP_DIAGNOSTICS\n"
 NTL_CXX_HEADERS = '\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"\n'
 
+LLAMA_VULKAN_ALLOCATION_PATCH = r"""from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+anchor = '#else\n    return std::aligned_alloc(align, size);\n#endif'
+cleanup = 'static void portable_aligned_free(void * ptr) {\n#ifdef _WIN32\n    _aligned_free(ptr);\n#else\n    std::free(ptr);\n#endif\n}'
+assert s.count(anchor) == 1 and s.count(cleanup) == 1, 'llama.cpp aligned allocation contract changed'
+assert '#elif defined(__ANDROID__) && __ANDROID_API__ < 28' not in s, 'llama.cpp allocation repair already present'
+replacement = '''#elif defined(__ANDROID__) && __ANDROID_API__ < 28
+    void * ptr = nullptr;
+    return posix_memalign(&ptr, align, size) == 0 ? ptr : nullptr;
+#else
+    return std::aligned_alloc(align, size);
+#endif'''
+p.write_text(s.replace(anchor, replacement))
+"""
+LLAMA_VULKAN_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/ggml/src/ggml-vulkan/ggml-vulkan-buffers.cpp\" <<'TERMI_LLAMA_ALIGNED'\n" + LLAMA_VULKAN_ALLOCATION_PATCH + "TERMI_LLAMA_ALIGNED\n"
+
 OCTAVE_FORTRAN_LINK = r'''
 	export F77="$FC"
 	# Autoconf links a C main against the Fortran runtime directly. Use this
@@ -266,7 +284,7 @@ def apply(change, hook, prepared):
     def llama_header_provider(t):
         anchor='TERMUX_PKG_BUILD_DEPENDS="ocl-icd, opencl-headers, spirv-headers, vulkan-headers"'
         assert t.count(anchor)==1, 'llama.cpp build prerequisites changed'
-        return hook(t.replace(anchor,anchor.replace('="','="ndk-sysroot,',1).replace('ndk-sysroot,ocl','ndk-sysroot, ocl')), 'termux_step_pre_configure', NTL_CXX_HEADERS)
+        return hook(t.replace(anchor,anchor.replace('="','="ndk-sysroot,',1).replace('ndk-sysroot,ocl','ndk-sysroot, ocl')), 'termux_step_pre_configure', NTL_CXX_HEADERS + LLAMA_VULKAN_SETUP)
     change('llama-cpp', llama_header_provider)
     change('vitetris', lambda t: hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/src/netw/tty_socket.c" <<'TERMI_VITETRIS_TIME'
 from pathlib import Path
