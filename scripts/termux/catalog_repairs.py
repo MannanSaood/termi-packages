@@ -207,6 +207,15 @@ p.write_text(s.replace('#include <stdlib.h>', '#include <stdlib.h>\n#include <er
 '''
 
 
+NETCDF_PTHREAD_PATCH = r'''from pathlib import Path
+import sys
+p=Path(sys.argv[1]); s=p.read_text()
+old = '#if 0\n#include <pthread.h>            /* link with -lpthread */\n#endif'
+assert s.count(old)==1, 'netcdf CRC pthread include contract changed'
+p.write_text(s.replace(old, '/* Termi: declare pthread_once explicitly for Android CRC table initialization. */\n#include <pthread.h>'))
+'''
+
+
 def apply(change, hook, prepared):
     change('proj', lambda t: hook(t, 'termux_step_pre_configure', PROJ_EPSILON_SETUP))
     # Two libc++ wrapper trees share include guards. Their include_next chain
@@ -932,6 +941,12 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
     change('libneatvnc', lambda t: hook(t, 'termux_step_pre_configure',
         '\tpython3 - "$TERMUX_PKG_SRCDIR/src/buffer.c" <<\'TERMI_NEATVNC_ALLOC\'\n'
         + NEATVNC_ALLOCATION_PATCH + 'TERMI_NEATVNC_ALLOC'), tree='x11-packages')
+
+    # Bionic's inttypes headers expose PTHREAD_ONCE_INIT through pthread_types
+    # without the function declaration, selecting the pthread branch anyway.
+    change('netcdf-c', lambda t: hook(t, 'termux_step_pre_configure',
+        '\tpython3 - "$TERMUX_PKG_SRCDIR/libdispatch/dcrc64.c" <<\'TERMI_NETCDF_PTHREAD\'\n'
+        + NETCDF_PTHREAD_PATCH + 'TERMI_NETCDF_PTHREAD'))
 
     # Replace global-state strtok with the equivalent per-invocation state.
     # Android's declaration is deprecated, and upstream enables -Werror.
