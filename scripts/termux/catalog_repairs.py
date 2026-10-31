@@ -194,6 +194,17 @@ def apply(change, hook, prepared):
     # floating-point types. Use the seeded libc++ tree consistently.
     for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra'):
         change(name, lambda t: hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS))
+    def apache_semaphore_provider(t):
+        dependency = 'TERMUX_PKG_DEPENDS="apr, apr-util, libandroid-support, '
+        link = '\tLDFLAGS="$LDFLAGS -lapr-1 -laprutil-1"'
+        assert t.count(dependency) == 1 and t.count(link) == 1, 'Apache APR link contract changed'
+        assert 'libandroid-sysv-semaphore' not in t, 'Apache semaphore provider already declared'
+        # APR references the compatibility API exported by this source-built
+        # library. Keep it in each consumer's DT_NEEDED even with --as-needed.
+        return t.replace(dependency, dependency + 'libandroid-sysv-semaphore, ').replace(
+            link, '\tLDFLAGS="$LDFLAGS -lapr-1 -laprutil-1 -Wl,--push-state,--no-as-needed '
+                  '-landroid-sysv-semaphore -Wl,--pop-state"')
+    change('apache2', apache_semaphore_provider)
     # These recipes compile a Linux host helper after an Android target build.
     # Keep target include paths out of GCC and preserve the target environment.
     def tcc_host_environment(t):
