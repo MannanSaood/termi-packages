@@ -8,7 +8,10 @@ def prepared():
     result=[]
     def change(name, edit, **kwargs):
         if name=='mapserver': result.append(edit(SOURCE)); raise Captured
-    try: catalog_repairs.apply(change, lambda *args: None, {})
+    def hook(text, name, body):
+        anchor=name+'() {\n'; assert text.count(anchor)==1
+        return text.replace(anchor,anchor+body,1)
+    try: catalog_repairs.apply(change, hook, {})
     except Captured: pass
     assert len(result)==1
     return result[0]

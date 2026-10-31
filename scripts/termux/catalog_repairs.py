@@ -254,9 +254,12 @@ def apply(change, hook, prepared):
         # Curl link metadata also needs the completed zstd provider.
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'Xerces build prerequisites changed'
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, zstd"\n'
-    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal'):
+    def focused_cxx_header_provider(t):
+        assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'C++ header prerequisites changed'
+        return t + '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n'
+    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin'):
         change(name, lambda t, name=name: hook(
-            xerces_header_provider(t) if name == 'xerces-c' else t,
+            xerces_header_provider(t) if name == 'xerces-c' else focused_cxx_header_provider(t) if name in {'lnav', 'libpinyin'} else t,
             'termux_step_pre_configure', NTL_CXX_HEADERS))
     # A catalog prefix may also contain libei (input emulation). Resolve
     # erl_call's EI symbols from the exact archive built by this recipe.
@@ -301,7 +304,7 @@ target.chmod(0o755)
 TERMI_MAPSERVER_PROOT
 	export PATH="$termi_mapserver_proot_bin:$PATH"
 ''')
-    change('mapserver', mapserver_aosp_proot)
+    change('mapserver', lambda t: hook(mapserver_aosp_proot(t), 'termux_step_pre_configure', NTL_CXX_HEADERS))
 
     def apache_semaphore_provider(t):
         dependency = 'TERMUX_PKG_DEPENDS="apr, apr-util, libandroid-support, '
