@@ -38,7 +38,7 @@ class FloatingHeadersTest(unittest.TestCase):
                 elif recipe == 'llama-cpp':
                     prepared_source = source.replace('="ocl-icd,', '="ndk-sysroot, ocl-icd,')
                 self.assertEqual(observed, [(prepared_source, 'termux_step_pre_configure',
-                    '\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"\n' + (catalog_repairs.LLAMA_VULKAN_SETUP if recipe == 'llama-cpp' else ''))])
+                    '\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"\n' + (catalog_repairs.LLAMA_VULKAN_SETUP if recipe == 'llama-cpp' else catalog_repairs.STEGHIDE_FLAGS_SETUP if recipe == 'steghide' else ''))])
                 self.assertNotIn('#define', result)
                 raise Captured
 

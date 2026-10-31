@@ -17,6 +17,23 @@ p.write_text(s)
 NTL_GMP_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/src/DoConfig\" <<'TERMI_NTL_GMP_DIAGNOSTICS'\n" + NTL_GMP_DIAGNOSTICS + "TERMI_NTL_GMP_DIAGNOSTICS\n"
 NTL_CXX_HEADERS = '\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"\n'
 
+STEGHIDE_FLAGS_PATCH = r'''from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+outputs = {}
+for name in ('configure', 'configure.in'):
+    p = root / name
+    s = p.read_text()
+    for flags, count in (('-std=c++11 -O2 -Wall -g', 1), ('-std=c++11 -O2 -Wall', 2)):
+        old = 'CXXFLAGS="' + flags + '"'
+        assert s.count(old) == count, 'Steghide configure flags contract changed: ' + name
+        s = s.replace(old, 'CXXFLAGS="$CXXFLAGS ' + flags + '"')
+    outputs[p] = s
+for p, s in outputs.items():
+    p.write_text(s)
+'''
+STEGHIDE_FLAGS_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_STEGHIDE_FLAGS'\n" + STEGHIDE_FLAGS_PATCH + "TERMI_STEGHIDE_FLAGS\n"
+
 LLAMA_VULKAN_ALLOCATION_PATCH = r"""from pathlib import Path
 import sys
 p = Path(sys.argv[1])
@@ -332,7 +349,7 @@ def apply(change, hook, prepared):
     for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'libdevil', 'codon', 'steghide', 'taskwarrior', 'pkgfile'):
         change(name, lambda t, name=name: hook(
             xerces_header_provider(t) if name == 'xerces-c' else focused_cxx_header_provider(t) if name in {'lnav', 'libpinyin', 'lensfun', 'libdevil', 'codon', 'steghide', 'taskwarrior', 'pkgfile'} else t,
-            'termux_step_pre_configure', NTL_CXX_HEADERS))
+            'termux_step_pre_configure', NTL_CXX_HEADERS + (STEGHIDE_FLAGS_SETUP if name == 'steghide' else '')))
     for name in ('dosbox-x', 'xmoto'):
         change(name, lambda t: hook(focused_cxx_header_provider(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
     def llama_header_provider(t):
