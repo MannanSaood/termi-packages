@@ -360,6 +360,7 @@ def apply(change, hook, prepared):
     for name, deps in (
         ('krfb', 'extra-cmake-modules, kf6-kdoctools, libxdamage, plasma-wayland-protocols'),
         ('okular', 'ebook-tools, extra-cmake-modules, kdegraphics-mobipocket'),
+        ('calligra', 'boost, eigen, extra-cmake-modules, kf6-kconfig-cross-tools, kf6-kdoctools, kf6-kdoctools-cross-tools, qt6-qttools'),
     ):
         def kde_header_provider(t, deps=deps):
             anchor = 'TERMUX_PKG_BUILD_DEPENDS="' + deps + '"'

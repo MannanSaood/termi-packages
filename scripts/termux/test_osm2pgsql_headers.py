@@ -5,7 +5,7 @@ import catalog_repairs
 
 class FloatingHeadersTest(unittest.TestCase):
     def test_single_scoped_header_order_repair_preserves_recipe(self):
-        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'darktable', 'rawtherapee', 'libdevil', 'dosbox-x', 'xmoto', 'llama-cpp', 'codon', 'steghide', 'taskwarrior', 'pkgfile', 'glmark2', 'mangohud', 'krfb', 'okular'):
+        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'darktable', 'rawtherapee', 'libdevil', 'dosbox-x', 'xmoto', 'llama-cpp', 'codon', 'steghide', 'taskwarrior', 'pkgfile', 'glmark2', 'mangohud', 'krfb', 'okular', 'calligra'):
             with self.subTest(recipe=recipe):
                 self.check_recipe(recipe)
 
@@ -24,6 +24,7 @@ class FloatingHeadersTest(unittest.TestCase):
         kde_deps = {
             'krfb': 'extra-cmake-modules, kf6-kdoctools, libxdamage, plasma-wayland-protocols',
             'okular': 'ebook-tools, extra-cmake-modules, kdegraphics-mobipocket',
+            'calligra': 'boost, eigen, extra-cmake-modules, kf6-kconfig-cross-tools, kf6-kdoctools, kf6-kdoctools-cross-tools, qt6-qttools',
         }
         if recipe in kde_deps:
             source += 'TERMUX_PKG_BUILD_DEPENDS="' + kde_deps[recipe] + '"\n'
