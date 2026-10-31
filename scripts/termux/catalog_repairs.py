@@ -263,6 +263,11 @@ def apply(change, hook, prepared):
             'termux_step_pre_configure', NTL_CXX_HEADERS))
     for name in ('dosbox-x', 'xmoto'):
         change(name, lambda t: hook(focused_cxx_header_provider(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
+    def llama_header_provider(t):
+        anchor='TERMUX_PKG_BUILD_DEPENDS="ocl-icd, opencl-headers, spirv-headers, vulkan-headers"'
+        assert t.count(anchor)==1, 'llama.cpp build prerequisites changed'
+        return hook(t.replace(anchor,anchor.replace('="','="ndk-sysroot,',1).replace('ndk-sysroot,ocl','ndk-sysroot, ocl')), 'termux_step_pre_configure', NTL_CXX_HEADERS)
+    change('llama-cpp', llama_header_provider)
     change('vitetris', lambda t: hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/src/netw/tty_socket.c" <<'TERMI_VITETRIS_TIME'
 from pathlib import Path
 import sys
