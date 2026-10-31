@@ -69,8 +69,22 @@ class FocusedResources(unittest.TestCase):
             seed.selected_recipes(plan, allowed, ['unknown'])
         self.assertEqual(original, plan)
         self.assertEqual(['swift'], seed.dependency_roots('packages', ['swift']))
-        for mode, roots in [('full-catalog', ['swift']), ('packages', ['swift', 'other']), ('packages', ['other'])]:
-            self.assertEqual([], seed.dependency_roots(mode, roots))
+        self.assertEqual([], seed.dependency_roots('full-catalog', ['swift']))
+        self.assertEqual(['other', 'swift'], seed.dependency_roots('packages', ['swift', 'other', 'swift']))
+        self.assertEqual(['other'], seed.dependency_roots('packages', ['other']))
+
+    def test_focused_multi_root_seed_omits_unrelated_packages_but_keeps_shared_dependencies(self):
+        plan = dict(recipes={
+            'apache2': dict(dependencies=['apr', 'semaphore']),
+            'tool': dict(dependencies=['apr']),
+            'apr': dict(dependencies=['uuid']),
+            'semaphore': dict(dependencies=[]), 'uuid': dict(dependencies=[]),
+            'unrelated': dict(dependencies=[])})
+        allowed = {'apr', 'uuid', 'semaphore', 'unrelated'}
+        roots = seed.dependency_roots('packages', ['tool', 'apache2'])
+        self.assertEqual({'apr', 'uuid', 'semaphore'}, seed.selected_recipes(plan, allowed, roots))
+        with self.assertRaisesRegex(ValueError, 'every compatible completed dependency'):
+            seed.selected_recipes(plan, allowed - {'uuid'}, roots)
 
     @unittest.skipUnless(os.name == 'posix', 'Linux process groups')
     def test_disk_interruption_kills_compiler_and_retains_truthful_evidence(self):

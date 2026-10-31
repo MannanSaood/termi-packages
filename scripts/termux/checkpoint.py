@@ -78,6 +78,39 @@ def gh(repository, *arguments):
     return subprocess.run(["gh", "release", *arguments, "--repo", repository], check=True, timeout=600)
 
 
+def compress_export(container, parts):
+    """Keep the gzip restore format, using two compression workers if present."""
+    exporter = subprocess.Popen(["docker", "export", container], stdout=subprocess.PIPE)
+    compressor = None
+    try:
+        pigz = shutil.which("pigz")
+        if pigz:
+            print("Checkpoint compression: pigz, two workers", flush=True)
+            compressor = subprocess.Popen([pigz, "-1", "-n", "-p", "2"],
+                                          stdin=exporter.stdout, stdout=subprocess.PIPE)
+            exporter.stdout.close()
+            shutil.copyfileobj(compressor.stdout, parts, 1024**2)
+            if compressor.wait() != 0:
+                raise ValueError("Checkpoint compressor failed; incomplete checkpoint is unusable")
+        else:
+            print("Checkpoint compression: Python gzip fallback", flush=True)
+            with gzip.GzipFile(fileobj=parts, mode="wb", compresslevel=1, mtime=0) as compressed:
+                shutil.copyfileobj(exporter.stdout, compressed, 1024**2)
+        if exporter.wait() != 0:
+            raise ValueError("Container export failed; incomplete checkpoint is unusable")
+    finally:
+        for process in (compressor, exporter):
+            if process is not None:
+                if process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill(); process.wait()
+                if process.stdout:
+                    process.stdout.close()
+
+
 def save(container, repository, tag, identity):
     visibility = json.loads(subprocess.check_output(["gh", "repo", "view", repository, "--json", "visibility"]))["visibility"]
     if visibility != "PUBLIC":
@@ -95,17 +128,11 @@ def save(container, repository, tag, identity):
         if shutil.disk_usage(directory).free < 2 * 1024**3:
             raise ValueError("Checkpoint streaming needs2GiB free scratch space")
         parts = Parts(directory, lambda path: gh(repository, "upload", tag, str(path)), background=True)
-        process = subprocess.Popen(["docker", "export", container], stdout=subprocess.PIPE)
         try:
-            with gzip.GzipFile(fileobj=parts, mode="wb", compresslevel=1, mtime=0) as compressed:
-                shutil.copyfileobj(process.stdout, compressed, 1024**2)
-            if process.wait() != 0:
-                raise ValueError("Container export failed; incomplete checkpoint is unusable")
+            compress_export(container, parts)
             parts.finish()
             parts.wait_uploads()
         finally:
-            if process.poll() is None:
-                process.terminate(); process.wait()
             parts.shutdown()
         manifest = directory / "checkpoint.json"
         manifest.write_text(json.dumps(dict(schema=1, input_identity=identity, parts=parts.records, environment=info["Config"].get("Env") or [],

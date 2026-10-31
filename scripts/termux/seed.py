@@ -120,9 +120,10 @@ def expand_bundles(raw, inventory):
 
 
 def dependency_roots(mode, requested):
-    # Swift's enormous source/objects need a small fresh prefix. The full seed
-    # remains published and pinned; only this isolated builder imports a subset.
-    return ['swift'] if mode == 'packages' and list(requested) == ['swift'] else []
+    # Focused builds need their complete dependency closure, not thousands of
+    # unrelated installed packages and duplicate archives to republish. The
+    # full seed stays published; the existing host/builder checks pin the subset.
+    return sorted(set(requested)) if mode == 'packages' else []
 
 
 def selected_recipes(plan, allowed, roots):

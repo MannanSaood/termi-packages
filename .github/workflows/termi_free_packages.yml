@@ -189,6 +189,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ -f build/candidate/container-id.txt ]; then
+            if ! command -v pigz >/dev/null; then
+              timeout 120 sudo apt-get install -y pigz || echo "Using Python gzip fallback"
+            fi
             python3 scripts/termux/checkpoint.py save --container "$(cat build/candidate/container-id.txt)" \
               --repository "$GITHUB_REPOSITORY" --tag "checkpoint-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
               --input-identity "$(cat build/candidate/build-input-identity.txt)" | tee build/checkpoint-result.log
