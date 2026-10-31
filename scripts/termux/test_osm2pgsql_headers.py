@@ -5,7 +5,7 @@ import catalog_repairs
 
 class FloatingHeadersTest(unittest.TestCase):
     def test_single_scoped_header_order_repair_preserves_recipe(self):
-        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'darktable', 'rawtherapee', 'libdevil', 'dosbox-x', 'xmoto', 'llama-cpp', 'codon', 'steghide', 'taskwarrior', 'pkgfile', 'glmark2', 'mangohud', 'krfb', 'okular', 'calligra'):
+        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'darktable', 'rawtherapee', 'libdevil', 'dosbox-x', 'xmoto', 'llama-cpp', 'codon', 'steghide', 'taskwarrior', 'pkgfile', 'glmark2', 'mangohud', 'krfb', 'okular', 'calligra', 'mariadb', 'godot'):
             with self.subTest(recipe=recipe):
                 self.check_recipe(recipe)
 
@@ -21,6 +21,8 @@ class FloatingHeadersTest(unittest.TestCase):
             source += 'TERMUX_PKG_BUILD_DEPENDS="ocl-icd, opencl-headers, spirv-headers, vulkan-headers"\n'
         if recipe == 'mangohud':
             source += 'TERMUX_PKG_BUILD_DEPENDS="dbus, libandroid-wordexp, nlohmann-json"\n'
+        if recipe == 'godot':
+            source += 'TERMUX_PKG_BUILD_DEPENDS="pulseaudio, yasm"\n'
         kde_deps = {
             'krfb': 'extra-cmake-modules, kf6-kdoctools, libxdamage, plasma-wayland-protocols',
             'okular': 'ebook-tools, extra-cmake-modules, kdegraphics-mobipocket',
@@ -39,7 +41,7 @@ class FloatingHeadersTest(unittest.TestCase):
                 result = transform(source)
                 self.assertIn('TERMUX_PKG_DEPENDS="boost, libc++, proj"\n', result)
                 self.assertIn('TERMUX_PKG_EXTRA_CONFIGURE_ARGS="-DEXTERNAL_FMT=OFF"\n', result)
-                prepared_source = source + ('\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, zstd"\n' if recipe == 'xerces-c' else '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n' if recipe in {'lnav', 'libpinyin', 'lensfun', 'libdevil', 'dosbox-x', 'xmoto', 'codon', 'steghide', 'taskwarrior', 'pkgfile', 'glmark2'} else '')
+                prepared_source = source + ('\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, zstd"\n' if recipe == 'xerces-c' else '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n' if recipe in {'lnav', 'libpinyin', 'lensfun', 'libdevil', 'dosbox-x', 'xmoto', 'codon', 'steghide', 'taskwarrior', 'pkgfile', 'glmark2', 'mariadb'} else '')
                 if recipe == 'rawtherapee':
                     prepared_source += '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate, libxres"\n'
                 elif recipe == 'darktable':
@@ -48,6 +50,8 @@ class FloatingHeadersTest(unittest.TestCase):
                     prepared_source = source.replace('="ocl-icd,', '="ndk-sysroot, ocl-icd,')
                 elif recipe == 'mangohud':
                     prepared_source = source.replace('="dbus,', '="ndk-sysroot, dbus,')
+                elif recipe == 'godot':
+                    prepared_source = source.replace('="pulseaudio,', '="ndk-sysroot, pulseaudio,')
                 elif recipe in kde_deps:
                     prepared_source = source.replace('="' + kde_deps[recipe] + '"', '="ndk-sysroot, ' + kde_deps[recipe] + '"')
                 self.assertEqual(observed, [(prepared_source, 'termux_step_pre_configure',

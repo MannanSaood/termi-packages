@@ -346,9 +346,9 @@ def apply(change, hook, prepared):
     def focused_cxx_header_provider(t):
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'C++ header prerequisites changed'
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n'
-    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'libdevil', 'codon', 'steghide', 'taskwarrior', 'pkgfile'):
+    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun', 'libdevil', 'codon', 'steghide', 'taskwarrior', 'pkgfile', 'mariadb'):
         change(name, lambda t, name=name: hook(
-            xerces_header_provider(t) if name == 'xerces-c' else focused_cxx_header_provider(t) if name in {'lnav', 'libpinyin', 'lensfun', 'libdevil', 'codon', 'steghide', 'taskwarrior', 'pkgfile'} else t,
+            xerces_header_provider(t) if name == 'xerces-c' else focused_cxx_header_provider(t) if name in {'lnav', 'libpinyin', 'lensfun', 'libdevil', 'codon', 'steghide', 'taskwarrior', 'pkgfile', 'mariadb'} else t,
             'termux_step_pre_configure', NTL_CXX_HEADERS + (STEGHIDE_FLAGS_SETUP if name == 'steghide' else '')))
     for name in ('dosbox-x', 'xmoto', 'glmark2'):
         change(name, lambda t: hook(focused_cxx_header_provider(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
@@ -357,6 +357,11 @@ def apply(change, hook, prepared):
         assert t.count(anchor) == 1, 'MangoHud build prerequisites changed'
         return hook(t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, dbus, libandroid-wordexp, nlohmann-json"'), 'termux_step_pre_configure', NTL_CXX_HEADERS)
     change('mangohud', mangohud_header_provider, tree='x11-packages')
+    def godot_header_provider(t):
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="pulseaudio, yasm"'
+        assert t.count(anchor) == 1, 'Godot build prerequisites changed'
+        return hook(t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, pulseaudio, yasm"'), 'termux_step_pre_configure', NTL_CXX_HEADERS)
+    change('godot', godot_header_provider, tree='x11-packages')
     for name, deps in (
         ('krfb', 'extra-cmake-modules, kf6-kdoctools, libxdamage, plasma-wayland-protocols'),
         ('okular', 'ebook-tools, extra-cmake-modules, kdegraphics-mobipocket'),
