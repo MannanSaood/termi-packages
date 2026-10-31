@@ -205,6 +205,14 @@ def apply(change, hook, prepared):
             link, '\tLDFLAGS="$LDFLAGS -lapr-1 -laprutil-1 -Wl,--push-state,--no-as-needed '
                   '-landroid-sysv-semaphore -Wl,--pop-state"')
     change('apache2', apache_semaphore_provider)
+    def php_pkgconfig_dependencies(t):
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="postgresql"'
+        assert t.count(anchor) == 1, 'PHP build dependency contract changed'
+        # gdlib.pc and its TIFF/HEIF requirements refer to these metadata
+        # providers even for shared linking. A focused prefix must declare
+        # them instead of relying on unrelated packages installed earlier.
+        return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libdeflate, libxpm, openh264, postgresql"')
+    change('php', php_pkgconfig_dependencies)
     # These recipes compile a Linux host helper after an Android target build.
     # Keep target include paths out of GCC and preserve the target environment.
     def tcc_host_environment(t):
