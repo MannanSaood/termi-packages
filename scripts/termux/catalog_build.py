@@ -33,6 +33,9 @@ SHARED_BUILD_OWNERS = {
     # PROJ now unblocks these independent recipes. Build each once, spread
     # across idle lanes; dependents adopt the next verified shared seed.
     "librttopo": 0, "libgeotiff": 1, "osm2pgsql": 5,
+    # Repaired shared C++ prerequisites: compile each in one idle prefix,
+    # then seed dependent lanes with its verified source output.
+    "libprotobuf-c": 0, "libvigra": 4,
 }
 
 

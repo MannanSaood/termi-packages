@@ -3,8 +3,13 @@ import unittest
 import catalog_repairs
 
 
-class Osm2pgsqlHeadersTest(unittest.TestCase):
+class FloatingHeadersTest(unittest.TestCase):
     def test_single_scoped_header_order_repair_preserves_recipe(self):
+        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra'):
+            with self.subTest(recipe=recipe):
+                self.check_recipe(recipe)
+
+    def check_recipe(self, recipe):
         # Stop after this recipe's real callback, before unrelated repairs.
         class Captured(Exception):
             pass
@@ -17,7 +22,7 @@ class Osm2pgsqlHeadersTest(unittest.TestCase):
             return text + name + '() {\n' + body + '}\n'
 
         def change(name, transform):
-            if name == 'osm2pgsql':
+            if name == recipe:
                 result = transform(source)
                 self.assertTrue(result.startswith(source))
                 self.assertEqual(observed, [(source, 'termux_step_pre_configure',

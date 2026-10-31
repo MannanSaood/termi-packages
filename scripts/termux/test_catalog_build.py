@@ -34,7 +34,7 @@ class GraphTests(unittest.TestCase):
                'libzim','openimageio','recoll','libatkmm-1.6','libxml++-2.6',
                'libpangomm-1.4','gegl','gtkmm4','gtkmm3','gtkmm2','libvips','eom','libkiwix','kdegraphics-thumbnailers','openjdk-21','openjdk-25','openjdk-17',
                'gimp','inkscape','kscreen','pavucontrol','gwenview','mate-utils',
-               'librttopo','libgeotiff','osm2pgsql']
+               'librttopo','libgeotiff','osm2pgsql','libprotobuf-c','libvigra']
         recipes={name:dict(dependencies=[]) for name in names}
         recipes.update({f'app{i}':dict(dependencies=names) for i in range(8)})
         counts={name:0 for name in names}

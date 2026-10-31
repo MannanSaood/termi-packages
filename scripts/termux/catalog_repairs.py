@@ -192,7 +192,8 @@ def apply(change, hook, prepared):
     # Two libc++ wrapper trees share include guards. Their include_next chain
     # can stop before Clang's float.h, hiding the macros Boost uses to select
     # floating-point types. Use the seeded libc++ tree consistently.
-    change('osm2pgsql', lambda t: hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS))
+    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra'):
+        change(name, lambda t: hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS))
     # These recipes compile a Linux host helper after an Android target build.
     # Keep target include paths out of GCC and preserve the target environment.
     def tcc_host_environment(t):
