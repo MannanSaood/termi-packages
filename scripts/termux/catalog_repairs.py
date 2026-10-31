@@ -340,7 +340,16 @@ def redland_build_prerequisites(text):
     return text.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libmpfr"\n' + anchor)
 
 
+def libreoffice_build_prerequisites(text):
+    anchor = 'TERMUX_PKG_BUILD_DEPENDS="ant, boost-headers, cppunit, gtk3, kf6-kconfig, kf6-kcoreaddons, kf6-ki18n, kf6-kio, kf6-kwindowsystem, qt6-qtbase, qt6-qtbase-cross-tools, qt6-qtmultimedia, postgresql, openjdk-21, openjdk-21-x, unixodbc, mariadb, libc++"'
+    assert text.count(anchor) == 1, 'LibreOffice build prerequisites changed'
+    # GTK's retained pkg-config closure needs libdeflate through libtiff and
+    # XRes through at-spi2. Import both completed source-built providers.
+    return text.replace(anchor, anchor.replace('"ant,', '"libdeflate, libxres, ant,'))
+
+
 def apply(change, hook, prepared):
+    change('libreoffice', libreoffice_build_prerequisites, tree='x11-packages')
     change('redland', redland_build_prerequisites)
     change('proj', lambda t: hook(t, 'termux_step_pre_configure', PROJ_EPSILON_SETUP))
     # Two libc++ wrapper trees share include guards. Their include_next chain
