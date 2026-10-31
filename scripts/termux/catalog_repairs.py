@@ -258,6 +258,25 @@ def apply(change, hook, prepared):
         change(name, lambda t, name=name: hook(
             xerces_header_provider(t) if name == 'xerces-c' else t,
             'termux_step_pre_configure', NTL_CXX_HEADERS))
+    # A catalog prefix may also contain libei (input emulation). Resolve
+    # erl_call's EI symbols from the exact archive built by this recipe.
+    change('erlang', lambda t: hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/lib/erl_interface/src/Makefile.in" <<'TERMI_ERLANG_EI'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+for archive, tail in [('MT_EILIB', ' $(THR_LIBS) $(LIBS)'), ('ST_EILIB', ' $(LIBS)')]:
+    prefix='$(ERL_CALL): $(ERLCALL) ../include/ei.h $('+archive+')\n'
+    start=s.find(prefix)
+    assert start >= 0 and s.count(prefix)==1, 'Erlang erl_call archive rule changed'
+    end=s.index('\nendif', start)
+    block=s[start:end]
+    anchor='-L$(OBJDIR) -lei'+tail
+    assert block.count(anchor)==1, 'Erlang erl_call link anchor changed'
+    s=s[:start]+block.replace(anchor,'$('+archive+')'+tail)+s[end:]
+p.write_text(s)
+TERMI_ERLANG_EI
+'''))
+
     def apache_semaphore_provider(t):
         dependency = 'TERMUX_PKG_DEPENDS="apr, apr-util, libandroid-support, '
         link = '\tLDFLAGS="$LDFLAGS -lapr-1 -laprutil-1"'
