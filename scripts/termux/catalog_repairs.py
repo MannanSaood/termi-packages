@@ -216,6 +216,14 @@ p.write_text(s.replace(old, '/* Termi: declare pthread_once explicitly for Andro
 '''
 
 
+def neatvnc_build_prerequisites(text):
+    anchor = 'TERMUX_PKG_AUTO_UPDATE=true'
+    assert text.count(anchor) == 1 and 'TERMUX_PKG_BUILD_DEPENDS=' not in text, 'neatvnc build prerequisites changed'
+    # GnuTLS publishes Requires.private: libzstd. Meson needs that metadata
+    # even for a shared consumer; the source-built zstd provider is required.
+    return text.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="zstd"\n' + anchor)
+
+
 def apply(change, hook, prepared):
     change('proj', lambda t: hook(t, 'termux_step_pre_configure', PROJ_EPSILON_SETUP))
     # Two libc++ wrapper trees share include guards. Their include_next chain
@@ -938,7 +946,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 
     # aligned_alloc starts at Android API 28; posix_memalign is available at
     # our API 26 floor. Preserve alignment, rounded size and failure cleanup.
-    change('libneatvnc', lambda t: hook(t, 'termux_step_pre_configure',
+    change('libneatvnc', lambda t: hook(neatvnc_build_prerequisites(t), 'termux_step_pre_configure',
         '\tpython3 - "$TERMUX_PKG_SRCDIR/src/buffer.c" <<\'TERMI_NEATVNC_ALLOC\'\n'
         + NEATVNC_ALLOCATION_PATCH + 'TERMI_NEATVNC_ALLOC'), tree='x11-packages')
 

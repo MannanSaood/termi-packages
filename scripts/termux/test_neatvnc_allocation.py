@@ -1,11 +1,12 @@
 from pathlib import Path
 import shutil
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 
-from catalog_repairs import NEATVNC_ALLOCATION_PATCH
+from catalog_repairs import NEATVNC_ALLOCATION_PATCH, neatvnc_build_prerequisites
 
 
 class NeatvncAllocationTest(unittest.TestCase):
@@ -42,6 +43,28 @@ struct nvnc_buffer *nvnc_buffer_new(size_t size) {
             path.write_text(self.source)
             self.assertEqual(0, self.patch(path).returncode)
             self.assertNotEqual(0, self.patch(path).returncode)
+
+    def test_explicit_provider_prerequisite_fails_closed(self):
+        source='TERMUX_PKG_AUTO_UPDATE=true\n-Dtls=enabled\n'
+        fixed=neatvnc_build_prerequisites(source)
+        self.assertEqual('TERMUX_PKG_BUILD_DEPENDS="zstd"\n'+source,fixed)
+        for text in [fixed,source.replace('true','false')]:
+            with self.assertRaises(AssertionError):
+                neatvnc_build_prerequisites(text)
+
+    @unittest.skipUnless(shutil.which('pkg-config'),'pkg-config unavailable')
+    def test_shared_gnutls_requires_zstd_private_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'gnutls.pc').write_text('Name: gnutls\nDescription: metadata fixture\nVersion: 3.8.13\nRequires.private: libzstd\nLibs: -lgnutls\n')
+            env=dict(os.environ,PKG_CONFIG_LIBDIR=str(root),PKG_CONFIG_PATH='',PKG_CONFIG_SYSROOT_DIR='')
+            command=['pkg-config','--cflags','gnutls']
+            before=subprocess.run(command,env=env,capture_output=True,text=True)
+            self.assertNotEqual(0,before.returncode)
+            self.assertIn('libzstd',before.stderr)
+            (root/'libzstd.pc').write_text('Name: libzstd\nDescription: metadata fixture\nVersion: 1.5.7\nLibs: -lzstd\n')
+            after=subprocess.run(command,env=env,capture_output=True,text=True)
+            self.assertEqual(0,after.returncode,after.stderr)
 
     @unittest.skipUnless(shutil.which('cc'), 'host C compiler unavailable')
     def test_alignment_rounded_size_and_failure_cleanup(self):
