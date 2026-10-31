@@ -5,7 +5,7 @@ import catalog_repairs
 
 class FloatingHeadersTest(unittest.TestCase):
     def test_single_scoped_header_order_repair_preserves_recipe(self):
-        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin'):
+        for recipe in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun'):
             with self.subTest(recipe=recipe):
                 self.check_recipe(recipe)
 
@@ -25,7 +25,7 @@ class FloatingHeadersTest(unittest.TestCase):
             if name == recipe:
                 result = transform(source)
                 self.assertTrue(result.startswith(source))
-                prepared_source = source + ('\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, zstd"\n' if recipe == 'xerces-c' else '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n' if recipe in {'lnav', 'libpinyin'} else '')
+                prepared_source = source + ('\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, zstd"\n' if recipe == 'xerces-c' else '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n' if recipe in {'lnav', 'libpinyin', 'lensfun'} else '')
                 self.assertEqual(observed, [(prepared_source, 'termux_step_pre_configure',
                     '\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"\n')])
                 self.assertNotIn('#define', result)

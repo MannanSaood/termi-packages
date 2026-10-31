@@ -257,10 +257,19 @@ def apply(change, hook, prepared):
     def focused_cxx_header_provider(t):
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'C++ header prerequisites changed'
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n'
-    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin'):
+    for name in ('osm2pgsql', 'libprotobuf-c', 'libvigra', 'xerces-c', 'gdal', 'lnav', 'libpinyin', 'lensfun'):
         change(name, lambda t, name=name: hook(
-            xerces_header_provider(t) if name == 'xerces-c' else focused_cxx_header_provider(t) if name in {'lnav', 'libpinyin'} else t,
+            xerces_header_provider(t) if name == 'xerces-c' else focused_cxx_header_provider(t) if name in {'lnav', 'libpinyin', 'lensfun'} else t,
             'termux_step_pre_configure', NTL_CXX_HEADERS))
+    change('vitetris', lambda t: hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/src/netw/tty_socket.c" <<'TERMI_VITETRIS_TIME'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+anchor='#include <errno.h>\n'
+assert s.count(anchor)==1 and '#include <time.h>' not in s, 'vitetris time declaration anchor changed'
+p.write_text(s.replace(anchor,anchor+'#include <time.h>\n'))
+TERMI_VITETRIS_TIME
+'''))
     # A catalog prefix may also contain libei (input emulation). Resolve
     # erl_call's EI symbols from the exact archive built by this recipe.
     change('erlang', lambda t: hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/lib/erl_interface/src/Makefile.in" <<'TERMI_ERLANG_EI'
