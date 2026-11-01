@@ -164,6 +164,48 @@ def supplemented_closure(graph, plan, built, initial):
     raise ValueError('Provider closure did not converge')
 
 
+def scoped_closure(entries, plan, built, initial):
+    """Keep alternative packages separate until a prefix actually selects them."""
+    exported, paths = {}, {}
+    for entry in entries:
+        paths.setdefault(entry['path'], []).append(entry)
+        if posixpath.dirname(entry['path']) in (PREFIX + 'lib/pkgconfig', PREFIX + 'share/pkgconfig'):
+            exported.setdefault(PurePosixPath(entry['path']).stem, []).append(entry)
+    selected = set(initial)
+    for _ in range(len(built) + 1):
+        active = [entry for entry in entries if entry['recipe'] in selected]
+        active_paths = {entry['path'] for entry in active}
+        additions = set()
+        for entry in active:
+            if 'target' in entry and entry['target'] not in active_paths:
+                owners = {r['recipe'] for r in paths.get(entry['target'], [])}
+                if len(owners) != 1:
+                    raise ValueError('Missing or ambiguous selected alias target: ' + entry['target'])
+                additions.update(owners)
+        if additions:
+            selected.update(selected_recipes(plan, built, sorted(selected | additions)))
+            continue
+        graph = provider_graph(active)
+        needed = {name for node in graph.values() for name in node['requires']} - graph.keys()
+        unknown, ambiguous = set(), {}
+        for name in needed:
+            owners = {entry['recipe'] for entry in exported.get(name, [])}
+            if not owners:
+                unknown.add(name)
+            elif len(owners) == 1:
+                additions.update(owners)
+            else:
+                ambiguous[name] = sorted(owners)
+        expanded = selected_recipes(plan, built, sorted(selected | additions)) if selected | additions else set()
+        if expanded == selected:
+            return dict(recipes=sorted(selected), additional_recipes=sorted(selected - set(initial)),
+                        missing_providers=sorted(unknown), ambiguous_providers=ambiguous,
+                        pkgconfig_names=sorted(graph),
+                        complete_provider_resolution=not unknown and not ambiguous)
+        selected = expanded
+    raise ValueError('Scoped provider closure did not converge')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--raw', type=Path, required=True)
@@ -189,18 +231,33 @@ def main():
             raise ValueError('Total pkg-config metadata exceeds bound')
         if index % 200 == 0:
             print('Verified package metadata', index, flush=True)
-    graph = provider_graph(entries)
+    # Save complete, hash-bound extraction evidence even if later analysis finds
+    # a real ambiguity. A parser repair can reuse this metadata without fetching
+    # and decoding all package archives again.
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    extraction = args.output.with_name('pkgconfig-entries.json')
+    extraction.write_text(json.dumps(dict(schema=1, source_pins=pins,
+        verified_archives=len(inventory['packages']), verified_recipes=len(built),
+        entries=entries), indent=2) + '\n')
+    candidates = {}
+    for entry in entries:
+        if posixpath.dirname(entry['path']) in (PREFIX + 'lib/pkgconfig', PREFIX + 'share/pkgconfig'):
+            candidates.setdefault(PurePosixPath(entry['path']).stem, set()).add(entry['recipe'])
     reports = {}
     for root in args.recipes:
         initial = selected_recipes(plan, built, [root])
-        reports[root] = supplemented_closure(graph, plan, built, initial)
+        try:
+            reports[root] = scoped_closure(entries, plan, built, initial)
+        except ValueError as error:
+            reports[root] = dict(error=str(error), complete_provider_resolution=False)
         reports[root]['initial_recipes'] = sorted(initial)
-    result = dict(schema=1, source_pins=pins, verified_archives=len(inventory['packages']),
-                  verified_recipes=len(built), providers=graph, requested=reports,
+    result = dict(schema=2, source_pins=pins, verified_archives=len(inventory['packages']),
+                  verified_recipes=len(built), metadata_sha256=hashlib.sha256(extraction.read_bytes()).hexdigest(),
+                  provider_candidates={n: sorted(v) for n, v in candidates.items()}, requested=reports,
                   approved=False, scope='build-pkgconfig-metadata-only')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + '\n')
-    print(json.dumps({n: {k: r[k] for k in ('additional_recipes', 'missing_providers')}
+    print(json.dumps({n: {k: r[k] for k in ('additional_recipes', 'missing_providers', 'ambiguous_providers', 'error') if k in r}
                       for n, r in reports.items()}), flush=True)
 
 

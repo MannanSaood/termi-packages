@@ -80,6 +80,9 @@ jobs:
               --title "Termi own-source build metadata audit" \
               --notes "Pinned package metadata only; no binaries executed or live repository published."
             gh release upload "$tag" build/pkgconfig-audit.log --repo "$GITHUB_REPOSITORY"
+            if [ -f build/pkgconfig-entries.json ]; then
+              gh release upload "$tag" build/pkgconfig-entries.json --repo "$GITHUB_REPOSITORY"
+            fi
             if [ -f build/pkgconfig-audit.json ]; then
               gh release upload "$tag" build/pkgconfig-audit.json --repo "$GITHUB_REPOSITORY"
             fi

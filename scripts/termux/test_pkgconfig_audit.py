@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from pkgconfig_audit import (PREFIX, archive_metadata, closure, provider_graph, requirements,
-                             supplemented_closure)
+                             supplemented_closure, scoped_closure)
 
 
 class MetadataTests(unittest.TestCase):
@@ -60,6 +60,39 @@ class MetadataTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             provider_graph([dict(path=path, text='Version: 1\n', recipe='foo'),
                             dict(path=path, text='Version: 2\n', recipe='other')])
+
+    def test_unrelated_conflicting_packages_do_not_poison_independent_prefix(self):
+        base = PREFIX + 'lib/pkgconfig/'
+        entries = [dict(path=base+'gtk.pc', text='Requires.private: xres\n', recipe='gtk3'),
+                   dict(path=base+'xres.pc', text='Name: xres\n', recipe='libxres'),
+                   dict(path=base+'purple.pc', text='Version: 2\n', recipe='purple2'),
+                   dict(path=base+'purple.pc', text='Version: 3\n', recipe='purple3')]
+        plan = dict(recipes={n: dict(dependencies=[]) for n in ['gtk3','libxres','purple2','purple3']})
+        report = scoped_closure(entries, plan, set(plan['recipes']), {'gtk3'})
+        self.assertTrue(report['complete_provider_resolution'])
+        self.assertEqual(['libxres'], report['additional_recipes'])
+        with self.assertRaises(ValueError):
+            scoped_closure(entries, plan, set(plan['recipes']), {'purple2','purple3'})
+
+    def test_ambiguous_needed_provider_is_reported_without_selecting_a_variant(self):
+        base = PREFIX + 'lib/pkgconfig/'
+        entries = [dict(path=base+'a.pc', text='Requires: purple\n', recipe='a'),
+                   dict(path=base+'purple.pc', text='Version: 2\n', recipe='purple2'),
+                   dict(path=base+'purple.pc', text='Version: 3\n', recipe='purple3')]
+        plan = dict(recipes={n: dict(dependencies=[]) for n in ['a','purple2','purple3']})
+        report = scoped_closure(entries, plan, set(plan['recipes']), {'a'})
+        self.assertFalse(report['complete_provider_resolution'])
+        self.assertEqual({'purple':['purple2','purple3']}, report['ambiguous_providers'])
+        self.assertEqual([], report['additional_recipes'])
+
+    def test_scoped_provider_also_imports_its_declared_dependencies(self):
+        base = PREFIX + 'lib/pkgconfig/'
+        entries = [dict(path=base+'a.pc', text='Requires: xres\n', recipe='a'),
+                   dict(path=base+'xres.pc', text='Name: xres\n', recipe='libxres')]
+        plan = dict(recipes={'a':dict(dependencies=[]), 'libxres':dict(dependencies=['libx11']),
+                             'libx11':dict(dependencies=[])})
+        report = scoped_closure(entries, plan, set(plan['recipes']), {'a'})
+        self.assertEqual(['libx11','libxres'], report['additional_recipes'])
 
     @unittest.skipUnless(shutil.which('dpkg-deb'), 'Linux dpkg-deb unavailable')
     def test_real_deb_reads_metadata_and_alias_without_executing_scripts(self):
