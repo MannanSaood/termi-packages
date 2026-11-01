@@ -363,7 +363,16 @@ def webkitgtk6_header_provider(text):
     return text.replace(deps, deps.replace('"g-ir-scanner,', '"ndk-sysroot, libdeflate, libxres, liborc, g-ir-scanner,')).replace(anchor, anchor + launcher)
 
 
+def fossil_host_flags(text):
+    anchor = 'CC="$CC $CPPFLAGS $CFLAGS $LDFLAGS"\n\tunset CFLAGS LDFLAGS'
+    assert text.count(anchor) == 1, 'Fossil cross/native flag boundary changed'
+    # Target flags are already captured in CC. Fossil also substitutes
+    # CPPFLAGS into BCCFLAGS for its Linux translate/mkindex generators.
+    return text.replace(anchor, anchor.replace('unset CFLAGS', 'unset CPPFLAGS CFLAGS'))
+
+
 def apply(change, hook, prepared):
+    change('fossil', fossil_host_flags)
     change('webkitgtk-6.0', webkitgtk6_header_provider, tree='x11-packages')
     change('libreoffice', lambda t: hook(libreoffice_build_prerequisites(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
     change('redland', redland_build_prerequisites)
