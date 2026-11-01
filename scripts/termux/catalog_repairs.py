@@ -1517,6 +1517,13 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
     for name in ('python-torchcodec', 'python-torchvision'):
         change(name, lambda t, name=name: torch_consumer_providers(t, name))
 
+    # Torchaudio uses the same Torch CppExtension backend as Torchvision.
+    # Preserve its features while selecting the verified single C++ header tree.
+    def torchaudio_headers(t):
+        assert 'TERMUX_PKG_VERSION="2.11.0"' in t and '\texport USE_CUDA=0\n' in t, 'Torchaudio preconfigure contract changed'
+        return hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS)
+    change('python-torchaudio', torchaudio_headers)
+
     # Slice uses global uint8_t during the native Chromium tools build. Newer
     # host libstdc++ no longer supplies that C type through unrelated headers.
     # Run after upstream source patches, retaining all host/target build flags.
