@@ -74,6 +74,24 @@ p.write_text(s.replace(anchor, replacement))
 """
 OPENSC_TOKENIZER_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/src/pkcs15init/pkcs15-lib.c\" <<'TERMI_OPENSC_PROFILE'\n" + OPENSC_TOKENIZER_PATCH + "TERMI_OPENSC_PROFILE\n"
 
+FOOT_OSC_TOKENIZER_PATCH = r'''from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+headers = [
+    '        for (const char *s_idx = strtok(string, ";"), *s_color = strtok(NULL, ";");\n             s_idx != NULL && s_color != NULL;\n             s_idx = strtok(NULL, ";"), s_color = strtok(NULL, ";"))',
+    '            for (const char *s_idx = strtok(string, ";");\n                 s_idx != NULL;\n                 s_idx = strtok(NULL, ";"))',
+]
+assert s.count('strtok(') == 6 and 'termi_osc_save' not in s, 'Foot OSC tokenizer contract changed'
+for header in headers:
+    assert s.count(header) == 1, 'Foot OSC loop changed'
+    indent = header[:len(header) - len(header.lstrip())]
+    replacement = header.replace('strtok(string, ";")', 'strtok_r(string, ";", &termi_osc_save)').replace('strtok(NULL, ";")', 'strtok_r(NULL, ";", &termi_osc_save)')
+    s = s.replace(header, indent + 'char *termi_osc_save = NULL;\n' + replacement)
+p.write_text(s)
+'''
+FOOT_OSC_TOKENIZER_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/osc.c\" <<'TERMI_FOOT_OSC'\n" + FOOT_OSC_TOKENIZER_PATCH + "TERMI_FOOT_OSC\n"
+
 OPENSC_PKCS11_TOKENIZER_PATCH = r'''from pathlib import Path
 import sys
 root = Path(sys.argv[1])
@@ -405,6 +423,7 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    change('foot', lambda text: hook(text, 'termux_step_pre_configure', FOOT_OSC_TOKENIZER_SETUP), tree='x11-packages')
     def libsearpc_immutable_source(text):
         url = 'https://github.com/haiwen/libsearpc/archive/refs/tags/v${TERMUX_PKG_VERSION:2:3}-latest.tar.gz'
         checksum = '7f800339ff712dbea024e7bd8b8aca989cd235f0a366dde3b56936192d358ad3'
