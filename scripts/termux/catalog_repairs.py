@@ -1485,6 +1485,22 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
     for name, tree in [('python-torch', 'packages'), ('step', 'x11-packages')]:
         change(name, lambda t, name=name: float_header_build_providers(t, name), tree=tree)
 
+    def panda3d_float_headers(t):
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="libandroid-glob"'
+        assert 'TERMUX_PKG_VERSION="1.10.16"' in t and t.count(anchor) == 1, 'Panda3D header provider contract changed'
+        t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libandroid-glob, ndk-sysroot, libcap-ng, libice, libsm, libxt, util-linux"')
+        return hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS)
+    change('panda3d', panda3d_float_headers)
+
+    def xfce_datetime_archived_source(t):
+        old = 'https://archive.xfce.org/src/panel-plugins/xfce4-datetime-plugin/'
+        assert '_MAJOR_VERSION=0.8\nTERMUX_PKG_VERSION=${_MAJOR_VERSION}.3\n' in t and t.count(old) == 1, 'Xfce datetime source contract changed'
+        assert 'TERMUX_PKG_SHA256=6b2eeb79fb586868737426cbd2a4cd43c7f8c58507d8a2f578e0150187cc00b0\n' in t and 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'Xfce datetime checksum/provider contract changed'
+        # The project's official retired-project archive has the exact same
+        # release bytes. Keep its version, checksum and generated configure.
+        return t.replace(old, 'https://archive.xfce.org/src/archive/xfce4-datetime-plugin/') + '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate, libxpm, libxres, libxt, openh264"\n'
+    change('xfce4-datetime-plugin', xfce_datetime_archived_source, tree='x11-packages')
+
     def rhythmbox_build_provider(t):
         anchor = 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross, valac"'
         assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="3.5.1"' in t, 'Rhythmbox build provider contract changed'
