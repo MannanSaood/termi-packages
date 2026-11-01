@@ -457,6 +457,13 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    def megacmd_target_headers(text):
+        version = 'TERMUX_PKG_VERSION=(\n\t"2.6.0"\n\t"10.19.0"\n)\n'
+        anchor = '\nTERMUX_PKG_DEPENDS='
+        assert text.count(version) == 1 and text.count(anchor) == 1 and 'TERMUX_PKG_BUILD_DEPENDS=' not in text, 'MEGAcmd source/provider contract changed'
+        text = text.replace(anchor, '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\nTERMUX_PKG_DEPENDS=')
+        return hook(text, 'termux_step_pre_configure', '\tCXXFLAGS+=" -nostdinc++"\n')
+    change('megacmd', megacmd_target_headers)
     def seafile_immutable_source(text):
         url = 'https://github.com/haiwen/seafile/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz'
         checksum = '60d79e7933d15da3f8aad17888aeab5fcad9e2e9ec5ecc1ec76f7aef1b3bd91f'
