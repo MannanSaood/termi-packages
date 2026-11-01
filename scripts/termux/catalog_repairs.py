@@ -405,6 +405,13 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    def libsearpc_immutable_source(text):
+        url = 'https://github.com/haiwen/libsearpc/archive/refs/tags/v${TERMUX_PKG_VERSION:2:3}-latest.tar.gz'
+        checksum = '7f800339ff712dbea024e7bd8b8aca989cd235f0a366dde3b56936192d358ad3'
+        assert 'TERMUX_PKG_VERSION=1:3.3.0\n' in text and text.count(url) == text.count(checksum) == 1, 'libsearpc source contract changed'
+        # Official v3.3-latest commit; all 72 files match verified Git objects.
+        return text.replace(url, 'https://codeload.github.com/haiwen/libsearpc/tar.gz/3a4548697a498c951bd421248bcbdb1873f7616d').replace(checksum, '6f8b76a86a50bec3bb74519d8361ae9af8248d3d570ad8382125bbe72c031cac')
+    change('libsearpc', libsearpc_immutable_source)
     # Pin release Git trees verified independently of mutable tag archive hashes.
     for package, tree, repository, commit, before, after in [
         ('libfcft', 'x11-packages', 'dnkl/fcft', 'ccd1afaad891d77c040bad04120e9f602438fc33',
