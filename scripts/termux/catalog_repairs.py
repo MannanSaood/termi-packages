@@ -396,6 +396,13 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    def ollama_target_headers(text):
+        providers = 'TERMUX_PKG_BUILD_DEPENDS="spirv-headers, vulkan-headers"'
+        flags = r'set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} --target=${CCTERMUX_HOST_PLATFORM} ${CPPFLAGS} ${CXXFLAGS}")'
+        assert text.count(providers) == 1 and text.count(flags) == 1, 'Ollama target toolchain changed'
+        return text.replace(providers, providers.replace('spirv-headers', 'ndk-sysroot, spirv-headers')).replace(
+            flags, flags.replace('${CXXFLAGS}")', '${CXXFLAGS} -nostdinc++")'))
+    change('ollama', ollama_target_headers)
     def gotify_browser_install(text):
         old = '\t(cd ui && yarn install && yarn build)\n'
         assert text.count(old) == 1, 'Gotify UI build commands changed'
