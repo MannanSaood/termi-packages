@@ -1456,6 +1456,24 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         return hook(t, 'termux_step_pre_configure', QT5_PERFETTO_INTEGER_SETUP)
     change('qt5-qtwebengine', qt5_perfetto_integer_header, tree='x11-packages')
 
+    # Preserve one seeded libc++ wrapper tree: a second implicit NDK tree has
+    # the same float.h guard and hides Clang's FLT_MANT_DIG/DBL_DIG constants.
+    # Include the already-built header and complete private .pc providers.
+    def float_header_build_providers(t, name):
+        if name == 'python-torch':
+            version = 'TERMUX_PKG_VERSION="2.14.1"'
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="vulkan-headers, vulkan-loader-android"'
+            providers = 'ndk-sysroot, libandroid-glob, libcap-ng, libice, libsm, libxt, util-linux, vulkan-headers, vulkan-loader-android'
+        else:
+            version = 'TERMUX_PKG_VERSION="26.08.2"'
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="eigen, extra-cmake-modules, kf6-kdoctools"'
+            providers = 'ndk-sysroot, libdeflate, libxpm, libxres, libxt, openh264, eigen, extra-cmake-modules, kf6-kdoctools'
+        assert version in t and t.count(anchor) == 1, 'Floating header build provider contract changed: ' + name
+        return hook(t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="' + providers + '"'),
+                    'termux_step_pre_configure', NTL_CXX_HEADERS)
+    for name, tree in [('python-torch', 'packages'), ('step', 'x11-packages')]:
+        change(name, lambda t, name=name: float_header_build_providers(t, name), tree=tree)
+
     def rhythmbox_build_provider(t):
         anchor = 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross, valac"'
         assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="3.5.1"' in t, 'Rhythmbox build provider contract changed'
