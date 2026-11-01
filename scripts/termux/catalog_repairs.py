@@ -1502,6 +1502,21 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
     for name in electron_providers:
         change(name, lambda t, name=name: electron_build_providers(t, name), tree='x11-packages')
 
+    # Hash-audited private FFmpeg/image providers for isolated Torch consumers.
+    def torch_consumer_providers(t, name):
+        if name == 'python-torchcodec':
+            assert 'TERMUX_PKG_VERSION="0.17.0"' in t, 'Torchcodec version changed'
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="pybind11"'
+            replacement = 'TERMUX_PKG_BUILD_DEPENDS="pybind11, googletest, libbsd, libdeflate, libmd, libunibreak, openh264"'
+        else:
+            assert 'TERMUX_PKG_VERSION="0.29.1"' in t and 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'Torchvision build metadata changed'
+            anchor = 'TERMUX_PKG_SETUP_PYTHON=true'
+            replacement = anchor + '\nTERMUX_PKG_BUILD_DEPENDS="googletest, libbsd, libdeflate, libmd, libunibreak"'
+        assert t.count(anchor) == 1, 'Torch consumer provider anchor changed'
+        return t.replace(anchor, replacement)
+    for name in ('python-torchcodec', 'python-torchvision'):
+        change(name, lambda t, name=name: torch_consumer_providers(t, name))
+
     # Slice uses global uint8_t during the native Chromium tools build. Newer
     # host libstdc++ no longer supplies that C type through unrelated headers.
     # Run after upstream source patches, retaining all host/target build flags.
