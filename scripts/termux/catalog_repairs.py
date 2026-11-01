@@ -457,6 +457,26 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    def coherent_target_headers(text, version):
+        assert text.count('TERMUX_PKG_VERSION=' + version + '\n') == 1, 'C++ header repair source version changed'
+        if 'TERMUX_PKG_BUILD_DEPENDS=' in text:
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="glm"'
+            assert text.count(anchor) == 1, 'SuperTux header providers changed'
+            text = text.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, glm"')
+        else:
+            anchor = '\nTERMUX_PKG_DEPENDS='
+            assert text.count(anchor) == 1, 'C++ header dependency anchor changed'
+            text = text.replace(anchor, '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\nTERMUX_PKG_DEPENDS=')
+        # The standard target CMake step already uses the prefix C++ headers.
+        # Host generators run before this hook and keep their native flags.
+        return hook(text, 'termux_step_pre_configure', '\tCXXFLAGS+=" -nostdinc++"\n')
+    for name, tree, version in [
+        ('libduckdb', 'packages', '"1.5.6"'),
+        ('openttd', 'x11-packages', '"15.3"'),
+        ('supertux', 'x11-packages', '"0.7.0"'),
+        ('lenmus', 'x11-packages', '6.0.1'),
+    ]:
+        change(name, lambda text, version=version: coherent_target_headers(text, version), tree=tree)
     change('foot', lambda text: hook(text, 'termux_step_pre_configure', FOOT_OSC_TOKENIZER_SETUP), tree='x11-packages')
     def libsearpc_immutable_source(text):
         url = 'https://github.com/haiwen/libsearpc/archive/refs/tags/v${TERMUX_PKG_VERSION:2:3}-latest.tar.gz'
