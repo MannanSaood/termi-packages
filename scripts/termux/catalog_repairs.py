@@ -871,6 +871,11 @@ TERMI_WX_THREADS'''),tree='x11-packages')
     change('libkdegames',lambda t:hook(t,'termux_step_pre_configure',
         '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_DISABLE_FIND_PACKAGE_7Zip=ON -Dgzip_EXECUTABLE=/usr/bin/gzip"'),tree='x11-packages')
 
+    # These two game resource builds discover the same target-only 7zz.
+    for name in ('kmines', 'knights'):
+        change(name,lambda t:hook(t,'termux_step_pre_configure',
+            '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_DISABLE_FIND_PACKAGE_7Zip=ON -Dgzip_EXECUTABLE=/usr/bin/gzip"'),tree='x11-packages')
+
     change('libkmahjongg',lambda t:hook(t,'termux_step_pre_configure',
         '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_DISABLE_FIND_PACKAGE_7Zip=ON -Dgzip_EXECUTABLE=/usr/bin/gzip"'),tree='x11-packages')
     # PyQt 6.11 still binds two QEvent names removed from the pinned Qt 6.12
@@ -1389,6 +1394,14 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \t$CC $CFLAGS $CPPFLAGS -fvisibility=hidden -c "$TERMUX_PKG_BUILDER_DIR/../../packages/libnl/getsubopt.c" -o "$termi_getsubopt/getsubopt.o"
 \t$AR crs "$termi_getsubopt/libgetsubopt.a" "$termi_getsubopt/getsubopt.o"
 \tLDFLAGS+=" -L$termi_getsubopt"'''), tree='root-packages')
+
+    # libnl's private libtool link dependency requires this source-built shim.
+    for name, tree in (('openmpi', 'packages'), ('mate-applets', 'x11-packages')):
+        change(name, lambda t: hook(t, 'termux_step_pre_configure', '''\tlocal termi_getsubopt="$TERMUX_PKG_TMPDIR/getsubopt"
+\tmkdir -p "$termi_getsubopt"
+\t$CC $CFLAGS $CPPFLAGS -fvisibility=hidden -c "$TERMUX_PKG_BUILDER_DIR/../../packages/libnl/getsubopt.c" -o "$termi_getsubopt/getsubopt.o"
+\t$AR crs "$termi_getsubopt/libgetsubopt.a" "$termi_getsubopt/getsubopt.o"
+\tLDFLAGS+=" -L$termi_getsubopt"'''), tree=tree)
     # Auto-detection otherwise finds the target Android sccache in the seed.
     change('libdart', lambda t: hook(t, 'termux_step_pre_configure',
         '''\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"
