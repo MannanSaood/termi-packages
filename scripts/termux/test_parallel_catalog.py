@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import tarfile
 import io
+import shutil
 import unittest
 
 from parallel_catalog import merge
@@ -11,6 +12,40 @@ from seed import digest, expand_bundles
 
 
 class MergeTests(unittest.TestCase):
+    def test_disposable_merge_links_verified_outputs_and_reclaims_bundles(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            source=root/'source'
+            candidate=self.candidate(source,'ab')
+            bundle=source/'packages.tar'
+            with tarfile.open(bundle,'w') as archive:
+                for path in source.glob('*.deb'):
+                    archive.add(path,arcname=path.name)
+            for path in source.glob('*.deb'):
+                path.unlink()
+            _,inventory=merge([candidate],root/'union',disposable_inputs=True)
+            self.assertFalse(bundle.exists())
+            for record in inventory['packages']:
+                original=source/record['file'];chosen=root/'union'/record['file']
+                self.assertTrue(original.samefile(chosen))
+            shutil.rmtree(source)
+            for record in inventory['packages']:
+                self.assertEqual(record['sha256'],digest(root/'union'/record['file']))
+
+    def test_disposable_merge_rejects_corruption_before_reclaiming_bundle(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);source=root/'source'
+            candidate=self.candidate(source,'a')
+            path=next(source.glob('*.deb'));path.write_bytes(b'corrupt')
+            bundle=source/'packages.tar'
+            with tarfile.open(bundle,'w') as archive:
+                archive.add(path,arcname=path.name)
+            path.unlink()
+            with self.assertRaisesRegex(ValueError,'hash differs'):
+                merge([candidate],root/'union',disposable_inputs=True)
+            self.assertTrue(bundle.exists())
+            self.assertFalse((root/'union').exists())
+
     def test_lane_bundle_expands_only_hash_pinned_regular_archives(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)

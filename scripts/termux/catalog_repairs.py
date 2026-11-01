@@ -52,6 +52,15 @@ p.write_text(s.replace(anchor, replacement))
 """
 LLAMA_VULKAN_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/ggml/src/ggml-vulkan/ggml-vulkan-buffers.cpp\" <<'TERMI_LLAMA_ALIGNED'\n" + LLAMA_VULKAN_ALLOCATION_PATCH + "TERMI_LLAMA_ALIGNED\n"
 
+# Ollama's upstream 0006 patch must run first. Replace its API<26 branch
+# after patching, retaining the same checked API<28 allocator used above.
+OLLAMA_VULKAN_ALLOCATION_PATCH = LLAMA_VULKAN_ALLOCATION_PATCH.replace(
+    's = p.read_text()\n',
+    's = p.read_text()\n' +
+    "upstream = '#elif defined(__ANDROID__) && __ANDROID_API__ < 26\\n\\tvoid *result = nullptr;\\n\\t(void)::posix_memalign(&result, align, size);\\n\\treturn result;\\n'\n" +
+    "assert s.count(upstream) == 1, 'Ollama upstream allocator patch changed'\n" +
+    "s = s.replace(upstream, '')\n")
+
 OPENSC_TOKENIZER_PATCH = r"""from pathlib import Path
 import sys
 p = Path(sys.argv[1])
@@ -419,10 +428,8 @@ def apply(change, hook, prepared):
         assert text.count(providers) == 1 and text.count(flags) == 1, 'Ollama target toolchain changed'
         text = text.replace(providers, providers.replace('spirv-headers', 'ndk-sysroot, spirv-headers')).replace(
             flags, flags.replace('${CXXFLAGS}")', '${CXXFLAGS} -nostdinc++")'))
-        copied = '\tcp -Rf "$_llama_cpp_tmp_checkout" "$TERMUX_PKG_SRCDIR/llama-cpp-source"\n'
-        assert text.count(copied) == 1, 'Ollama nested llama source copy changed'
-        repair = '\tpython3 - "$TERMUX_PKG_SRCDIR/llama-cpp-source/ggml/src/ggml-vulkan/ggml-vulkan-buffers.cpp" <<\'TERMI_OLLAMA_ALIGNED\'\n' + LLAMA_VULKAN_ALLOCATION_PATCH + 'TERMI_OLLAMA_ALIGNED\n'
-        return text.replace(copied, copied + repair)
+        repair = '\tpython3 - "$TERMUX_PKG_SRCDIR/llama-cpp-source/ggml/src/ggml-vulkan/ggml-vulkan-buffers.cpp" <<\'TERMI_OLLAMA_ALIGNED\'\n' + OLLAMA_VULKAN_ALLOCATION_PATCH + 'TERMI_OLLAMA_ALIGNED\n'
+        return hook(text, 'termux_step_pre_configure', repair)
     change('ollama', ollama_target_headers)
     def gotify_browser_install(text):
         old = '\t(cd ui && yarn install && yarn build)\n'

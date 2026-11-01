@@ -85,7 +85,7 @@ def main():
         # Download/expand only one new candidate at a time. Keeping all lane
         # bundles AND extracted copies exhausted the standard runner's disk.
         next_output=Path('build/merge-working')/str(index)
-        _, inventory=merge(inputs,next_output,prefer_first_compatible=manifest.get("duplicate_policy")=="prefer-first-compatible-parent")
+        _, inventory=merge(inputs,next_output,prefer_first_compatible=manifest.get("duplicate_policy")=="prefer-first-compatible-parent",disposable_inputs=True)
         alternates.extend(inventory.get('alternate_builds',[]))
         # Reclaim only these explicitly created disposable input directories,
         # and only AFTER every chosen output has been hash-verified/copied.

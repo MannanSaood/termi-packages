@@ -6,6 +6,7 @@ Merging candidates never signs them, runs package scripts, or approves them.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -14,7 +15,7 @@ import subprocess
 from seed import compatibility, compatible_failures, digest, pinned, expand_bundles
 
 
-def merge(inputs, output, prefer_first_compatible=False):
+def merge(inputs, output, prefer_first_compatible=False, disposable_inputs=False):
     if output.exists():
         raise ValueError("Merge destination must be new")
     sources = []
@@ -24,6 +25,11 @@ def merge(inputs, output, prefer_first_compatible=False):
             [("inventory.json",inventory_pin),("catalog-ledger.json",ledger_pin),("catalog-plan.json",plan_pin)]]
         sources.append((directory,inventory,ledger,plan,dict(inventory=inventory_pin,ledger=ledger_pin,plan=plan_pin)))
         expand_bundles(directory,inventory)
+        if disposable_inputs:
+            # Only the merge runner opts in for its own scratch downloads.
+            # Expansion has verified every member before reclaiming bundles.
+            for bundle in directory.glob('*.tar'):
+                bundle.unlink()
     if not sources:
         raise ValueError("At least one pinned candidate required")
     target = sources[0][3]
@@ -59,7 +65,12 @@ def merge(inputs, output, prefer_first_compatible=False):
         origins.append(pins)
     output.mkdir(parents=True)
     for name,path in paths.items():
-        shutil.copyfile(path,output/name)
+        if disposable_inputs:
+            # These inputs are immutable scratch files on the same filesystem.
+            # Reclaiming their directories later leaves the chosen inode alive.
+            os.link(path,output/name)
+        else:
+            shutil.copyfile(path,output/name)
     merged = dict(schema=1,identity=[target["identity"],"verified-candidate-union"],
                   recipes={name:dict(status="built" if name in built else recipe["initial_status"],attempts=0)
                            for name,recipe in target["recipes"].items()}, source_candidates=origins)
