@@ -387,6 +387,15 @@ EMACS_SECCOMP_TARGET_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_EMACS_
 
 
 def apply(change, hook, prepared):
+    def mpv_aaudio_platform_gate(text):
+        line = next(line for line in text.splitlines() if '\tsed -i ' in line and 'aaudio_opt =' in line)
+        anchor = line + '\n\tfi\n'
+        assert text.count(anchor) == 1 and line.startswith('\t\t'), 'mpv AAudio fallback boundary changed'
+        # Both recipes mark Android false to avoid mpv's Android application
+        # path. Keep AAudio's real header check on API26 too, not just below it.
+        return text.replace(anchor, '\tfi\n' + line[1:] + '\n')
+    for name, tree in [('mpv', 'packages'), ('mpv-x', 'x11-packages')]:
+        change(name, mpv_aaudio_platform_gate, tree=tree)
     for name, tree in [('emacs', 'packages'), ('emacs-x', 'x11-packages')]:
         change(name, lambda t: hook(t, 'termux_step_post_get_source', EMACS_SECCOMP_TARGET_SETUP), tree=tree)
     def httrack_spawn_provider(text):
