@@ -36,11 +36,34 @@ anchor = b'config("compiler") {\n  asmflags = []\n  cflags = []\n  cflags_c = []
 assert raw.count(anchor) == 1, 'Qt5 Chromium host compiler config contract changed'
 addition = b'  if (current_toolchain == host_toolchain && !is_win) {\n    cflags_cc += [ "-include", "stdint.h" ]\n  }\n'
 outputs[p] = raw.replace(anchor, anchor + addition)
+# New gperf already emits its own conditional fallthrough attribute. The old
+# wrapper must not append a second annotation before the same switch label.
+p = root.parent.parent / 'third_party/blink/renderer/build/scripts/gperf.py'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == 'de7d6c0577dffc1d84778ec5d45c0058c0e688560ef52e383e492adb6772275e', 'Qt5 pinned gperf wrapper changed'
+anchor = b"        gperf_output = gperf_output.replace('/*FALLTHROUGH*/',\n                                            '  FALLTHROUGH;')\n"
+assert raw.count(anchor) == 1, 'Qt5 gperf fallthrough contract changed'
+outputs[p] = raw.replace(anchor, b"        if '[[fallthrough]]' not in gperf_output:\n" + b''.join(b'    ' + line for line in anchor.splitlines(keepends=True)))
 # Check every pinned input before modifying any source file.
 for p, raw in outputs.items():
     p.write_bytes(raw)
 '''
 QT5_PERFETTO_INTEGER_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR/src/3rdparty/chromium/third_party/perfetto" <<\'TERMI_QT5_PERFETTO_INTEGER\'\n' + QT5_PERFETTO_INTEGER_PATCH + 'TERMI_QT5_PERFETTO_INTEGER\n'
+
+CHROMIUM_SKIA_FLOAT_PATCH = r'''from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1]) / 'third_party/skia/src/utils/SkFloatUtils.h'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == 'eacd25581a236bb26d8120eb6a154618f4d022819e9116771b421ec7b3369b83', 'Chromium155 pinned Skia float helper changed'
+for anchor in (b'#include <float.h>', b'const int digits = DBL_MANT_DIG;', b'const int digits = FLT_MANT_DIG;'):
+    assert raw.count(anchor) == 1, 'Skia numeric precision contract changed'
+raw = raw.replace(b'#include <float.h>', b'#include <limits>')
+raw = raw.replace(b'const int digits = DBL_MANT_DIG;', b'const int digits = std::numeric_limits<double>::digits;')
+raw = raw.replace(b'const int digits = FLT_MANT_DIG;', b'const int digits = std::numeric_limits<float>::digits;')
+p.write_bytes(raw)
+'''
+CHROMIUM_SKIA_FLOAT_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" <<\'TERMI_CHROMIUM_SKIA_FLOAT\'\n' + CHROMIUM_SKIA_FLOAT_PATCH + 'TERMI_CHROMIUM_SKIA_FLOAT\n'
 
 NTL_GMP_DIAGNOSTICS = r'''from pathlib import Path
 import sys
@@ -1450,7 +1473,8 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
     def chromium_host_build_provider(t):
         anchor = 'TERMUX_PKG_BUILD_DEPENDS="libffi-static"'
         assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="155.0.8059.84"' in t, 'Chromium host build provider contract changed'
-        return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libffi-static, googletest, libbsd, libcap-ng, libdeflate, libice, libmd, libsm, libunibreak, libxres, libxt, util-linux"')
+        t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libffi-static, googletest, libbsd, libcap-ng, libdeflate, libice, libmd, libsm, libunibreak, libxres, libxt, util-linux"')
+        return hook(t, 'termux_step_pre_configure', CHROMIUM_SKIA_FLOAT_SETUP)
     change('chromium-host-tools', chromium_host_build_provider, tree='x11-packages')
 
     # Hash-verified own-source .pc metadata audit 41334206651: include the
