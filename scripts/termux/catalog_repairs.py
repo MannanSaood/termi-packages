@@ -1396,12 +1396,18 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \tLDFLAGS+=" -L$termi_getsubopt"'''), tree='root-packages')
 
     # libnl's private libtool link dependency requires this source-built shim.
-    for name, tree in (('openmpi', 'packages'), ('mate-applets', 'x11-packages')):
-        change(name, lambda t: hook(t, 'termux_step_pre_configure', '''\tlocal termi_getsubopt="$TERMUX_PKG_TMPDIR/getsubopt"
+    def libnl_private_link_support(t, name):
+        if name == 'mate-applets':
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="autoconf-archive, mate-common, glib"'
+            assert t.count(anchor) == 1, 'MATE applets build providers changed'
+            t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="autoconf-archive, mate-common, glib, libdeflate"')
+        return hook(t, 'termux_step_pre_configure', '''\tlocal termi_getsubopt="$TERMUX_PKG_TMPDIR/getsubopt"
 \tmkdir -p "$termi_getsubopt"
 \t$CC $CFLAGS $CPPFLAGS -fvisibility=hidden -c "$TERMUX_PKG_BUILDER_DIR/../../packages/libnl/getsubopt.c" -o "$termi_getsubopt/getsubopt.o"
 \t$AR crs "$termi_getsubopt/libgetsubopt.a" "$termi_getsubopt/getsubopt.o"
-\tLDFLAGS+=" -L$termi_getsubopt"'''), tree=tree)
+\tLDFLAGS+=" -L$termi_getsubopt"''')
+    for name, tree in (('openmpi', 'packages'), ('mate-applets', 'x11-packages')):
+        change(name, lambda t, name=name: libnl_private_link_support(t, name), tree=tree)
     # Auto-detection otherwise finds the target Android sccache in the seed.
     change('libdart', lambda t: hook(t, 'termux_step_pre_configure',
         '''\tCXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"
