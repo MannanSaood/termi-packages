@@ -1490,7 +1490,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         anchor = 'TERMUX_PKG_BUILD_DEPENDS="libnotify, libffi-static"'
         assert t.count(anchor) == 1 and f'TERMUX_PKG_VERSION={version}\n' in t, 'Electron host build provider contract changed: ' + name
         t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libnotify, libffi-static, ' + providers + '"')
-        if name in ('electron42-host-tools', 'electron-host-tools-for-code-oss'):
+        if name in ('electron42-host-tools', 'electron43-host-tools', 'electron-host-tools-for-code-oss'):
             # The default Ninja worker count killed Blink's large host jumbo
             # compile on the free runner. Bound only this recipe's invocations;
             # retain every target, compiler flag and jumbo source grouping.
