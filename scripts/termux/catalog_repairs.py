@@ -24,7 +24,17 @@ raw = p.read_bytes()
 assert hashlib.sha256(raw).hexdigest() == '5eab2bef990322bcccacd77f5ff55b89559ec29ad54dae1014575cdcdba4c977', 'Qt5 pinned Perfetto GN config changed'
 anchor = b'config("default_config") {\n  configs = [ ":public_config" ]\n'
 assert raw.count(anchor) == 1, 'Qt5 Perfetto private config contract changed'
-addition = b'  if (!is_android && !is_win) {\n    cflags_cc = [ "-include", "stdint.h" ]\n  }\n'
+addition = b'  if (current_toolchain == host_toolchain && !is_win) {\n    cflags_cc = [ "-include", "stdint.h" ]\n  }\n'
+outputs[p] = raw.replace(anchor, anchor + addition)
+# Chromium's other old native generators have the same integer-header
+# assumptions. Use toolchain identity: Qt5's Android target is Linux-labelled.
+# This hash includes the recipe's existing Android-target compiler patch.
+p = root.parent.parent / 'build/config/compiler/BUILD.gn'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '69fe1a23781b90b73073be98dd30360046cb5e8f57d16a545108807d2abc11af', 'Qt5 post-upstream Chromium compiler config changed'
+anchor = b'config("compiler") {\n  asmflags = []\n  cflags = []\n  cflags_c = []\n  cflags_cc = []\n'
+assert raw.count(anchor) == 1, 'Qt5 Chromium host compiler config contract changed'
+addition = b'  if (current_toolchain == host_toolchain && !is_win) {\n    cflags_cc += [ "-include", "stdint.h" ]\n  }\n'
 outputs[p] = raw.replace(anchor, anchor + addition)
 # Check every pinned input before modifying any source file.
 for p, raw in outputs.items():
