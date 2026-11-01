@@ -464,26 +464,33 @@ def apply(change, hook, prepared):
         # Official v9.0.22 commit; all 217 exported files match Git objects.
         return text.replace(url, 'https://codeload.github.com/haiwen/seafile/tar.gz/0a4ec322cc654b903c163d52a019f798a0db5739').replace(checksum, 'b896a960af96f01c8329686a5ce22995b854e64cb8c5f01811b82fd6c04fc4bb')
     change('seafile-client', seafile_immutable_source)
-    def coherent_target_headers(text, version):
+    def coherent_target_headers(text, version, provider=None, after_python=False):
         assert text.count('TERMUX_PKG_VERSION=' + version + '\n') == 1, 'C++ header repair source version changed'
-        if 'TERMUX_PKG_BUILD_DEPENDS=' in text:
-            anchor = 'TERMUX_PKG_BUILD_DEPENDS="glm"'
-            assert text.count(anchor) == 1, 'SuperTux header providers changed'
-            text = text.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, glm"')
+        if provider is not None:
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="' + provider + '"'
+            assert text.count(anchor) == 1, 'C++ header providers changed'
+            text = text.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="ndk-sysroot, ' + provider + '"')
         else:
             anchor = '\nTERMUX_PKG_DEPENDS='
-            assert text.count(anchor) == 1, 'C++ header dependency anchor changed'
+            assert 'TERMUX_PKG_BUILD_DEPENDS=' not in text and text.count(anchor) == 1, 'C++ header dependency anchor changed'
             text = text.replace(anchor, '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\nTERMUX_PKG_DEPENDS=')
         # The standard target CMake step already uses the prefix C++ headers.
         # Host generators run before this hook and keep their native flags.
-        return hook(text, 'termux_step_pre_configure', '\tCXXFLAGS+=" -nostdinc++"\n')
-    for name, tree, version in [
-        ('libduckdb', 'packages', '"1.5.6"'),
-        ('openttd', 'x11-packages', '"15.3"'),
-        ('supertux', 'x11-packages', '"0.7.0"'),
-        ('lenmus', 'x11-packages', '6.0.1'),
+        body = '\tCXXFLAGS+=" -nostdinc++"\n'
+        if after_python:
+            anchor = '\tfi\n}\n'
+            assert text.count(anchor) == 1 and text.count('\t\ttermux_setup_build_python\n') == 1, 'Glaxnimate host Python boundary changed'
+            return text.replace(anchor, '\tfi\n' + body + '}\n')
+        return hook(text, 'termux_step_pre_configure', body)
+    for name, tree, version, provider, after_python in [
+        ('libduckdb', 'packages', '"1.5.6"', None, False),
+        ('openttd', 'x11-packages', '"15.3"', None, False),
+        ('supertux', 'x11-packages', '"0.7.0"', 'glm', False),
+        ('lenmus', 'x11-packages', '6.0.1', None, False),
+        ('transmission', 'packages', '"4.1.3"', None, False),
+        ('glaxnimate', 'x11-packages', '"0.6.0"', 'extra-cmake-modules', True),
     ]:
-        change(name, lambda text, version=version: coherent_target_headers(text, version), tree=tree)
+        change(name, lambda text, version=version, provider=provider, after_python=after_python: coherent_target_headers(text, version, provider, after_python), tree=tree)
     change('foot', lambda text: hook(text, 'termux_step_pre_configure', FOOT_OSC_TOKENIZER_SETUP), tree='x11-packages')
     def libsearpc_immutable_source(text):
         url = 'https://github.com/haiwen/libsearpc/archive/refs/tags/v${TERMUX_PKG_VERSION:2:3}-latest.tar.gz'
