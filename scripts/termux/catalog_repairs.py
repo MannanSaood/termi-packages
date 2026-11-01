@@ -1513,7 +1513,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
             anchor = 'TERMUX_PKG_SETUP_PYTHON=true'
             replacement = anchor + '\nTERMUX_PKG_BUILD_DEPENDS="googletest, libbsd, libdeflate, libmd, libunibreak"'
         assert t.count(anchor) == 1, 'Torch consumer provider anchor changed'
-        return t.replace(anchor, replacement)
+        return hook(t.replace(anchor, replacement), 'termux_step_pre_configure', NTL_CXX_HEADERS)
     for name in ('python-torchcodec', 'python-torchvision'):
         change(name, lambda t, name=name: torch_consumer_providers(t, name))
 
