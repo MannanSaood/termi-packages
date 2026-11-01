@@ -1412,7 +1412,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         if name == 'mate-applets':
             anchor = 'TERMUX_PKG_BUILD_DEPENDS="autoconf-archive, mate-common, glib"'
             assert t.count(anchor) == 1, 'MATE applets build providers changed'
-            t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="autoconf-archive, mate-common, glib, libdeflate"')
+            t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="autoconf-archive, mate-common, glib, libdeflate, libxpm, libxres, libxt, openh264"')
         return hook(t, 'termux_step_pre_configure', '''\tlocal termi_getsubopt="$TERMUX_PKG_TMPDIR/getsubopt"
 \tmkdir -p "$termi_getsubopt"
 \t$CC $CFLAGS $CPPFLAGS -fvisibility=hidden -c "$TERMUX_PKG_BUILDER_DIR/../../packages/libnl/getsubopt.c" -o "$termi_getsubopt/getsubopt.o"
@@ -1421,8 +1421,24 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
     def chromium_host_build_provider(t):
         anchor = 'TERMUX_PKG_BUILD_DEPENDS="libffi-static"'
         assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="155.0.8059.84"' in t, 'Chromium host build provider contract changed'
-        return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libffi-static, libdeflate"')
+        return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libffi-static, googletest, libbsd, libcap-ng, libdeflate, libice, libmd, libsm, libunibreak, libxres, libxt, util-linux"')
     change('chromium-host-tools', chromium_host_build_provider, tree='x11-packages')
+
+    # Hash-verified own-source .pc metadata audit 41334206651: include the
+    # complete Requires/Requires.private provider closure in isolated prefixes.
+    # These are build providers, with native tools/features preserved intact.
+    electron_providers = {
+        'electron42-host-tools': ('42.11.12', 'libcap-ng, libdeflate, libice, libsm, libxres, libxt, util-linux'),
+        'electron43-host-tools': ('43.7.11', 'googletest, libbsd, libcap-ng, libdeflate, libice, libmd, libsm, libunibreak, libxres, libxt, util-linux'),
+        'electron-host-tools-for-code-oss': ('42.7.1', 'libcap-ng, libdeflate, libice, libsm, libxres, libxt, util-linux'),
+    }
+    def electron_build_providers(t, name):
+        version, providers = electron_providers[name]
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="libnotify, libffi-static"'
+        assert t.count(anchor) == 1 and f'TERMUX_PKG_VERSION={version}\n' in t, 'Electron host build provider contract changed: ' + name
+        return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libnotify, libffi-static, ' + providers + '"')
+    for name in electron_providers:
+        change(name, lambda t, name=name: electron_build_providers(t, name), tree='x11-packages')
 
     # Slice uses global uint8_t during the native Chromium tools build. Newer
     # host libstdc++ no longer supplies that C type through unrelated headers.
@@ -1435,7 +1451,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
     def rhythmbox_build_provider(t):
         anchor = 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross, valac"'
         assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="3.5.1"' in t, 'Rhythmbox build provider contract changed'
-        return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross, valac, libdeflate"')
+        return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross, valac, libcap-ng, libdeflate, libdrm, libice, liborc, libsm, libxpm, libxres, libxt, openh264, util-linux"')
     change('rhythmbox', rhythmbox_build_provider, tree='x11-packages')
 
     for name, tree in (('openmpi', 'packages'), ('mate-applets', 'x11-packages')):
