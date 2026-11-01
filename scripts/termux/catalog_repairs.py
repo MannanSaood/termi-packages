@@ -396,6 +396,18 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    # Pin release Git trees verified independently of mutable tag archive hashes.
+    for package, tree, repository, commit, before, after in [
+        ('libfcft', 'x11-packages', 'dnkl/fcft', 'ccd1afaad891d77c040bad04120e9f602438fc33',
+         'f18bf79562e06d41741690cd1e07a02eb2600ae39eb5752eef8a698f603a482c', '9949fbce0826669369c3b9361ac04b0459fdc51037e2ccf2e2483794909903f4'),
+        ('wallust', 'packages', 'explosion-mental/wallust', 'b689616d630bb2e541695f101d313699464aac09',
+         '46c2592217f0de968437850b14b2e844f2af4158b70135b2b448dc426c0309a1', '8609d27162975777797f2f625d884a6475c766ed943393219d585577ac8bfcfe')]:
+        old_url = 'https://codeberg.org/' + repository + '/archive/${TERMUX_PKG_VERSION}.tar.gz'
+        new_url = 'https://codeberg.org/' + repository + '/archive/' + commit + '.tar.gz'
+        def pin_release(text, old=old_url, new=new_url, old_hash=before, new_hash=after):
+            assert text.count(old) == 1 and text.count(old_hash) == 1, 'Codeberg release source changed'
+            return text.replace(old, new).replace(old_hash, new_hash)
+        change(package, pin_release, tree=tree)
     def icoutils_download(text):
         old = 'https://savannah.nongnu.org/download/icoutils/icoutils-$TERMUX_PKG_VERSION.tar.bz2'
         assert text.count(old) == 1, 'icoutils source URL changed'
