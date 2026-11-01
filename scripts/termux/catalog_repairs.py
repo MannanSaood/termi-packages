@@ -457,6 +457,13 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    def seafile_immutable_source(text):
+        url = 'https://github.com/haiwen/seafile/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz'
+        checksum = '60d79e7933d15da3f8aad17888aeab5fcad9e2e9ec5ecc1ec76f7aef1b3bd91f'
+        assert 'TERMUX_PKG_VERSION="9.0.22"\n' in text and text.count(url) == text.count(checksum) == 1, 'Seafile source contract changed'
+        # Official v9.0.22 commit; all 217 exported files match Git objects.
+        return text.replace(url, 'https://codeload.github.com/haiwen/seafile/tar.gz/0a4ec322cc654b903c163d52a019f798a0db5739').replace(checksum, 'b896a960af96f01c8329686a5ce22995b854e64cb8c5f01811b82fd6c04fc4bb')
+    change('seafile-client', seafile_immutable_source)
     def coherent_target_headers(text, version):
         assert text.count('TERMUX_PKG_VERSION=' + version + '\n') == 1, 'C++ header repair source version changed'
         if 'TERMUX_PKG_BUILD_DEPENDS=' in text:
