@@ -396,6 +396,8 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    change('kstars', lambda text: hook(text, 'termux_step_pre_configure',
+        '\tCXXFLAGS+=" -nostdinc++"\n'), tree='x11-packages')
     def qb64_headers(text):
         old = 'exec $TERMUX_STANDALONE_TOOLCHAIN/bin/$CXX -I$TERMUX_PREFIX/include "\\$@"'
         new = 'exec "$TERMUX_STANDALONE_TOOLCHAIN/bin/$CXX" -nostdinc++ -I"$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include/c++/v1" -I"$TERMUX_PREFIX/include" "\\$@"'
