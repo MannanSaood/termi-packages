@@ -387,13 +387,25 @@ EMACS_SECCOMP_TARGET_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_EMACS_
 
 
 def apply(change, hook, prepared):
+    def netpbm_host_language(text):
+        anchor = '\techo "CFLAGS_FOR_BUILD = " >> config.mk'
+        assert text.count(anchor) == 1, 'Netpbm host language flags anchor changed'
+        return text.replace(anchor, anchor.replace('CFLAGS_FOR_BUILD = ', 'CFLAGS_FOR_BUILD = -std=gnu17'))
+    change('netpbm', netpbm_host_language)
     def mpv_aaudio_platform_gate(text):
         line = next(line for line in text.splitlines() if '\tsed -i ' in line and 'aaudio_opt =' in line)
         anchor = line + '\n\tfi\n'
         assert text.count(anchor) == 1 and line.startswith('\t\t'), 'mpv AAudio fallback boundary changed'
         # Both recipes mark Android false to avoid mpv's Android application
         # path. Keep AAudio's real header check on API26 too, not just below it.
-        return text.replace(anchor, '\tfi\n' + line[1:] + '\n')
+        text = text.replace(anchor, '\tfi\n' + line[1:] + '\n')
+        # libass and libplacebo retain private pkg-config requirements. Import
+        # their completed source-built providers into each focused prefix.
+        deps = 'TERMUX_PKG_BUILD_DEPENDS="vulkan-headers, vulkan-loader-generic"'
+        if 'TERMUX_PKG_BUILD_DEPENDS=' in text:
+            assert text.count(deps) == 1, 'mpv-X build providers changed'
+            return text.replace(deps, deps.replace('"vulkan-headers,', '"libunibreak, libdeflate, vulkan-headers,'))
+        return text + '\nTERMUX_PKG_BUILD_DEPENDS="libunibreak, libdeflate, vulkan-headers, vulkan-loader-generic"\n'
     for name, tree in [('mpv', 'packages'), ('mpv-x', 'x11-packages')]:
         change(name, mpv_aaudio_platform_gate, tree=tree)
     for name, tree in [('emacs', 'packages'), ('emacs-x', 'x11-packages')]:
