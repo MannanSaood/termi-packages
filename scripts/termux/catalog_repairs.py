@@ -389,7 +389,7 @@ EMACS_SECCOMP_TARGET_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_EMACS_
 QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 	termi_qt_cxx="$(command -v "$CXX")"
 	termi_qt_launcher="$TERMUX_PKG_TMPDIR/termi-qtwebengine-cxx-launcher"
-	printf '#!/bin/bash\ncompiler="$1"\nshift\ntarget=%q\nheaders=%q\ncase "$compiler" in\n  "$target"|"${target##*/}") exec "$compiler" -nostdinc++ -isystem "$headers" "$@";;\n  *) exec "$compiler" "$@";;\nesac\n' "$termi_qt_cxx" "$TERMUX_PREFIX/include/c++/v1" > "$termi_qt_launcher"
+	printf '#!/bin/bash\ncompiler="$1"\nshift\ntarget=%q\nheaders=%q\ncase "$compiler" in\n  "$target"|"${target##*/}") exec "$compiler" -nostdinc++ -I "$headers" "$@";;\n  *) exec "$compiler" "$@";;\nesac\n' "$termi_qt_cxx" "$TERMUX_PREFIX/include/c++/v1" > "$termi_qt_launcher"
 	chmod 755 "$termi_qt_launcher"
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_qt_launcher"
 '''
