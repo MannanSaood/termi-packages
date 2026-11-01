@@ -1406,6 +1406,12 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \t$CC $CFLAGS $CPPFLAGS -fvisibility=hidden -c "$TERMUX_PKG_BUILDER_DIR/../../packages/libnl/getsubopt.c" -o "$termi_getsubopt/getsubopt.o"
 \t$AR crs "$termi_getsubopt/libgetsubopt.a" "$termi_getsubopt/getsubopt.o"
 \tLDFLAGS+=" -L$termi_getsubopt"''')
+    def chromium_host_build_provider(t):
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="libffi-static"'
+        assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="155.0.8059.84"' in t, 'Chromium host build provider contract changed'
+        return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libffi-static, libdeflate"')
+    change('chromium-host-tools', chromium_host_build_provider, tree='x11-packages')
+
     def rhythmbox_build_provider(t):
         anchor = 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross, valac"'
         assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="3.5.1"' in t, 'Rhythmbox build provider contract changed'
