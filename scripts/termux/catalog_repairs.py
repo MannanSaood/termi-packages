@@ -345,11 +345,11 @@ def libreoffice_build_prerequisites(text):
     assert text.count(anchor) == 1, 'LibreOffice build prerequisites changed'
     # Retained pkg-config metadata needs libdeflate through libtiff, XRes
     # through at-spi2, and ORC through GStreamer's video/audio modules.
-    return text.replace(anchor, anchor.replace('"ant,', '"libdeflate, libxres, liborc, ant,'))
+    return text.replace(anchor, anchor.replace('"ant,', '"ndk-sysroot, libdeflate, libxres, liborc, ant,'))
 
 
 def apply(change, hook, prepared):
-    change('libreoffice', libreoffice_build_prerequisites, tree='x11-packages')
+    change('libreoffice', lambda t: hook(libreoffice_build_prerequisites(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
     change('redland', redland_build_prerequisites)
     change('proj', lambda t: hook(t, 'termux_step_pre_configure', PROJ_EPSILON_SETUP))
     # Two libc++ wrapper trees share include guards. Their include_next chain
