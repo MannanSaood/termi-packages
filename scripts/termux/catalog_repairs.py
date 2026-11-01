@@ -92,6 +92,40 @@ p.write_text(s)
 '''
 FOOT_OSC_TOKENIZER_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR/osc.c\" <<'TERMI_FOOT_OSC'\n" + FOOT_OSC_TOKENIZER_PATCH + "TERMI_FOOT_OSC\n"
 
+FOOT_CONFIG_TOKENIZER_PATCH = r'''from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+sites = {
+    'config.c': [
+        ('    for (const char *conf_dir = strtok(xdg_config_dirs_copy, ":");\n         conf_dir != NULL;\n         conf_dir = strtok(NULL, ":"))', 'termi_conf_dirs_save', 'xdg_config_dirs_copy', ':'),
+        ('    const char *first_as_str = strtok(value_copy, " ");\n    const char *second_as_str = strtok(NULL, " ");', 'termi_color_save', 'value_copy', ' '),
+        ('    for (const char *font = strtok(copy, ",");\n         font != NULL;\n         font = strtok(NULL, ","))', 'termi_fonts_save', 'copy', ','),
+    ],
+    'slave.c': [
+        ('    for (const char *path = strtok(path_list, ":");\n         path != NULL;\n         path = strtok(NULL, ":"))', 'termi_paths_save', 'path_list', ':'),
+    ],
+    'utils/xtgettcap.c': [
+        ('                const char *key = strtok(key_value, "=");\n                const char *value = strtok(NULL, "=");', 'termi_key_value_save', 'key_value', '='),
+    ],
+}
+outputs = {}
+for name, entries in sites.items():
+    p = root / name
+    s = p.read_text()
+    assert s.count('strtok(') == 2 * len(entries), 'Foot tokenizer count changed: ' + name
+    for anchor, state, initial, delimiter in entries:
+        assert s.count(anchor) == 1 and state not in s, 'Foot tokenizer scope changed: ' + name
+        replacement = anchor
+        for argument in [initial, 'NULL']:
+            replacement = replacement.replace('strtok(' + argument + ', "' + delimiter + '")', 'strtok_r(' + argument + ', "' + delimiter + '", &' + state + ')')
+        indent = anchor[:len(anchor) - len(anchor.lstrip())]
+        s = s.replace(anchor, indent + 'char *' + state + ' = NULL;\n' + replacement)
+    outputs[p] = s
+for p, s in outputs.items():
+    p.write_text(s)
+'''
+FOOT_OSC_TOKENIZER_SETUP += "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_FOOT_CONFIG'\n" + FOOT_CONFIG_TOKENIZER_PATCH + "TERMI_FOOT_CONFIG\n"
+
 OPENSC_PKCS11_TOKENIZER_PATCH = r'''from pathlib import Path
 import sys
 root = Path(sys.argv[1])
