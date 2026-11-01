@@ -348,7 +348,22 @@ def libreoffice_build_prerequisites(text):
     return text.replace(anchor, anchor.replace('"ant,', '"ndk-sysroot, libdeflate, libxres, liborc, ant,'))
 
 
+def webkitgtk6_header_provider(text):
+    deps = 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, xorgproto"'
+    anchor = '\ttermux_setup_gir\n'
+    assert text.count(deps) == text.count(anchor) == 1, 'WebKitGTK 6 build anchors changed'
+    # This recipe resets its CMake arguments from webkit2gtk-4.1 first. Add
+    # the launcher afterwards so the effective compiler keeps one C++ tree.
+    launcher = '''\tlocal termi_webkit_launcher="$TERMUX_PKG_TMPDIR/termi-webkit-cxx-launcher"
+\tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_webkit_launcher"
+\tchmod 755 "$termi_webkit_launcher"
+\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_webkit_launcher"
+'''
+    return text.replace(deps, deps.replace('"g-ir-scanner,', '"ndk-sysroot, g-ir-scanner,')).replace(anchor, anchor + launcher)
+
+
 def apply(change, hook, prepared):
+    change('webkitgtk-6.0', webkitgtk6_header_provider, tree='x11-packages')
     change('libreoffice', lambda t: hook(libreoffice_build_prerequisites(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
     change('redland', redland_build_prerequisites)
     change('proj', lambda t: hook(t, 'termux_step_pre_configure', PROJ_EPSILON_SETUP))
