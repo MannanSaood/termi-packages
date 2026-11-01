@@ -1,6 +1,18 @@
 """Repairs grounded in the first completed four-lane catalog failure logs."""
 import re
 
+QT5_PERFETTO_INTEGER_PATCH = r'''from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1])
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == 'b9b0eab08331aa50cedd79b59e76a622bee19dbd5794b994e6b0711e3abfb50c', 'Qt5 pinned Perfetto Slice header changed'
+anchor = b'#include <stddef.h>\n'
+assert raw.count(anchor) == 1 and b'#include <stdint.h>' not in raw, 'Qt5 Perfetto integer include contract changed'
+p.write_bytes(raw.replace(anchor, anchor + b'#include <stdint.h>\n'))
+'''
+QT5_PERFETTO_INTEGER_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/tracing/core/slice.h" <<\'TERMI_QT5_PERFETTO_INTEGER\'\n' + QT5_PERFETTO_INTEGER_PATCH + 'TERMI_QT5_PERFETTO_INTEGER\n'
+
 NTL_GMP_DIAGNOSTICS = r'''from pathlib import Path
 import sys
 p = Path(sys.argv[1])
@@ -1411,6 +1423,14 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="155.0.8059.84"' in t, 'Chromium host build provider contract changed'
         return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libffi-static, libdeflate"')
     change('chromium-host-tools', chromium_host_build_provider, tree='x11-packages')
+
+    # Slice uses global uint8_t during the native Chromium tools build. Newer
+    # host libstdc++ no longer supplies that C type through unrelated headers.
+    # Run after upstream source patches, retaining all host/target build flags.
+    def qt5_perfetto_integer_header(t):
+        assert 'TERMUX_PKG_VERSION="5.15.19"' in t, 'Qt5 WebEngine source version changed'
+        return hook(t, 'termux_step_pre_configure', QT5_PERFETTO_INTEGER_SETUP)
+    change('qt5-qtwebengine', qt5_perfetto_integer_header, tree='x11-packages')
 
     def rhythmbox_build_provider(t):
         anchor = 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross, valac"'
