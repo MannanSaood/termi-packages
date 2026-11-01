@@ -359,7 +359,8 @@ def webkitgtk6_header_provider(text):
 \tchmod 755 "$termi_webkit_launcher"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_webkit_launcher"
 '''
-    return text.replace(deps, deps.replace('"g-ir-scanner,', '"ndk-sysroot, g-ir-scanner,')).replace(anchor, anchor + launcher)
+    # GTK4/TIFF and GStreamer retain private pkg-config requirements too.
+    return text.replace(deps, deps.replace('"g-ir-scanner,', '"ndk-sysroot, libdeflate, libxres, liborc, g-ir-scanner,')).replace(anchor, anchor + launcher)
 
 
 def apply(change, hook, prepared):
