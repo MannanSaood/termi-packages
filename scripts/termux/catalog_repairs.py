@@ -372,6 +372,14 @@ def fossil_host_flags(text):
 
 
 def apply(change, hook, prepared):
+    def httrack_spawn_provider(text):
+        anchor = 'TERMUX_PKG_DEPENDS="httrack-data, libandroid-execinfo, libiconv, openssl, zlib"'
+        assert text.count(anchor) == 1, 'HTTrack runtime dependency anchor changed'
+        # The crash symbolizer retains backtraces on API26 through the
+        # source-built spawn compatibility library, as in the MuPDF repair.
+        text = text.replace(anchor, anchor.replace('libandroid-execinfo,', 'libandroid-execinfo, libandroid-spawn,'))
+        return hook(text, 'termux_step_pre_configure', '\tLDFLAGS+=" -landroid-spawn"')
+    change('httrack', httrack_spawn_provider)
     change('fossil', fossil_host_flags)
     change('webkitgtk-6.0', webkitgtk6_header_provider, tree='x11-packages')
     change('libreoffice', lambda t: hook(libreoffice_build_prerequisites(t), 'termux_step_pre_configure', NTL_CXX_HEADERS), tree='x11-packages')
