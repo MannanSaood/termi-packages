@@ -417,8 +417,12 @@ def apply(change, hook, prepared):
         providers = 'TERMUX_PKG_BUILD_DEPENDS="spirv-headers, vulkan-headers"'
         flags = r'set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} --target=${CCTERMUX_HOST_PLATFORM} ${CPPFLAGS} ${CXXFLAGS}")'
         assert text.count(providers) == 1 and text.count(flags) == 1, 'Ollama target toolchain changed'
-        return text.replace(providers, providers.replace('spirv-headers', 'ndk-sysroot, spirv-headers')).replace(
+        text = text.replace(providers, providers.replace('spirv-headers', 'ndk-sysroot, spirv-headers')).replace(
             flags, flags.replace('${CXXFLAGS}")', '${CXXFLAGS} -nostdinc++")'))
+        copied = '\tcp -Rf "$_llama_cpp_tmp_checkout" "$TERMUX_PKG_SRCDIR/llama-cpp-source"\n'
+        assert text.count(copied) == 1, 'Ollama nested llama source copy changed'
+        repair = '\tpython3 - "$TERMUX_PKG_SRCDIR/llama-cpp-source/ggml/src/ggml-vulkan/ggml-vulkan-buffers.cpp" <<\'TERMI_OLLAMA_ALIGNED\'\n' + LLAMA_VULKAN_ALLOCATION_PATCH + 'TERMI_OLLAMA_ALIGNED\n'
+        return text.replace(copied, copied + repair)
     change('ollama', ollama_target_headers)
     def gotify_browser_install(text):
         old = '\t(cd ui && yarn install && yarn build)\n'
