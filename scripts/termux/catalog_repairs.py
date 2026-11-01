@@ -15,7 +15,18 @@ for name, digest, anchor in (
     assert hashlib.sha256(raw).hexdigest() == digest, 'Qt5 pinned Perfetto integer header changed: ' + name
     assert raw.count(anchor) == 1 and b'#include <stdint.h>' not in raw, 'Qt5 Perfetto integer include contract changed'
     outputs[p] = raw.replace(anchor, anchor + b'#include <stdint.h>\n')
-# Check both pinned headers before modifying either source file.
+# The old Perfetto revision has more headers that rely on transitive integer
+# declarations. Its private default config reaches every Perfetto target but
+# is not propagated to Chromium embedders. Fix Linux host compilation together,
+# retaining Android target flags and the two already verified header repairs.
+p = root / 'gn/BUILD.gn'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '5eab2bef990322bcccacd77f5ff55b89559ec29ad54dae1014575cdcdba4c977', 'Qt5 pinned Perfetto GN config changed'
+anchor = b'config("default_config") {\n  configs = [ ":public_config" ]\n'
+assert raw.count(anchor) == 1, 'Qt5 Perfetto private config contract changed'
+addition = b'  if (!is_android && !is_win) {\n    cflags_cc = [ "-include", "stdint.h" ]\n  }\n'
+outputs[p] = raw.replace(anchor, anchor + addition)
+# Check every pinned input before modifying any source file.
 for p, raw in outputs.items():
     p.write_bytes(raw)
 '''
