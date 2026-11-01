@@ -4,14 +4,22 @@ import re
 QT5_PERFETTO_INTEGER_PATCH = r'''from pathlib import Path
 import hashlib
 import sys
-p = Path(sys.argv[1])
-raw = p.read_bytes()
-assert hashlib.sha256(raw).hexdigest() == 'b9b0eab08331aa50cedd79b59e76a622bee19dbd5794b994e6b0711e3abfb50c', 'Qt5 pinned Perfetto Slice header changed'
-anchor = b'#include <stddef.h>\n'
-assert raw.count(anchor) == 1 and b'#include <stdint.h>' not in raw, 'Qt5 Perfetto integer include contract changed'
-p.write_bytes(raw.replace(anchor, anchor + b'#include <stdint.h>\n'))
+root = Path(sys.argv[1])
+outputs = {}
+for name, digest, anchor in (
+    ('include/perfetto/ext/tracing/core/slice.h', 'b9b0eab08331aa50cedd79b59e76a622bee19dbd5794b994e6b0711e3abfb50c', b'#include <stddef.h>\n'),
+    ('src/trace_processor/importers/gzip/gzip_utils.h', '5901cf92b506cae0ea070822feaaea64a6651cef5de741af52bf7162d8f2c1a2', b'#include <memory>\n'),
+):
+    p = root / name
+    raw = p.read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == digest, 'Qt5 pinned Perfetto integer header changed: ' + name
+    assert raw.count(anchor) == 1 and b'#include <stdint.h>' not in raw, 'Qt5 Perfetto integer include contract changed'
+    outputs[p] = raw.replace(anchor, anchor + b'#include <stdint.h>\n')
+# Check both pinned headers before modifying either source file.
+for p, raw in outputs.items():
+    p.write_bytes(raw)
 '''
-QT5_PERFETTO_INTEGER_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR/src/3rdparty/chromium/third_party/perfetto/include/perfetto/ext/tracing/core/slice.h" <<\'TERMI_QT5_PERFETTO_INTEGER\'\n' + QT5_PERFETTO_INTEGER_PATCH + 'TERMI_QT5_PERFETTO_INTEGER\n'
+QT5_PERFETTO_INTEGER_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR/src/3rdparty/chromium/third_party/perfetto" <<\'TERMI_QT5_PERFETTO_INTEGER\'\n' + QT5_PERFETTO_INTEGER_PATCH + 'TERMI_QT5_PERFETTO_INTEGER\n'
 
 NTL_GMP_DIAGNOSTICS = r'''from pathlib import Path
 import sys
