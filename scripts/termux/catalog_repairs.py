@@ -396,6 +396,12 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    def qb64_headers(text):
+        old = 'exec $TERMUX_STANDALONE_TOOLCHAIN/bin/$CXX -I$TERMUX_PREFIX/include "\\$@"'
+        new = 'exec "$TERMUX_STANDALONE_TOOLCHAIN/bin/$CXX" -nostdinc++ -I"$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include/c++/v1" -I"$TERMUX_PREFIX/include" "\\$@"'
+        assert text.count(old) == 1, 'QB64 target C++ wrapper changed'
+        return text.replace(old, new)
+    change('qb64', qb64_headers, tree='x11-packages')
     def qt6_webengine_headers(text):
         assert text.count('\ttermux_step_configure_cmake\n') == 1 and 'CMAKE_CXX_COMPILER_LAUNCHER' not in text, 'Qt6 WebEngine CMake launcher contract changed'
         # Qt forwards this launcher to Chromium's GN cc_wrapper. Select only
