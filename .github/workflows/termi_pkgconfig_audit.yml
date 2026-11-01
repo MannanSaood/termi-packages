@@ -1,0 +1,86 @@
+name: Audit verified Termi pkg-config providers
+run-name: Audit completed Termi package metadata
+on:
+  workflow_dispatch:
+    inputs:
+      seed_tag:
+        required: true
+      inventory_sha256:
+        required: true
+      ledger_sha256:
+        required: true
+      plan_sha256:
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: termi-pkgconfig-audit
+  cancel-in-progress: false
+jobs:
+  audit:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GODEBUG: http2client=0
+      SEED_TAG: ${{ inputs.seed_tag }}
+      INVENTORY_PIN: ${{ inputs.inventory_sha256 }}
+      LEDGER_PIN: ${{ inputs.ledger_sha256 }}
+      PLAN_PIN: ${{ inputs.plan_sha256 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check bounded metadata audit contracts
+        run: PYTHONPATH=scripts/termux python3 -m unittest test_pkgconfig_audit -v
+      - name: Reserve scratch on this disposable standard runner
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$RUNNER_OS" = Linux
+          for directory in /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL; do
+            if [ -d "$directory" ]; then
+              test "$(readlink -f "$directory")" = "$directory"
+              sudo rm -rf -- "$directory"
+            fi
+          done
+          python3 -c 'import shutil; assert shutil.disk_usage(".").free >= 40 * 1024**3, "Need bounded seed expansion scratch plus reserve"'
+      - name: Download and audit only pinned own-source packages
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_REPOSITORY" = MannanSaood/termi-packages
+          mkdir -p build/audit-raw
+          PYTHONPATH=scripts/termux python3 - <<'PY'
+          import json, os, pathlib, re, subprocess
+          from seed_download import download
+          tag = os.environ['SEED_TAG']
+          if not re.fullmatch(r'candidate-[0-9]+-[0-9]+-0', tag):
+              raise ValueError('Require own candidate seed')
+          run = json.loads(subprocess.check_output(['gh','run','view',tag.split('-')[1],
+              '--repo',os.environ['GITHUB_REPOSITORY'],'--json','status,conclusion']))
+          if run != dict(status='completed',conclusion='success'):
+              raise ValueError('Require a successful completed seed run')
+          download(tag, pathlib.Path('build/audit-raw'))
+          PY
+          python3 scripts/termux/pkgconfig_audit.py --raw build/audit-raw \
+            --inventory-sha256 "$INVENTORY_PIN" --ledger-sha256 "$LEDGER_PIN" \
+            --plan-sha256 "$PLAN_PIN" --output build/pkgconfig-audit.json \
+            --recipes mate-applets rhythmbox chromium-host-tools qt5-qtwebengine \
+              electron42-host-tools electron43-host-tools electron-host-tools-for-code-oss \
+            | tee build/pkgconfig-audit.log
+      - name: Retain metadata evidence, never publish live APT
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -f build/pkgconfig-audit.log ]; then
+            tag="pkgconfig-audit-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false \
+              --title "Termi own-source build metadata audit" \
+              --notes "Pinned package metadata only; no binaries executed or live repository published."
+            gh release upload "$tag" build/pkgconfig-audit.log --repo "$GITHUB_REPOSITORY"
+            if [ -f build/pkgconfig-audit.json ]; then
+              gh release upload "$tag" build/pkgconfig-audit.json --repo "$GITHUB_REPOSITORY"
+            fi
+          fi
