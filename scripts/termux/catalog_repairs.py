@@ -396,6 +396,11 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    def gotify_browser_install(text):
+        old = '\t(cd ui && yarn install && yarn build)\n'
+        assert text.count(old) == 1, 'Gotify UI build commands changed'
+        return text.replace(old, '\t(cd ui && PUPPETEER_SKIP_DOWNLOAD=true yarn install && yarn build)\n')
+    change('gotify', gotify_browser_install)
     change('kstars', lambda text: hook(text, 'termux_step_pre_configure',
         '\tCXXFLAGS+=" -nostdinc++"\n'), tree='x11-packages')
     def qb64_headers(text):
