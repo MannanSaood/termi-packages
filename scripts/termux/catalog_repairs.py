@@ -371,7 +371,24 @@ def fossil_host_flags(text):
     return text.replace(anchor, anchor.replace('unset CFLAGS', 'unset CPPFLAGS CFLAGS'))
 
 
+
+EMACS_SECCOMP_TARGET_PATCH = r'''from pathlib import Path
+import sys
+p = Path(sys.argv[1]) / "lib-src/Makefile.in"
+s = p.read_text()
+anchor = 'ifeq ($(shell uname -m),x86_64)'
+assert s.count(anchor) == 1, 'Emacs seccomp architecture gate changed'
+assert '# Currently, we can only generate seccomp filter files for x86-64.' in s
+# The generator uses x86 arch_prctl and runs the target-built executable.
+# Select it by configure's target host CPU, not the cross-builder's uname.
+p.write_text(s.replace(anchor, 'ifeq (@host_cpu@,x86_64)'))
+'''
+EMACS_SECCOMP_TARGET_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_EMACS_SECCOMP_TARGET'\n" + EMACS_SECCOMP_TARGET_PATCH + "TERMI_EMACS_SECCOMP_TARGET\n"
+
+
 def apply(change, hook, prepared):
+    for name, tree in [('emacs', 'packages'), ('emacs-x', 'x11-packages')]:
+        change(name, lambda t: hook(t, 'termux_step_post_get_source', EMACS_SECCOMP_TARGET_SETUP), tree=tree)
     def httrack_spawn_provider(text):
         anchor = 'TERMUX_PKG_DEPENDS="httrack-data, libandroid-execinfo, libiconv, openssl, zlib"'
         assert text.count(anchor) == 1, 'HTTrack runtime dependency anchor changed'
