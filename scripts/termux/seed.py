@@ -86,7 +86,7 @@ def compatible_failures(old, new, ledger):
                   and entry.get("compile_resume_available") is False))}
 
 
-def expand_bundles(raw, inventory):
+def expand_bundles(raw, inventory, selected=None):
     """Unpack only inventory-pinned regular Debian members; never tar.extract."""
     expected = {r["file"]:r["sha256"] for r in inventory["packages"]}
     total = 0
@@ -101,6 +101,8 @@ def expand_bundles(raw, inventory):
                 total += member.size
                 if member.size > 2 * 1024**3 or total > 16 * 1024**3:
                     raise ValueError("Package bundle exceeds bounded source-cache budget")
+                if selected is not None and name not in selected:
+                    continue
                 target = raw / name
                 if target.exists() or target.is_symlink():
                     if target.is_symlink() or digest(target) != expected[name]:
@@ -149,7 +151,6 @@ def prepare(raw, context, new_graph, output, inventory_hash, ledger_hash, graph_
     ledger_path = pinned(raw, "catalog-ledger.json", ledger_hash)
     graph_path = pinned(raw, "catalog-plan.json", graph_hash)
     inventory, ledger, old = [json.loads(p.read_text()) for p in [inventory_path, ledger_path, graph_path]]
-    expand_bundles(raw,inventory)
     new = json.loads(new_graph.read_text())
     for name, key in [("upstream.lock.json", "lock"), ("source.json", "source"), ("patches.json", "patches")]:
         if json.loads((context / name).read_text()) != new["configuration"][key]:
@@ -160,6 +161,9 @@ def prepare(raw, context, new_graph, output, inventory_hash, ledger_hash, graph_
     present = {r["recipe"] for r in records}
     if allowed != present:
         raise ValueError("A completed seed recipe has no recorded outputs")
+    # Verify compatibility and scope before materializing bundled archives.
+    # In particular a dependency-free root needs no copied package payloads.
+    expand_bundles(raw, inventory, {r['file'] for r in records})
     if output.exists() and any(output.iterdir()):
         raise ValueError("Seed output must be new/empty")
     (output / "pool").mkdir(parents=True)
