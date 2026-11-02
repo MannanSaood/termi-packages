@@ -123,6 +123,28 @@ p.write_bytes(raw.replace(anchor, anchor + addition))
 '''
 CODE_OSS_REMOTE_ENV_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" <<\'TERMI_CODE_OSS_REMOTE_ENV\'\n' + CODE_OSS_REMOTE_ENV_PATCH + 'TERMI_CODE_OSS_REMOTE_ENV\n'
 
+CODE_OSS_COPILOT_SDK_PATCH = r'''from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1]) / 'build/lib/extensions.ts'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '57281576d6ac70f0dbc0ad238952a8e489f4edf3bab886df59b94d497e81f583', 'Code OSS pinned extension packaging source changed'
+rules = (Path(sys.argv[1]) / 'build/.moduleignore').read_bytes()
+assert rules.splitlines().count(b'@github/copilot/sdk/index.js') == 1, 'Code OSS app-wide SDK exclusion contract changed'
+anchor = b"\t\t\t.pipe(util2.cleanNodeModules(path.join(root, 'build', `.moduleignore.${process.platform}`)))\n\t).pipe(util2.setExecutableBit(['**/*.sh']));\n}\n\nexport function packageMarketplaceExtensionsStream"
+replacement = b"""\t\t\t.pipe(util2.cleanNodeModules(path.join(root, 'build', `.moduleignore.${process.platform}`))),
+\t\t// The app-wide cleaner strips sdk/index.js. The built-in extension
+\t\t// needs its own SDK entry point before platform files are materialized.
+\t\tgulp.src('extensions/copilot/node_modules/@github/copilot/sdk/index.js', { base: '.', allowEmpty: false })
+\t).pipe(util2.setExecutableBit(['**/*.sh']));
+}
+
+export function packageMarketplaceExtensionsStream"""
+assert raw.count(anchor) == 1, 'Code OSS built-in Copilot dependency stream contract changed'
+p.write_bytes(raw.replace(anchor, replacement))
+'''
+CODE_OSS_COPILOT_SDK_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" <<\'TERMI_CODE_OSS_COPILOT_SDK\'\n' + CODE_OSS_COPILOT_SDK_PATCH + 'TERMI_CODE_OSS_COPILOT_SDK\n'
+
 ELECTRON42_PREFIX_PATCH = r'''from pathlib import Path
 import hashlib
 import sys
@@ -1659,7 +1681,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         assert t.count(anchor) == t.count(path) == 1, 'Code OSS header provider contract changed'
         t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="electron-headers-for-code-oss, libxpm, openh264"')
         t = t.replace(path, 'npm_config_nodedir=$TERMUX_PREFIX/lib/code-oss/node_headers')
-        return hook(t, 'termux_step_pre_configure', CODE_OSS_REMOTE_ENV_SETUP)
+        return hook(t, 'termux_step_pre_configure', CODE_OSS_REMOTE_ENV_SETUP + CODE_OSS_COPILOT_SDK_SETUP)
     change('code-oss', code_oss_headers, tree='x11-packages')
 
     # Use the same Electron revision as Code OSS's verified host tools and
