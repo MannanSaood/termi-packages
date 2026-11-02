@@ -1,6 +1,52 @@
 """Repairs grounded in the first completed four-lane catalog failure logs."""
 import re
 
+SYNCTHING_NATIVE_GENERATE_PATCH = r"""from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1]) / 'build.go'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '58c41a6b262b7c1aa81514b19f9b5310ff9c7af9bd6ec7f2b76e0be7b67a8948', 'Syncthing 2.1.6 build driver changed'
+anchor = b'\tecmd := exec.Command(cmd, args...)\n\tecmd.Stdout = os.Stdout\n'
+assert raw.count(anchor) == 1, 'Syncthing printed command contract changed'
+replacement = b'''\tecmd := exec.Command(cmd, args...)
+\tif cmd == goCmd && len(args) > 0 && args[0] == "generate" {
+\t\tfor _, entry := range os.Environ() {
+\t\t\tkey := strings.SplitN(entry, "=", 2)[0]
+\t\t\tif key == "GOOS" || key == "GOARCH" || key == "CC" || key == "CXX" || key == "CFLAGS" || key == "CXXFLAGS" || key == "CPPFLAGS" || key == "LDFLAGS" || strings.HasPrefix(key, "CGO_") {
+\t\t\t\tcontinue
+\t\t\t}
+\t\t\tecmd.Env = append(ecmd.Env, entry)
+\t\t}
+\t\tecmd.Env = append(ecmd.Env, "GOOS="+runtime.GOOS, "GOARCH="+runtime.GOARCH, "CGO_ENABLED=0")
+\t}
+\tecmd.Stdout = os.Stdout
+'''
+p.write_bytes(raw.replace(anchor, replacement))
+"""
+
+SYNCTHING_NATIVE_GENERATE_SETUP = "\tpython3 - \"$TERMUX_PKG_SRCDIR\" <<'TERMI_SYNCTHING_NATIVE_GENERATE'\n" + SYNCTHING_NATIVE_GENERATE_PATCH + "TERMI_SYNCTHING_NATIVE_GENERATE\n"
+
+WLR_NATIVE_SCDOC_SETUP = r'''
+	if [ "$TERMUX_ON_DEVICE_BUILD" = false ]; then
+		local _termi_scdoc="$TERMUX_PKG_CACHEDIR/termi-native-scdoc-1.11.5"
+		if [ ! -x "$_termi_scdoc/bin/scdoc" ] || [ ! -f "$_termi_scdoc/share/pkgconfig/scdoc.pc" ]; then
+			local _termi_scdoc_archive="$TERMUX_PKG_TMPDIR/scdoc-1.11.5.tar.gz"
+			termux_download https://git.sr.ht/~sircmpwn/scdoc/archive/1.11.5.tar.gz "$_termi_scdoc_archive" 98780bbdf16c1bce89ef3a8c0f537ac6e4ea77087b609e7698857614488a2a62
+			mkdir -p "$_termi_scdoc/src" "$_termi_scdoc/bin" "$_termi_scdoc/share/pkgconfig"
+			tar -xf "$_termi_scdoc_archive" -C "$_termi_scdoc/src" --strip-components=1
+			(
+				unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
+				export CC=gcc CFLAGS=-O2
+				make -C "$_termi_scdoc/src" scdoc scdoc.pc PREFIX="$_termi_scdoc" OUTDIR="$_termi_scdoc/obj"
+			)
+			cp "$_termi_scdoc/src/scdoc" "$_termi_scdoc/bin/scdoc"
+			cp "$_termi_scdoc/src/scdoc.pc" "$_termi_scdoc/share/pkgconfig/scdoc.pc"
+		fi
+		termux_setup_pkg_config_wrapper "$_termi_scdoc/share/pkgconfig"
+	fi
+'''
+
 QT5_PERFETTO_INTEGER_PATCH = r'''from pathlib import Path
 import hashlib
 import sys
@@ -1421,8 +1467,15 @@ TERMI_QEMU_RWF'''))
 \t\tgo build -o "$TERMUX_PKG_TMPDIR/syncthing-build-tool" build.go
 \t)
 \t"$TERMUX_PKG_TMPDIR/syncthing-build-tool" -goos'''
-        return t.replace('\tgo run build.go -goos',native)
+        assert 'TERMUX_PKG_VERSION="2.1.6"' in t and t.count('\tgo run build.go -goos') == 1, 'Syncthing native driver contract changed'
+        return hook(t.replace('\tgo run build.go -goos',native), 'termux_step_pre_configure', SYNCTHING_NATIVE_GENERATE_SETUP)
     change('syncthing',syncthing)
+
+    def wlr_native_scdoc(t):
+        anchor = '\ttermux_setup_wayland_cross_pkg_config_wrapper\n'
+        assert 'TERMUX_PKG_VERSION=0.5.0\n' in t and t.count(anchor) == 1, 'wlr-randr native documentation contract changed'
+        return t.replace(anchor, anchor + WLR_NATIVE_SCDOC_SETUP)
+    change('wlr-randr', wlr_native_scdoc, tree='x11-packages')
 
     for name in ['upx','yoga']:
         change(name,lambda t:hook(t,'termux_step_pre_configure','\tCXXFLAGS+=" -nostdinc++"'))
