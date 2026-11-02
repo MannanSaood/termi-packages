@@ -1304,6 +1304,8 @@ TERMI_YAZI_PROOT
 \tchmod 755 "$termi_cxx"
 \texport CXX="$termi_cxx"'''+ ('\n\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER=$termi_cxx"' if cmake else ''))
     def configure_consumer(t, name):
+        if name == 'luanti':
+            t=focused_cxx_header_provider(t)
         if name == 'inkscape':
             t=inkscape_host_ragel(t)
         # Qt6's public dialect bits predate md4c 0.6's new default flags (one
