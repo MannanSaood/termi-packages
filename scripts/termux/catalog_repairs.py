@@ -106,6 +106,23 @@ p.write_bytes(raw)
 '''
 CHROMIUM_SKIA_FLOAT_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" <<\'TERMI_CHROMIUM_SKIA_FLOAT\'\n' + CHROMIUM_SKIA_FLOAT_PATCH + 'TERMI_CHROMIUM_SKIA_FLOAT\n'
 
+CODE_OSS_REMOTE_ENV_PATCH = r'''from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1]) / 'build/npm/postinstall.ts'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '38ce19931f2fe825d31e870c68346d60ab16df81270d9988e4b5b617118c9283', 'Code OSS post-patch npm environment source changed'
+anchor = b"\t\t\t\tsetNpmrcConfig('remote', env);\n"
+assert raw.count(anchor) == 1, 'Code OSS remote npm configuration contract changed'
+addition = b"""\t\t\t\tif (!process.env['VSCODE_REMOTE_CC'] && !process.env['VSCODE_REMOTE_CXX']) {
+\t\t\t\t\tdelete env['CPPFLAGS'];
+\t\t\t\t\tenv['npm_config_nodedir'] = '';
+\t\t\t\t}
+"""
+p.write_bytes(raw.replace(anchor, anchor + addition))
+'''
+CODE_OSS_REMOTE_ENV_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" <<\'TERMI_CODE_OSS_REMOTE_ENV\'\n' + CODE_OSS_REMOTE_ENV_PATCH + 'TERMI_CODE_OSS_REMOTE_ENV\n'
+
 ELECTRON42_PREFIX_PATCH = r'''from pathlib import Path
 import hashlib
 import sys
@@ -1589,7 +1606,20 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
 \t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Electron42 duplicate C++ system include"
 '''
-        return hook(t, 'termux_step_pre_configure', headers + NTL_CXX_HEADERS + '\n' + ELECTRON42_PREFIX_SETUP)
+        t = hook(t, 'termux_step_pre_configure', headers + NTL_CXX_HEADERS + '\n' + ELECTRON42_PREFIX_SETUP + CHROMIUM_SKIA_FLOAT_SETUP)
+        # A checkpoint continuation skips pre_configure. Reestablish only its
+        # repeatable compiler environment before make, without reapplying any
+        # source patch to an already patched tree.
+        resume_headers = '''\tlocal _termi_cpp_system="-isystem$TERMUX_PREFIX/include/c++/v1"
+\tif [[ "$CPPFLAGS" == *"$_termi_cpp_system"* ]]; then
+\t\tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
+\t\t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Electron42 duplicate resumed C++ system include"
+\tfi
+\tif [[ "$CXXFLAGS" != *" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"* ]]; then
+\t\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"
+\tfi
+'''
+        return hook(t, 'termux_step_make', resume_headers)
     change('electron42', electron42_consumer, tree='x11-packages')
 
     # VSCode 1.132.0 explicitly checks Electron42.7.1. Its native modules must
@@ -1600,7 +1630,8 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         path = 'npm_config_nodedir=$TERMUX_PREFIX/opt/electron42-host-tools/node_headers'
         assert t.count(anchor) == t.count(path) == 1, 'Code OSS header provider contract changed'
         t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="electron-headers-for-code-oss, libxpm, openh264"')
-        return t.replace(path, 'npm_config_nodedir=$TERMUX_PREFIX/lib/code-oss/node_headers')
+        t = t.replace(path, 'npm_config_nodedir=$TERMUX_PREFIX/lib/code-oss/node_headers')
+        return hook(t, 'termux_step_pre_configure', CODE_OSS_REMOTE_ENV_SETUP)
     change('code-oss', code_oss_headers, tree='x11-packages')
 
     # Use the same Electron revision as Code OSS's verified host tools and
