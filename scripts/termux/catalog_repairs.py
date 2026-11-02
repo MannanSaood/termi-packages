@@ -84,6 +84,29 @@ p.write_bytes(raw)
 '''
 CHROMIUM_SKIA_FLOAT_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" <<\'TERMI_CHROMIUM_SKIA_FLOAT\'\n' + CHROMIUM_SKIA_FLOAT_PATCH + 'TERMI_CHROMIUM_SKIA_FLOAT\n'
 
+ELECTRON42_PREFIX_PATCH = r'''from pathlib import Path
+import hashlib
+import sys
+root = Path(sys.argv[1])
+prefix = sys.argv[2].encode()
+assert prefix == b'/data/data/com.terminal.nextgen/files/usr', 'Electron42 requires the Termi prefix'
+old = b'/data/data/com.termux/files/usr'
+outputs = {}
+for name, digest in (
+    ('third_party/swiftshader/src/Vulkan/BUILD.gn', '543265f631be647857dd2cf4595ca9ce982c795d349272db188dec88b6d6a632'),
+    ('third_party/electron_node/deps/cares/src/lib/ares_private.h', '27bb6479b657f67455a6afcef33c14014312c9ff6c27b5535262e3da5adc9f85'),
+):
+    p = root / name
+    raw = p.read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == digest, 'Electron42 pinned post-patch prefix input changed: ' + name
+    assert raw.count(old) == 2 and prefix not in raw, 'Electron42 prefix occurrence contract changed: ' + name
+    outputs[p] = raw.replace(old, prefix)
+# Check both pinned inputs before changing either file.
+for p, raw in outputs.items():
+    p.write_bytes(raw)
+'''
+ELECTRON42_PREFIX_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" "$TERMUX_PREFIX" <<\'TERMI_ELECTRON42_PREFIX\'\n' + ELECTRON42_PREFIX_PATCH + 'TERMI_ELECTRON42_PREFIX\n'
+
 NTL_GMP_DIAGNOSTICS = r'''from pathlib import Path
 import sys
 p = Path(sys.argv[1])
@@ -1528,7 +1551,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         command = 'ninja -C out/Release'
         assert t.count(command) == 8, 'Electron42 consumer Ninja commands changed'
         t = t.replace(command, 'ninja -j 1 -C out/Release')
-        return hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS)
+        return hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS + '\n' + ELECTRON42_PREFIX_SETUP)
     change('electron42', electron42_consumer, tree='x11-packages')
 
     # VSCode 1.132.0 explicitly checks Electron42.7.1. Its native modules must
