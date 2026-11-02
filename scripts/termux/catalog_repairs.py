@@ -1592,6 +1592,12 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
     # Run after upstream source patches, retaining all host/target build flags.
     def qt5_perfetto_integer_header(t):
         assert 'TERMUX_PKG_VERSION="5.15.19"' in t, 'Qt5 WebEngine source version changed'
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="libdrm, qt5-qtbase-cross-tools, qt5-qtdeclarative-cross-tools"'
+        assert t.count(anchor) == 1, 'Qt5 WebEngine header provider contract changed'
+        # Qt's Chromium bridge disables implicit C++ includes and uses the
+        # prefix header tree. Declare its provider instead of relying on a
+        # transitive dependency that the selected build prefix may omit.
+        t = t.replace(anchor, anchor.replace('="', '="ndk-sysroot, ', 1))
         return hook(t, 'termux_step_pre_configure', QT5_PERFETTO_INTEGER_SETUP)
     change('qt5-qtwebengine', qt5_perfetto_integer_header, tree='x11-packages')
 
