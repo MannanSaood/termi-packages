@@ -1551,7 +1551,15 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         command = 'ninja -C out/Release'
         assert t.count(command) == 8, 'Electron42 consumer Ninja commands changed'
         t = t.replace(command, 'ninja -j 1 -C out/Release')
-        return hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS + '\n' + ELECTRON42_PREFIX_SETUP)
+        # GN emits pkg-config C system paths before CPPFLAGS. A duplicate
+        # -isystem for libc++ makes Clang disregard our -I priority, so its
+        # C wrappers can be bypassed. Keep one ordinary C++ include entry.
+        headers = '''\tlocal _termi_cpp_system="-isystem$TERMUX_PREFIX/include/c++/v1"
+\t[[ "$CPPFLAGS" == *"$_termi_cpp_system"* ]] || termux_error_exit "Electron42 C++ system include contract changed"
+\tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
+\t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Electron42 duplicate C++ system include"
+'''
+        return hook(t, 'termux_step_pre_configure', headers + NTL_CXX_HEADERS + '\n' + ELECTRON42_PREFIX_SETUP)
     change('electron42', electron42_consumer, tree='x11-packages')
 
     # VSCode 1.132.0 explicitly checks Electron42.7.1. Its native modules must
