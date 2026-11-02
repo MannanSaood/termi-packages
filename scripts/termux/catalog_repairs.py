@@ -1521,6 +1521,27 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
     for name in electron_providers:
         change(name, lambda t, name=name: electron_build_providers(t, name), tree='x11-packages')
 
+    # The target consumer uses the same source and Ninja entry points as its
+    # verified host tools. Keep their worker bound and single C++ header tree.
+    def electron42_consumer(t):
+        assert 'TERMUX_PKG_VERSION=42.11.12\n' in t, 'Electron42 consumer version changed'
+        command = 'ninja -C out/Release'
+        assert t.count(command) == 8, 'Electron42 consumer Ninja commands changed'
+        t = t.replace(command, 'ninja -j 1 -C out/Release')
+        return hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS)
+    change('electron42', electron42_consumer, tree='x11-packages')
+
+    # VSCode 1.132.0 explicitly checks Electron42.7.1. Its native modules must
+    # use the matching source-built header provider and that provider's path.
+    def code_oss_headers(t):
+        assert 'TERMUX_PKG_VERSION="1.132.0"' in t, 'Code OSS version changed'
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="electron42-headers"'
+        path = 'npm_config_nodedir=$TERMUX_PREFIX/opt/electron42-host-tools/node_headers'
+        assert t.count(anchor) == t.count(path) == 1, 'Code OSS header provider contract changed'
+        t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="electron-headers-for-code-oss, libxpm, openh264"')
+        return t.replace(path, 'npm_config_nodedir=$TERMUX_PREFIX/lib/code-oss/node_headers')
+    change('code-oss', code_oss_headers, tree='x11-packages')
+
     # Hash-audited private FFmpeg/image providers for isolated Torch consumers.
     def torch_consumer_providers(t, name):
         if name == 'python-torchcodec':
