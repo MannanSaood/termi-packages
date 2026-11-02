@@ -63,6 +63,20 @@ replacement = b"""      conjunction<
                       negation<std::is_same<std::decay_t<U>, T>>>>::value,"""
 assert raw.count(anchor) == 1, 'Qt5 Optional forwarding-assignment contract changed'
 outputs[p] = raw.replace(anchor, replacement)
+# Qt's Chromium targets do not consume the qmake CXXFLAGS. Put the explicit
+# C++ header policy in their compiler command, before pkg-config's C -I paths.
+# The native host and v8_snapshot commands retain their system headers.
+p = root.parent.parent / 'build/toolchain/gcc_toolchain.gni'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '8730a4075eacb34203db0c40b5a6d5104eab552e87df987e40e3e40739a8f422', 'Qt5 pinned GCC toolchain template changed'
+anchor = b'    cxx = compiler_prefix + invoker.cxx\n'
+addition = b"""    if (target_name == "target") {
+      assert(invoker_toolchain_args.current_cpu == "arm64")
+      cxx += " -nostdinc++ -I/data/data/com.terminal.nextgen/files/usr/include/c++/v1"
+    }
+"""
+assert raw.count(anchor) == 1, 'Qt5 target C++ compiler contract changed'
+outputs[p] = raw.replace(anchor, anchor + addition)
 # Check every pinned input before modifying any source file.
 for p, raw in outputs.items():
     p.write_bytes(raw)
