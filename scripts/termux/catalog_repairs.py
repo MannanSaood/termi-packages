@@ -1613,7 +1613,24 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
 \t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Chromium155 duplicate C++ system include"
 '''
-        return hook(t, 'termux_step_pre_configure', headers + NTL_CXX_HEADERS + '\n' + CHROMIUM_SKIA_FLOAT_SETUP)
+        t = hook(t, 'termux_step_pre_configure', headers + NTL_CXX_HEADERS + '\n' + CHROMIUM_SKIA_FLOAT_SETUP)
+        # Continued builds skip pre_configure but regenerate GN in configure.
+        # Restore its repeatable environment before GN consumes it, and again
+        # before make; never reapply the already-patched source helper.
+        resumed_headers = '''\tlocal _termi_cpp_system="-isystem$TERMUX_PREFIX/include/c++/v1"
+\tif [[ "$CPPFLAGS" == *"$_termi_cpp_system"* ]]; then
+\t\tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
+\t\t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Chromium155 duplicate resumed C++ system include"
+\tfi
+\tif [[ "$CXXFLAGS" != *" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"* ]]; then
+\t\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"
+\tfi
+'''
+        for step in ['termux_step_configure', 'termux_step_make']:
+            anchor = step + '() {\n'
+            assert t.count(anchor) == 1, 'Chromium155 continued build hook changed'
+            t = t.replace(anchor, anchor + resumed_headers)
+        return t
     change('chromium-host-tools', chromium_host_build_provider, tree='x11-packages')
 
     # Hash-verified own-source .pc metadata audit 41334206651: include the
