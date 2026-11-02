@@ -17,6 +17,16 @@ def run(args, **kwargs):
     return subprocess.run(args, check=True, **kwargs)
 
 
+def candidate_image_after_identity_check(context, cache_image, proof_path):
+    if cache_image:
+        from resume_image import verify_restored_inputs
+        verify_restored_inputs(cache_image, context, proof_path)
+        return cache_image
+    tag = "termi-termux-candidate:" + uuid.uuid4().hex
+    run(["docker", "build", "--tag", tag, str(context)])
+    return tag
+
+
 def attach_builder(container, timeout):
     try:
         return subprocess.run(['docker','start','--attach',container],timeout=timeout).returncode
@@ -145,6 +155,9 @@ def main():
     (output / "build-input-identity.txt").write_text(identity + "\n")
     if args.cache_image:
         image_info = json.loads(subprocess.check_output(["docker", "image", "inspect", args.cache_image]))[0]
+        if (image_info['Config'].get('User') != 'builder'
+                or image_info['Config'].get('WorkingDir') != '/home/builder/termux-packages'):
+            raise ValueError('Restored cache requires the dedicated builder identity and workdir')
         if (image_info["Config"].get("Labels") or {}).get("org.termi.build-input-identity") != identity:
             raise ValueError("Restored cache does not match the complete build-input identity")
         cache_check = subprocess.check_output(["docker", "create", "--entrypoint", "/bin/true", args.cache_image], text=True).strip()
@@ -156,13 +169,10 @@ def main():
                     raise ValueError("Cached prefix/source/patch identity differs from this build")
         finally:
             run(["docker", "rm", cache_check])
-        dockerfile = output / "context/Dockerfile"
-        original = dockerfile.read_text()
-        dockerfile.write_text("FROM " + args.cache_image + "\n" + original.split("\n", 1)[1])
     artifacts = output / "artifacts"
     artifacts.mkdir()
-    tag = "termi-termux-candidate:" + uuid.uuid4().hex
-    run(["docker", "build", "--tag", tag, str(output / "context")])
+    tag = candidate_image_after_identity_check(
+        output / "context", args.cache_image, output / "resume-input-verification.json")
     if args.reclaim_workflow_inputs:
         reclaim_workflow_archives(Path(os.environ["GITHUB_WORKSPACE"]), output / "context", args.seed_dir)
     container = subprocess.check_output([
@@ -174,7 +184,10 @@ def main():
         "--env", f"TERMI_CATALOG_RETRY_FAILED={int(args.catalog_retry_failed)}",
         "--env", f"TERMI_CATALOG_LANE={args.catalog_lane or ''}",
         "--env", f"TERMI_RECLAIM_RECIPE_CACHE={int(args.reclaim_workflow_inputs)}",
-        "--security-opt", "no-new-privileges", tag, args.mode, *(args.packages or [])], text=True).strip()
+        "--security-opt", "no-new-privileges",
+        *(["--entrypoint", "/bin/bash"] if args.cache_image else []), tag,
+        *(["/home/builder/build-in-container.sh"] if args.cache_image else []),
+        args.mode, *(args.packages or [])], text=True).strip()
     (output / "container-id.txt").write_text(container + "\n")
     result = None
     try:
