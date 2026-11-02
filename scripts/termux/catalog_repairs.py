@@ -1493,7 +1493,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         anchor = 'TERMUX_PKG_BUILD_DEPENDS="libffi-static"'
         assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="155.0.8059.84"' in t, 'Chromium host build provider contract changed'
         t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libffi-static, googletest, libbsd, libcap-ng, libdeflate, libice, libmd, libsm, libunibreak, libxres, libxt, util-linux"')
-        return hook(t, 'termux_step_pre_configure', CHROMIUM_SKIA_FLOAT_SETUP)
+        return hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS + '\n' + CHROMIUM_SKIA_FLOAT_SETUP)
     change('chromium-host-tools', chromium_host_build_provider, tree='x11-packages')
 
     # Hash-verified own-source .pc metadata audit 41334206651: include the
