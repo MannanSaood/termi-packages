@@ -44,6 +44,25 @@ assert hashlib.sha256(raw).hexdigest() == 'de7d6c0577dffc1d84778ec5d45c0058c0e68
 anchor = b"        gperf_output = gperf_output.replace('/*FALLTHROUGH*/',\n                                            '  FALLTHROUGH;')\n"
 assert raw.count(anchor) == 1, 'Qt5 gperf fallthrough contract changed'
 outputs[p] = raw.replace(anchor, b"        if '[[fallthrough]]' not in gperf_output:\n" + b''.join(b'    ' + line for line in anchor.splitlines(keepends=True)))
+# Do not instantiate value-construction traits for an Optional's own copy
+# assignment. Eager && substitution recurses through LayoutUnit's constructor
+# on Clang21; the existing conjunction preserves the original eligibility.
+p = root.parent.parent / 'base/optional.h'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '1cb7210bddde45ec35801273565f4a386b35073942d35370539efe53d97b4dc5', 'Qt5 pinned Optional header changed'
+anchor = b"""      !std::is_same<internal::RemoveCvRefT<U>, Optional<T>>::value &&
+          std::is_constructible<T, U>::value &&
+          std::is_assignable<T&, U>::value &&
+          (!std::is_scalar<T>::value ||
+           !std::is_same<std::decay_t<U>, T>::value),"""
+replacement = b"""      conjunction<
+          negation<std::is_same<internal::RemoveCvRefT<U>, Optional<T>>>,
+          std::is_constructible<T, U>,
+          std::is_assignable<T&, U>,
+          disjunction<negation<std::is_scalar<T>>,
+                      negation<std::is_same<std::decay_t<U>, T>>>>::value,"""
+assert raw.count(anchor) == 1, 'Qt5 Optional forwarding-assignment contract changed'
+outputs[p] = raw.replace(anchor, replacement)
 # Check every pinned input before modifying any source file.
 for p, raw in outputs.items():
     p.write_bytes(raw)
