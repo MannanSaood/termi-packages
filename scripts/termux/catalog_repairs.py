@@ -1633,6 +1633,27 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         return t
     change('chromium-host-tools', chromium_host_build_provider, tree='x11-packages')
 
+    # Own-source GTK .pc audit: retain the complete private provider closure
+    # when these consumers use a dependency-only seed prefix.
+    gtk_seed_consumers = {
+        'vala-panel-appmenu': ('25.04', 'libdeflate, libxpm, libxres, libxt, openh264'),
+        'xfce4-eyes-plugin': ('4.7.0', 'libdeflate, libxpm, libxres, libxt, openh264'),
+        'xfce4-places-plugin': ('1.9.0', 'libdeflate, libxpm, libxres, libxt, openh264'),
+        'xfce4-taskmanager': ('1.6.0', 'libdeflate, libxpm, libxres, openh264'),
+    }
+    def gtk_seed_providers(t, name):
+        version, providers = gtk_seed_consumers[name]
+        assert f'TERMUX_PKG_VERSION="{version}"' in t, 'GTK seed consumer version changed'
+        if name == 'vala-panel-appmenu':
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross, gtk3, valac"'
+            assert t.count(anchor) == 1, 'Vala panel build providers changed'
+            return t.replace(anchor, anchor[:-1] + ', ' + providers + '"')
+        anchor = '\nTERMUX_PKG_DEPENDS='
+        assert t.count(anchor) == 1 and 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'XFCE build providers changed'
+        return t.replace(anchor, '\nTERMUX_PKG_BUILD_DEPENDS="' + providers + '"' + anchor)
+    for name in gtk_seed_consumers:
+        change(name, lambda t, name=name: gtk_seed_providers(t, name), tree='x11-packages')
+
     # Hash-verified own-source .pc metadata audit 41334206651: include the
     # complete Requires/Requires.private provider closure in isolated prefixes.
     # These are build providers, with native tools/features preserved intact.
