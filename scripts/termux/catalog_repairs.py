@@ -1603,6 +1603,17 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         return t.replace(path, 'npm_config_nodedir=$TERMUX_PREFIX/lib/code-oss/node_headers')
     change('code-oss', code_oss_headers, tree='x11-packages')
 
+    # Use the same Electron revision as Code OSS's verified host tools and
+    # headers. Bound the matching large target build on standard free runners.
+    def code_oss_electron_target(t):
+        anchor = 'TERMUX_PKG_VERSION=42.7.0\n'
+        assert t.count(anchor) == 1 and '_CHROMIUM_VERSION=148.0.7778.280\n' in t, 'Code OSS Electron target version changed'
+        assert 'TERMUX_PKG_BUILD_DEPENDS="electron-host-tools-for-code-oss, libnotify, libffi-static"' in t, 'Code OSS Electron host provider changed'
+        command = 'ninja -C out/Release'
+        assert t.count(command) == 8, 'Code OSS Electron Ninja commands changed'
+        return t.replace(anchor, 'TERMUX_PKG_VERSION=42.7.1\n').replace(command, 'ninja -j 1 -C out/Release')
+    change('electron-for-code-oss', code_oss_electron_target, tree='x11-packages')
+
     # Hash-audited private FFmpeg/image providers for isolated Torch consumers.
     def torch_consumer_providers(t, name):
         if name == 'python-torchcodec':
