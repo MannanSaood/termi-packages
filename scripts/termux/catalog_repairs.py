@@ -77,6 +77,14 @@ addition = b"""    if (target_name == "target") {
 """
 assert raw.count(anchor) == 1, 'Qt5 target C++ compiler contract changed'
 outputs[p] = raw.replace(anchor, anchor + addition)
+# Android's private alignment macro is absent from current NDK headers.
+# Preserve the shim's unsigned page rounding and existing overflow check.
+p = root.parents[3] / 'core/api/qtbug-61521.cpp'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == 'c3c6bbb79dd2efece285c1dbe727aae387dd0403337a71b19b412906a7ad268d', 'Qt5 post-patch allocator shim changed'
+anchor = b'    size_t bytes = __BIONIC_ALIGN(size, pagesize);'
+assert raw.count(anchor) == 1, 'Qt5 page alignment contract changed'
+outputs[p] = raw.replace(anchor, b'    size_t bytes = (size + pagesize - 1) & ~(pagesize - 1);')
 # Check every pinned input before modifying any source file.
 for p, raw in outputs.items():
     p.write_bytes(raw)
