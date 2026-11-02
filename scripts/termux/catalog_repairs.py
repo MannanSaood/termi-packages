@@ -146,6 +146,34 @@ for p, raw in outputs.items():
 '''
 ELECTRON42_PREFIX_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" "$TERMUX_PREFIX" <<\'TERMI_ELECTRON42_PREFIX\'\n' + ELECTRON42_PREFIX_PATCH + 'TERMI_ELECTRON42_PREFIX\n'
 
+CODE_OSS_ELECTRON_PREFIX_PATCH = r'''from pathlib import Path
+import hashlib
+import sys
+root = Path(sys.argv[1])
+prefix = sys.argv[2].encode()
+assert prefix == b'/data/data/com.terminal.nextgen/files/usr', 'Code OSS Electron requires the Termi prefix'
+outputs = {}
+p = root / 'third_party/swiftshader/src/Vulkan/BUILD.gn'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '175ec858d32bd5acad8cc3a138503530654832de1bdaa2a3f1038ef263efe863', 'Code OSS Electron pinned SwiftShader override changed'
+old = b'/data/data/com.termux/files/usr'
+assert raw.count(old) == 2 and prefix not in raw, 'Code OSS Electron SwiftShader prefix contract changed'
+outputs[p] = raw.replace(old, prefix)
+# Node 24.18 predates the Termux-specific paths in Node 24.19. Change only
+# its two default-platform resolver paths, preserving other OS branches.
+p = root / 'third_party/electron_node/deps/cares/src/lib/ares_private.h'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '70280e6e5b5b664d3dda55816411ec49bb9a350c52b60b8b61318f5e157e7275', 'Code OSS Electron pinned resolver header changed'
+for name in (b'resolv.conf', b'hosts'):
+    anchor = b'"/etc/' + name + b'"'
+    assert raw.count(anchor) == 1, 'Code OSS Electron resolver path contract changed'
+    raw = raw.replace(anchor, b'"' + prefix + b'/etc/' + name + b'"')
+outputs[p] = raw
+for p, raw in outputs.items():
+    p.write_bytes(raw)
+'''
+CODE_OSS_ELECTRON_PREFIX_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" "$TERMUX_PREFIX" <<\'TERMI_CODE_OSS_ELECTRON_PREFIX\'\n' + CODE_OSS_ELECTRON_PREFIX_PATCH + 'TERMI_CODE_OSS_ELECTRON_PREFIX\n'
+
 NTL_GMP_DIAGNOSTICS = r'''from pathlib import Path
 import sys
 p = Path(sys.argv[1])
@@ -1593,8 +1621,8 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 
     # The target consumer uses the same source and Ninja entry points as its
     # verified host tools. Keep their worker bound and single C++ header tree.
-    def electron42_consumer(t):
-        assert 'TERMUX_PKG_VERSION=42.11.12\n' in t, 'Electron42 consumer version changed'
+    def electron42_consumer(t, version='42.11.12', prefix_setup=ELECTRON42_PREFIX_SETUP):
+        assert f'TERMUX_PKG_VERSION={version}\n' in t, 'Electron42 consumer version changed'
         command = 'ninja -C out/Release'
         assert t.count(command) == 8, 'Electron42 consumer Ninja commands changed'
         t = t.replace(command, 'ninja -j 1 -C out/Release')
@@ -1606,7 +1634,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
 \t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Electron42 duplicate C++ system include"
 '''
-        t = hook(t, 'termux_step_pre_configure', headers + NTL_CXX_HEADERS + '\n' + ELECTRON42_PREFIX_SETUP + CHROMIUM_SKIA_FLOAT_SETUP)
+        t = hook(t, 'termux_step_pre_configure', headers + NTL_CXX_HEADERS + '\n' + prefix_setup + CHROMIUM_SKIA_FLOAT_SETUP)
         # A checkpoint continuation skips pre_configure. Reestablish only its
         # repeatable compiler environment before make, without reapplying any
         # source patch to an already patched tree.
@@ -1642,7 +1670,8 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
         assert 'TERMUX_PKG_BUILD_DEPENDS="electron-host-tools-for-code-oss, libnotify, libffi-static"' in t, 'Code OSS Electron host provider changed'
         command = 'ninja -C out/Release'
         assert t.count(command) == 8, 'Code OSS Electron Ninja commands changed'
-        return t.replace(anchor, 'TERMUX_PKG_VERSION=42.7.1\n').replace(command, 'ninja -j 1 -C out/Release')
+        t = t.replace(anchor, 'TERMUX_PKG_VERSION=42.7.1\n')
+        return electron42_consumer(t, '42.7.1', CODE_OSS_ELECTRON_PREFIX_SETUP).replace('Electron42', 'Code OSS Electron')
     change('electron-for-code-oss', code_oss_electron_target, tree='x11-packages')
 
     # Hash-audited private FFmpeg/image providers for isolated Torch consumers.
