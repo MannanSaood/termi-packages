@@ -119,7 +119,7 @@ jobs:
           sys.path.insert(0,'scripts/termux')
           from seed_download import download
           download(tag,pathlib.Path('build/seed-raw'))
-          from seed import prepare, dependency_roots
+          from seed_host_import import prepare, dependency_roots
           prepare(pathlib.Path('build/seed-raw'),pathlib.Path('build/context'),pathlib.Path('build/catalog-plan.json'),
                   pathlib.Path('build/context/seed'),os.environ['SEED_INVENTORY'],os.environ['SEED_LEDGER'],os.environ['SEED_PLAN'],
                   dependency_roots(os.environ['BUILD_MODE'],os.environ['RECIPES'].split()))

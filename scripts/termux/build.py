@@ -144,7 +144,7 @@ def main():
         raise SystemExit("Output already exists; use a new build directory")
     prepare(args.upstream.resolve(), output / "context", lock, full_catalog=args.mode == "full-catalog" or args.full_recipes)
     if args.seed_dir:
-        from seed import prepare as prepare_seed, dependency_roots
+        from seed_host_import import prepare as prepare_seed, dependency_roots
         prepare_seed(args.seed_dir.resolve(), output / "context", args.seed_graph.resolve(), output / "context/seed",
                      args.seed_inventory_sha256, args.seed_ledger_sha256, args.seed_plan_sha256,
                      dependency_roots(args.mode, args.packages or []))
