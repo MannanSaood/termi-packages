@@ -1,6 +1,20 @@
 """Repairs grounded in the first completed four-lane catalog failure logs."""
 import re
 
+CHROMIUM_TARGET_PREFIX_PATCH = r'''from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1])
+prefix = sys.argv[2].encode()
+assert prefix == b'/data/data/com.terminal.nextgen/files/usr', 'Chromium requires the Termi prefix'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '344ec5292cdd240892b9ad37d529d22b0afc9c3f416ca10104320802f2b34f3f', 'Chromium pinned SwiftShader override changed'
+old = b'/data/data/com.termux/files/usr'
+assert raw.count(old) == 2 and prefix not in raw, 'Chromium SwiftShader prefix contract changed'
+p.write_bytes(raw.replace(old, prefix))
+'''
+
+
 SYNCTHING_NATIVE_GENERATE_PATCH = r"""from pathlib import Path
 import hashlib
 import sys
@@ -1670,6 +1684,13 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
             t = t.replace(old_hash, 'TERMUX_PKG_SHA256=927e7813bbe4c35e28e31b376a1eb17057068d329dc780722ec21b37186a0507\n')
             assert t.count('ninja -C out/Release') == 5, 'Chromium target Ninja commands changed'
             t = t.replace('ninja -C out/Release', 'ninja -j 1 -C out/Release')
+        if not host:
+            # The override consumes SwiftShader built from Termi's pinned host
+            # source. Rewrite its two literal paths after installing it.
+            anchor = '\tcp -Rf $TERMUX_PKG_BUILDER_DIR/third_party_override/swiftshader/* $TERMUX_PKG_SRCDIR/third_party/swiftshader/\n'
+            assert t.count(anchor) == 1, 'Chromium SwiftShader override hook changed'
+            fix = '\tpython3 - "$TERMUX_PKG_SRCDIR/third_party/swiftshader/src/Vulkan/BUILD.gn" "$TERMUX_PREFIX" <<\'TERMI_CHROMIUM_PREFIX\'\n' + CHROMIUM_TARGET_PREFIX_PATCH + 'TERMI_CHROMIUM_PREFIX\n'
+            t = t.replace(anchor, anchor + fix)
         # The unbundle toolchain emits pkg-config C system paths before
         # CPPFLAGS. Remove the duplicate system entry so libc++'s normal -I
         # path keeps priority over those C headers.
@@ -2012,6 +2033,38 @@ TERMI_CKWART_MAIN
         return matching_cxx(t)
     for name in ('asymptote', 'crawl'):
         change(name, lambda t, name=name: independent_cpp_headers(t, name))
+
+    # Completed catalog diagnostics show the same libc++/C header inversion
+    # in these independent consumers. Keep native host compilers separate.
+    def remaining_cpp_headers(t, name):
+        t = prepared.get(name, t)
+        versions = {'mosh': '1.4.0', 'newsboat': '2.45', 'python-soxr': '1.1.0', 'libapt-pkg-perl': '0.1.43'}
+        assert re.search(r'TERMUX_PKG_VERSION="?' + re.escape(versions[name]) + r'"?\n', t), 'C++ consumer version changed'
+        if name == 'newsboat':
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="openssl"'
+            assert t.count(anchor) == 1, 'Newsboat build providers changed'
+            t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="openssl, ndk-sysroot"')
+        else:
+            t = focused_cxx_header_provider(t)
+        t = hook(t, 'termux_step_pre_configure', '''\tlocal _termi_cpp_system="-isystem$TERMUX_PREFIX/include/c++/v1"
+\t[[ "$CPPFLAGS" == *"$_termi_cpp_system"* ]] || termux_error_exit "C++ system header input changed"
+\tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
+\t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Duplicate C++ system header input"
+''')
+        t = matching_cxx(t)
+        if name == 'libapt-pkg-perl':
+            anchor = 'make CC="${CC}++" LD="${CC}++"'
+            assert t.count(anchor) == 1, 'Perl APT C++ driver contract changed'
+            t = t.replace(anchor, 'make CC="$CXX" LD="$CXX"')
+        return t
+    for name in ('mosh', 'newsboat', 'python-soxr', 'libapt-pkg-perl'):
+        change(name, lambda t, name=name: remaining_cpp_headers(t, name))
+
+    def openscad_eigen(t):
+        assert 'TERMUX_PKG_VERSION="2021.01"' in t, 'OpenSCAD version changed'
+        assert 'TERMUX_PKG_BUILD_DEPENDS="boost-headers, cgal, eigen"' in t, 'OpenSCAD header providers changed'
+        return hook(t, 'termux_step_pre_configure', '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DEIGEN3_INCLUDE_DIR=$TERMUX_PREFIX/include/eigen3"')
+    change('openscad', openscad_eigen)
 
     # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
     # otherwise inherits Android CPPFLAGS/pkg-config paths from the recipe.
