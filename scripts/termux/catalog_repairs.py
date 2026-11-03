@@ -1949,6 +1949,58 @@ TERMI_XRDP'''), tree='x11-packages')
 \t\texport PATH="$termi_iserv:$PATH"
 '''))
 
+    # Independent catalog failures can be repaired and built concurrently.
+    def ckermit_host_main(t):
+        t = prepared.get('ckermit', t)
+        assert 'TERMUX_PKG_VERSION=9.0.302\n' in t, 'C-Kermit source version changed'
+        return hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/ckwart.c" <<'TERMI_CKWART_MAIN'
+from pathlib import Path
+import hashlib, sys
+p = Path(sys.argv[1]); raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == 'b4b07c7f94ee0a2e2c8aa6ef6521e0bad1cd8aecffcaa99b075129fd8c91dd82', 'Pinned C-Kermit generator changed'
+anchor = b'main(argc,argv) int argc; char **argv; {'
+assert raw.count(anchor) == 1, 'C-Kermit main signature changed'
+p.write_bytes(raw.replace(anchor, b'int ' + anchor))
+TERMI_CKWART_MAIN
+''')
+    change('ckermit', ckermit_host_main)
+
+    def python2_c_dialect(t):
+        t = prepared.get('python2', t)
+        assert 'TERMUX_PKG_VERSION=${_MAJOR_VERSION}.18\n' in t, 'Python2 version changed'
+        anchor = '\t$TERMUX_PKG_SRCDIR/configure\n'
+        assert t.count(anchor) == 1, 'Python2 native configure changed'
+        t = t.replace(anchor, '\tCFLAGS="${CFLAGS:-} -std=gnu17" $TERMUX_PKG_SRCDIR/configure\n')
+        return hook(t, 'termux_step_pre_configure', '\tCFLAGS+=" -std=gnu17"')
+    change('python2', python2_c_dialect)
+
+    def cadaver_glob(t):
+        t = prepared.get('cadaver', t)
+        anchor = 'TERMUX_PKG_DEPENDS="libiconv, libneon, readline"'
+        assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="0.28"' in t, 'Cadaver dependency contract changed'
+        t = t.replace(anchor, 'TERMUX_PKG_DEPENDS="libandroid-glob, libiconv, libneon, readline"')
+        return hook(t, 'termux_step_pre_configure', '\texport LIBS="${LIBS:-} -landroid-glob"')
+    change('cadaver', cadaver_glob)
+
+    def independent_cpp_headers(t, name):
+        t = prepared.get(name, t)
+        version = {'asymptote': '3.15', 'crawl': '0.34.1'}[name]
+        assert f'TERMUX_PKG_VERSION="{version}"' in t, 'Independent C++ consumer version changed'
+        if name == 'asymptote':
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="eigen, glm"'
+            assert t.count(anchor) == 1, 'Asymptote header providers changed'
+            t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="eigen, glm, ndk-sysroot"')
+        else:
+            t = focused_cxx_header_provider(t)
+        t = hook(t, 'termux_step_pre_configure', '''\tlocal _termi_cpp_system="-isystem$TERMUX_PREFIX/include/c++/v1"
+\t[[ "$CPPFLAGS" == *"$_termi_cpp_system"* ]] || termux_error_exit "C++ system header input changed"
+\tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
+\t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Duplicate C++ system header input"
+''')
+        return matching_cxx(t)
+    for name in ('asymptote', 'crawl'):
+        change(name, lambda t, name=name: independent_cpp_headers(t, name))
+
     # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
     # otherwise inherits Android CPPFLAGS/pkg-config paths from the recipe.
     change('below', lambda t: t.replace('\tcargo fetch --target $CARGO_TARGET_NAME\n', '''\tcargo fetch --target $CARGO_TARGET_NAME
