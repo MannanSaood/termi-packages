@@ -1,6 +1,23 @@
 """Repairs grounded in the first completed four-lane catalog failure logs."""
 import re
 
+ICES_SOUNDCARD_PATCH = r'''from pathlib import Path
+import hashlib
+import sys
+root = Path(sys.argv[1])
+outputs = {}
+for name, digest in [('im_alsa.c', '9b8774aa62b5ae9894496a06bf7e40087c3c58dc7c176095b7d47a54b94a33a7'), ('im_oss.c', '6fc5b9c9fa6060ac186fa910676b8be28a45b9947315aca79d0bad081f2bb567')]:
+    p = root / 'src' / name
+    raw = p.read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == digest, 'IceS pinned sound input changed: ' + name
+    anchor = b'#include <sys/soundcard.h>'
+    assert raw.count(anchor) == 1, 'IceS soundcard include changed: ' + name
+    outputs[p] = raw.replace(anchor, b'#include <linux/soundcard.h>')
+for p, raw in outputs.items():
+    p.write_bytes(raw)
+'''
+ICES_SOUNDCARD_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" <<\'TERMI_ICES_SOUNDCARD\'\n' + ICES_SOUNDCARD_PATCH + 'TERMI_ICES_SOUNDCARD\n'
+
 CHROMIUM_TARGET_PREFIX_PATCH = r'''from pathlib import Path
 import hashlib
 import sys
@@ -1323,6 +1340,8 @@ TERMI_YAZI_PROOT
         assert t.count(anchor) == 1, 'Target C++ wrapper API contract changed'
         return t.replace(anchor, replacement)
     def configure_consumer(t, name):
+        if name == 'tectonic':
+            t = focused_cxx_header_provider(t)
         if name == 'luanti':
             t=focused_cxx_header_provider(t)
         if name == 'inkscape':
@@ -1688,6 +1707,9 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
             assert t.count(old_version) == t.count(old_hash) == 1, 'Chromium target source contract changed'
             t = t.replace(old_version, 'TERMUX_PKG_VERSION="155.0.8059.84"\n')
             t = t.replace(old_hash, 'TERMUX_PKG_SHA256=927e7813bbe4c35e28e31b376a1eb17057068d329dc780722ec21b37186a0507\n')
+            anchor = 'libc++, libevdev'
+            assert t.count(anchor) == 1, 'Chromium curl runtime providers changed'
+            t = t.replace(anchor, 'libc++, libcurl, libevdev')
             assert t.count('ninja -C out/Release') == 5, 'Chromium target Ninja commands changed'
             t = t.replace('ninja -C out/Release', 'ninja -j 1 -C out/Release')
         if not host:
@@ -2069,7 +2091,15 @@ TERMI_CKWART_MAIN
             anchor = 'TERMUX_PKG_DEPENDS="abseil-cpp, libandroid-support, libc++, libprotobuf, ncurses, openssl, openssh | dropbear"'
             assert t.count(anchor) == 1, 'Mosh execinfo provider contract changed'
             t = t.replace(anchor, anchor.replace('libandroid-support, ', 'libandroid-support, libandroid-execinfo, '))
-        return api_pin_matching_cxx(t) if name == 'newsboat' else t
+        if name == 'newsboat':
+            t = api_pin_matching_cxx(t)
+            anchor = '"$@" --target=%q\\n'
+            assert t.count(anchor) == 1, 'Newsboat target wrapper system include changed'
+            t = t.replace(anchor, '"$@" --target=%q -isystem%q\\n')
+            anchor = '"${TERMUX_HOST_PLATFORM}${TERMUX_PKG_API_LEVEL}" > "$termi_cxx"'
+            assert t.count(anchor) == 1, 'Newsboat system header path changed'
+            t = t.replace(anchor, '"${TERMUX_HOST_PLATFORM}${TERMUX_PKG_API_LEVEL}" "$TERMUX_PREFIX/include" > "$termi_cxx"')
+        return t
     for name in ('mosh', 'newsboat', 'python-soxr', 'libapt-pkg-perl'):
         change(name, lambda t, name=name: remaining_cpp_headers(t, name))
 
@@ -2102,6 +2132,34 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
 ''')
         return matching_cxx(t)
     change('python-skia-pathops', skia_pathops_headers)
+
+    def skiasharp_headers(t):
+        assert 'TERMUX_PKG_VERSION="3.119.4"' in t, 'SkiaSharp version changed'
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="libc++, gn, python"'
+        assert t.count(anchor) == 1, 'SkiaSharp header providers changed'
+        t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libc++, gn, python, ndk-sysroot"')
+        t = hook(t, 'termux_step_pre_configure', '''\tlocal _termi_cpp_system="-isystem$TERMUX_PREFIX/include/c++/v1"
+\t[[ "$CPPFLAGS" == *"$_termi_cpp_system"* ]] || termux_error_exit "SkiaSharp C++ header input changed"
+\tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
+\t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "SkiaSharp duplicate C++ header input"
+''')
+        return matching_cxx(t)
+    change('libskiasharp', skiasharp_headers)
+
+    def heimer_cache(t):
+        assert 'TERMUX_PKG_VERSION="4.5.0"' in t, 'Heimer version changed'
+        anchor = '-DBUILD_WITH_QT6=ON\n'
+        assert t.count(anchor) == 1, 'Heimer CMake configuration changed'
+        return t.replace(anchor, anchor + '-DENABLE_CCACHE=OFF\n')
+    change('heimer', heimer_cache, tree='x11-packages')
+
+    def ices_headers(t):
+        assert 'TERMUX_PKG_VERSION=2.0.3\n' in t, 'IceS version changed'
+        anchor = 'TERMUX_PKG_DEPENDS="libshout"'
+        assert t.count(anchor) == 1, 'IceS ALSA provider changed'
+        t = t.replace(anchor, 'TERMUX_PKG_DEPENDS="alsa-lib, libshout"')
+        return hook(t, 'termux_step_pre_configure', ICES_SOUNDCARD_SETUP)
+    change('ices', ices_headers)
 
     # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
     # otherwise inherits Android CPPFLAGS/pkg-config paths from the recipe.
