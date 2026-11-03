@@ -1317,6 +1317,11 @@ TERMI_YAZI_PROOT
 \tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q "$@"\\n' "$CXX" "$TERMUX_PREFIX/include/c++/v1" > "$termi_cxx"
 \tchmod 755 "$termi_cxx"
 \texport CXX="$termi_cxx"'''+ ('\n\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER=$termi_cxx"' if cmake else ''))
+    def api_pin_matching_cxx(t):
+        anchor = "\tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q \"$@\"\\n' \"$CXX\" \"$TERMUX_PREFIX/include/c++/v1\" > \"$termi_cxx\""
+        replacement = "\tprintf '#!/bin/bash\\nexec %q -nostdinc++ -I%q \"$@\" --target=%q\\n' \"$CXX\" \"$TERMUX_PREFIX/include/c++/v1\" \"${TERMUX_HOST_PLATFORM}${TERMUX_PKG_API_LEVEL}\" > \"$termi_cxx\""
+        assert t.count(anchor) == 1, 'Target C++ wrapper API contract changed'
+        return t.replace(anchor, replacement)
     def configure_consumer(t, name):
         if name == 'luanti':
             t=focused_cxx_header_provider(t)
@@ -1383,7 +1388,8 @@ TERMI_OPENSCAD_ASSERT
 \tprintf '#!/bin/bash\\ncompiler="$1"\\nshift\\nexec "$compiler" -nostdinc++ -I%q "$@"\\n' "$TERMUX_PREFIX/include/c++/v1" > "$termi_webkit_launcher"
 \tchmod 755 "$termi_webkit_launcher"
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_webkit_launcher"''')
-        return matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'krita', 'kf6-kimageformats', 'transmission-gtk', 'inkscape'})
+        result = matching_cxx(t,name in {'libavif', 'libjxl', 'poppler', 'box2d', 'tesseract', 'qt6-qtbase', 'fcitx5-gtk-common', 'recastnavigation', 'ffmpegthumbnailer', 'luanti', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'yosys', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'krita', 'kf6-kimageformats', 'transmission-gtk', 'inkscape'})
+        return api_pin_matching_cxx(result) if name == 'tectonic' else result
     for name, tree in [(n, 'packages') for n in ['openjdk-17', 'openjdk-21', 'openjdk-25', 'gegl', 'libavif', 'libopenmpt', 'libxapian', 'libraw', 'libglibmm-2.4', 'libglibmm-2.68', 'harfbuzz', 'libjxl', 'poppler', 'go-findimagedupes', 'graphviz', 'tesseract', 'tectonic', 'ffmpegthumbnailer', 'gmic', 'mupdf', 'python-pymupdf', 'yosys']]+[(n, 'x11-packages') for n in ['gimp', 'transmission-gtk', 'inkscape', 'pavucontrol', 'ardour', 'gtkmm4', 'krita', 'kf6-kimageformats', 'box2d', 'dia', 'deadbeef', 'qt6-qtbase', 'fcitx5-gtk-common', 'love', 'recastnavigation', 'praat', 'luanti', 'libvte', 'webkit2gtk-4.1', 'libaccounts-qt', 'libkexiv2', 'poppler-qt', 'qt6-qtsvg', 'qt6-qtmultimedia', 'gpsbabel', 'analitza', 'opencv', 'kolourpaint', 'kpipewire', 'libksysguard', 'qt6-qtwayland', 'kseexpr', 'calligraplan', 'mlt', 'mixxx', 'quickshell', 'spectacle', 'libncnn', 'keepassxc', 'telegram-desktop', 'wireshark-qt', 'audacity', 'tenacity', 'openscad-x', 'audacious-plugins', 'mkvtoolnix', 'qscintilla-qt6', 'signond', 'leocad', 'signon-plugin-oauth2']]:
         change(name, lambda t, name=name: configure_consumer(t,name),tree=tree)
 
@@ -1781,6 +1787,9 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
 \t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Electron42 duplicate C++ system include"
 '''
+        anchor = 'TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"'
+        assert t.count(anchor) == 1, 'Electron curl runtime providers changed'
+        t = t.replace(anchor, anchor.replace('libc++, ', 'libc++, libcurl, '))
         t = hook(t, 'termux_step_pre_configure', headers + NTL_CXX_HEADERS + '\n' + prefix_setup + CHROMIUM_SKIA_FLOAT_SETUP)
         # Continued builds regenerate GN before make. Restore the repeatable
         # environment at entry to both hooks, without reapplying source patches.
@@ -2056,15 +2065,43 @@ TERMI_CKWART_MAIN
             anchor = 'make CC="${CC}++" LD="${CC}++"'
             assert t.count(anchor) == 1, 'Perl APT C++ driver contract changed'
             t = t.replace(anchor, 'make CC="$CXX" LD="$CXX"')
-        return t
+        if name == 'mosh':
+            anchor = 'TERMUX_PKG_DEPENDS="abseil-cpp, libandroid-support, libc++, libprotobuf, ncurses, openssl, openssh | dropbear"'
+            assert t.count(anchor) == 1, 'Mosh execinfo provider contract changed'
+            t = t.replace(anchor, anchor.replace('libandroid-support, ', 'libandroid-support, libandroid-execinfo, '))
+        return api_pin_matching_cxx(t) if name == 'newsboat' else t
     for name in ('mosh', 'newsboat', 'python-soxr', 'libapt-pkg-perl'):
         change(name, lambda t, name=name: remaining_cpp_headers(t, name))
 
     def openscad_eigen(t):
         assert 'TERMUX_PKG_VERSION="2021.01"' in t, 'OpenSCAD version changed'
         assert 'TERMUX_PKG_BUILD_DEPENDS="boost-headers, cgal, eigen"' in t, 'OpenSCAD header providers changed'
-        return hook(t, 'termux_step_pre_configure', '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DEIGEN3_INCLUDE_DIR=$TERMUX_PREFIX/include/eigen3"')
+        t = hook(t, 'termux_step_pre_configure', '\tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DEIGEN3_INCLUDE_DIR=$TERMUX_PREFIX/include/eigen3"')
+        return hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/src/Geometry.h" <<'TERMI_OPENSCAD_ASSERT'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]); s = p.read_text()
+anchor = '#include <stddef.h>'
+assert s.count(anchor) == 1 and '#include <cassert>' not in s, 'OpenSCAD Geometry header changed'
+p.write_text(s.replace(anchor, anchor + '\n#include <cassert>'))
+TERMI_OPENSCAD_ASSERT
+''')
     change('openscad', openscad_eigen)
+
+    def skia_pathops_headers(t):
+        assert 'TERMUX_PKG_VERSION="0.9.2"' in t, 'Skia pathops version changed'
+        anchor = r'extra_cflags=[\"-DSK_DISABLE_LEGACY_PNG_WRITEBUFFER\", \"-I${TERMUX_PREFIX}/include\"]'
+        assert t.count(anchor) == 1, 'Skia GN include flag contract changed'
+        t = t.replace(anchor, r'''extra_cflags=[\"-DSK_DISABLE_LEGACY_PNG_WRITEBUFFER\", \"-isystem${TERMUX_PREFIX}/include\"]
+extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
+        t = focused_cxx_header_provider(t)
+        t = hook(t, 'termux_step_pre_configure', '''\tlocal _termi_cpp_system="-isystem$TERMUX_PREFIX/include/c++/v1"
+\t[[ "$CPPFLAGS" == *"$_termi_cpp_system"* ]] || termux_error_exit "Skia pathops C++ header input changed"
+\tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
+\t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Skia pathops duplicate C++ header input"
+''')
+        return matching_cxx(t)
+    change('python-skia-pathops', skia_pathops_headers)
 
     # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
     # otherwise inherits Android CPPFLAGS/pkg-config paths from the recipe.
