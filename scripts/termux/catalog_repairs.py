@@ -1750,9 +1750,8 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "Electron42 duplicate C++ system include"
 '''
         t = hook(t, 'termux_step_pre_configure', headers + NTL_CXX_HEADERS + '\n' + prefix_setup + CHROMIUM_SKIA_FLOAT_SETUP)
-        # A checkpoint continuation skips pre_configure. Reestablish only its
-        # repeatable compiler environment before make, without reapplying any
-        # source patch to an already patched tree.
+        # Continued builds regenerate GN before make. Restore the repeatable
+        # environment at entry to both hooks, without reapplying source patches.
         resume_headers = '''\tlocal _termi_cpp_system="-isystem$TERMUX_PREFIX/include/c++/v1"
 \tif [[ "$CPPFLAGS" == *"$_termi_cpp_system"* ]]; then
 \t\tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
@@ -1762,6 +1761,9 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \t\tCXXFLAGS+=" -nostdinc++ -I$TERMUX_PREFIX/include/c++/v1"
 \tfi
 '''
+        anchor = 'termux_step_configure() {\n'
+        assert t.count(anchor) == 1, 'Electron continued configure hook changed'
+        t = t.replace(anchor, anchor + resume_headers)
         return hook(t, 'termux_step_make', resume_headers)
     change('electron42', electron42_consumer, tree='x11-packages')
 
