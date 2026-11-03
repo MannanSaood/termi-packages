@@ -1656,10 +1656,20 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
 \t$CC $CFLAGS $CPPFLAGS -fvisibility=hidden -c "$TERMUX_PKG_BUILDER_DIR/../../packages/libnl/getsubopt.c" -o "$termi_getsubopt/getsubopt.o"
 \t$AR crs "$termi_getsubopt/libgetsubopt.a" "$termi_getsubopt/getsubopt.o"
 \tLDFLAGS+=" -L$termi_getsubopt"''')
-    def chromium_host_build_provider(t):
-        anchor = 'TERMUX_PKG_BUILD_DEPENDS="libffi-static"'
-        assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="155.0.8059.84"' in t, 'Chromium host build provider contract changed'
-        t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libffi-static, googletest, libbsd, libcap-ng, libdeflate, libice, libmd, libsm, libunibreak, libxres, libxt, util-linux"')
+    def chromium_host_build_provider(t, host=True):
+        if host:
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="libffi-static"'
+            assert t.count(anchor) == 1 and 'TERMUX_PKG_VERSION="155.0.8059.84"' in t, 'Chromium host build provider contract changed'
+            t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libffi-static, googletest, libbsd, libcap-ng, libdeflate, libice, libmd, libsm, libunibreak, libxres, libxt, util-linux"')
+        else:
+            # Use the exact source release already verified for our host tools.
+            old_version = 'TERMUX_PKG_VERSION=155.0.8059.79\n'
+            old_hash = 'TERMUX_PKG_SHA256=a13680be9cd424a6f47cc7656186ab9334ea64cb8aa59c0134ed021d7dc76d12\n'
+            assert t.count(old_version) == t.count(old_hash) == 1, 'Chromium target source contract changed'
+            t = t.replace(old_version, 'TERMUX_PKG_VERSION="155.0.8059.84"\n')
+            t = t.replace(old_hash, 'TERMUX_PKG_SHA256=927e7813bbe4c35e28e31b376a1eb17057068d329dc780722ec21b37186a0507\n')
+            assert t.count('ninja -C out/Release') == 5, 'Chromium target Ninja commands changed'
+            t = t.replace('ninja -C out/Release', 'ninja -j 1 -C out/Release')
         # The unbundle toolchain emits pkg-config C system paths before
         # CPPFLAGS. Remove the duplicate system entry so libc++'s normal -I
         # path keeps priority over those C headers.
@@ -1687,6 +1697,7 @@ TERMI_WML_DECLARATIONS'''), tree='x11-packages')
             t = t.replace(anchor, anchor + resumed_headers)
         return t
     change('chromium-host-tools', chromium_host_build_provider, tree='x11-packages')
+    change('chromium', lambda t: chromium_host_build_provider(t, False), tree='x11-packages')
 
     # Own-source GTK .pc audit: retain the complete private provider closure
     # when these consumers use a dependency-only seed prefix.
@@ -1987,6 +1998,7 @@ TERMI_CKWART_MAIN
         version = {'asymptote': '3.15', 'crawl': '0.34.1'}[name]
         assert f'TERMUX_PKG_VERSION="{version}"' in t, 'Independent C++ consumer version changed'
         if name == 'asymptote':
+            t = hook(t, 'termux_step_pre_configure', '\tCXXFLAGS+=" -nostdinc++"')
             anchor = 'TERMUX_PKG_BUILD_DEPENDS="eigen, glm"'
             assert t.count(anchor) == 1, 'Asymptote header providers changed'
             t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="eigen, glm, ndk-sysroot"')
