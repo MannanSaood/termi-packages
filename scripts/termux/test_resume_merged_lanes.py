@@ -117,3 +117,28 @@ class FreshRecipeTests(unittest.TestCase):
 
     def test_source_change_defers_dispatch(self):
         self.full_dispatch(remote='new-source')
+
+
+class ReadRetryTests(unittest.TestCase):
+    def test_transient_api_failure_recovers_without_any_mutation(self):
+        failure = subprocess.CalledProcessError(1, ['gh', 'run', 'list'])
+        with patch.object(resume_merged_lanes.subprocess, 'check_output',
+                          side_effect=[failure, '{"runs": []}']) as query, \
+                patch.object(resume_merged_lanes.subprocess, 'run') as mutation, \
+                patch.object(resume_merged_lanes.time, 'sleep'):
+            self.assertEqual(dict(runs=[]), resume_merged_lanes.read(['gh', 'run', 'list']))
+        self.assertEqual(2, query.call_count)
+        mutation.assert_not_called()
+
+    def test_repeated_failure_is_bounded_and_fail_closed(self):
+        failure = subprocess.TimeoutExpired(['gh', 'run', 'list'], 120)
+        with patch.object(resume_merged_lanes.subprocess, 'check_output', side_effect=failure) as query, \
+                patch.object(resume_merged_lanes.time, 'sleep'):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                resume_merged_lanes.read(['gh', 'run', 'list'])
+        self.assertEqual(3, query.call_count)
+
+    def test_invalid_json_is_not_treated_as_an_empty_inventory(self):
+        with patch.object(resume_merged_lanes.subprocess, 'check_output', return_value='bad'):
+            with self.assertRaises(json.JSONDecodeError):
+                resume_merged_lanes.read(['gh', 'run', 'list'])

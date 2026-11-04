@@ -13,6 +13,17 @@ from verify_restart import verify
 REPO = 'MannanSaood/termi-packages'
 
 
+def read(command):
+    """Retry read-only GitHub requests; never retry workflow mutations here."""
+    for attempt in range(3):
+        try:
+            return json.loads(subprocess.check_output(command, text=True, timeout=120))
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            if attempt == 2:
+                raise
+            time.sleep(3 * (attempt + 1))
+
+
 def fresh_recipe_eligible(name, plan, ledger, runs):
     if not re.fullmatch(r'[a-z0-9][a-z0-9+._-]*', name) or name not in plan['recipes']:
         raise ValueError('Invalid explicit source recipe')
@@ -65,8 +76,6 @@ def main():
         raise ValueError('Required preserved completions absent')
     # Publication must have succeeded, not merely local merge creation.
     subprocess.run(['gh', 'release', 'view', args.tag, '--repo', REPO], check=True, stdout=subprocess.DEVNULL)
-    def read(command):
-        return json.loads(subprocess.check_output(command, text=True))
     for request in requests:
         prior = read(['gh', 'run', 'view', str(request['after_run']), '--repo', REPO,
                       '--json', 'status,displayTitle,jobs'])

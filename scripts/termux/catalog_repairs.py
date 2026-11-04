@@ -2268,7 +2268,7 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
         assert 'TERMUX_PKG_VERSION="1:11.1.2"' in t, 'QEMU version changed'
         anchor = 'TERMUX_PKG_BUILD_DEPENDS="libtasn1"'
         assert t.count(anchor) == 1, 'QEMU SDL image providers changed'
-        t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libtasn1, libdeflate"')
+        t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libtasn1, libdeflate, libxres"')
         return hook(t, 'termux_step_pre_configure', '''\tpython3 - "$TERMUX_PKG_SRCDIR/block/linux-aio.c" <<'TERMI_QEMU_SYSTEM_RWF'
 from pathlib import Path
 import sys
