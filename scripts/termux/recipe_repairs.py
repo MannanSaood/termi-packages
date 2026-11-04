@@ -416,17 +416,27 @@ TERMI_BINDGEN
     return text.replace(anchor, anchor + setup)
 
 
+def revisioned(after):
+    revision=re.search(r"^TERMUX_PKG_REVISION=(\d+)$",after,re.M)
+    if revision:
+        after=after[:revision.start()]+f"TERMUX_PKG_REVISION={int(revision[1])+1}"+after[revision.end():]
+    else:
+        # A multiline version array must finish before the revision is set.
+        # Inserting after its opening line silently adds an array element.
+        version = re.search(r"^TERMUX_PKG_VERSION=(?:\(\n[^)]*^\)|[^\n]*)$", after, re.M)
+        if version is None:
+            raise ValueError('Missing complete package version declaration')
+        after=after[:version.end()]+"\nTERMUX_PKG_REVISION=1"+after[version.end():]
+    return after
+
+
 def apply(patch, original):
     prepared = {}
     def change(name, edit, tree="packages"):
         path=f"{tree}/{name}/build.sh"
         before=original(path)
         after=edit(before)
-        revision=re.search(r"^TERMUX_PKG_REVISION=(\d+)$",after,re.M)
-        if revision:
-            after=after[:revision.start()]+f"TERMUX_PKG_REVISION={int(revision[1])+1}"+after[revision.end():]
-        else:
-            after=re.sub(r"^(TERMUX_PKG_VERSION=.*)$",r"\1\nTERMUX_PKG_REVISION=1",after,count=1,flags=re.M)
+        after=revisioned(after)
         prepared[name] = after
         patch(path,before,after)
 
