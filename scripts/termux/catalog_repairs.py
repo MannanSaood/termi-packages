@@ -2247,6 +2247,22 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
         return t.replace(anchor, anchor + LIBIME_ANDROID_LOADER_SETUP)
     change('icewm', icewm_android_loader, tree='x11-packages')
 
+    def fcitx_chinese_android_loader(t):
+        assert 'TERMUX_PKG_VERSION="5.1.15"' in t, 'fcitx Chinese addons version changed'
+        assert 'TERMUX_PKG_BUILD_DEPENDS="aosp-libs, boost-headers, extra-cmake-modules"' in t, 'fcitx loader provider changed'
+        anchor = '\t\ttermux_setup_proot\n'
+        assert t.count(anchor) == 1, 'fcitx dictionary proot setup changed'
+        return t.replace(anchor, anchor + LIBIME_ANDROID_LOADER_SETUP)
+    change('fcitx5-chinese-addons', fcitx_chinese_android_loader, tree='x11-packages')
+
+    def jellyfin_private_providers(t):
+        assert 'TERMUX_PKG_VERSION=(\n\t12.2\n\t8.1.3.1\n)' in t, 'Jellyfin/FFmpeg versions changed'
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="aspnetcore-targeting-pack-10.0, dotnet-targeting-pack-10.0, libcairo, pango, libjpeg-turbo, giflib, librsvg"'
+        assert t.count(anchor) == 1, 'Jellyfin build providers changed'
+        providers = 'googletest, libbsd, libcap-ng, libdeflate, libice, libmd, libsm, libunibreak, libxt, util-linux'
+        return t.replace(anchor, anchor[:-1] + ', ' + providers + '"')
+    change('jellyfin-server', jellyfin_private_providers)
+
     def erofs_private_getsubopt(t):
         assert 'TERMUX_PKG_VERSION="1.9.4"' in t, 'EROFS version changed'
         return hook(t, 'termux_step_pre_configure', '''\tlocal termi_getsubopt="$TERMUX_PKG_TMPDIR/getsubopt"
