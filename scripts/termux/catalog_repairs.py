@@ -1,6 +1,48 @@
 """Repairs grounded in the first completed four-lane catalog failure logs."""
 import re
 
+SIMULAVR_ARCH_PATCH = r'''from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1]) / 'debian/CMakeLists.txt'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '8ec6796364fad6e377f23f0309faac82b30a53a4f0da71d8abe12f3ba981d8e4', 'SimulAVR pinned architecture mapping changed'
+anchor = b'else()\n  message(SEND_ERROR "unknown system architecture: ${CMAKE_SYSTEM_PROCESSOR}")'
+assert raw.count(anchor) == 1, 'SimulAVR architecture fallback changed'
+p.write_bytes(raw.replace(anchor, b'elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^(aarch64|arm64)$")\n  set(PACKAGE_ARCHITECTURE "arm64")\n' + anchor))
+'''
+SIMULAVR_ARCH_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" <<\'TERMI_SIMULAVR_ARCH\'\n' + SIMULAVR_ARCH_PATCH + 'TERMI_SIMULAVR_ARCH\n'
+
+FIO_STATIC_FLEX_PATCH = r'''from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1]) / 'configure'
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == 'df3f5666b53a1491c1dc15cf7288a3110e7a913d195c8842afd4361758c1f277', 'fio pinned configure changed'
+anchor = b'if compile_prog "" "-lfl" "flex"; then\n  LIBS="-lfl $LIBS"'
+assert raw.count(anchor) == 1, 'fio flex probe changed'
+static = str(Path(sys.argv[2]) / 'lib/libfl.a').encode()
+assert Path(static.decode()).is_file(), 'Source-built static flex provider missing'
+p.write_bytes(raw.replace(anchor, b'if compile_prog "" "'+static+b'" "flex"; then\n  LIBS="'+static+b' $LIBS"'))
+'''
+FIO_STATIC_FLEX_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR" "$TERMUX_PREFIX" <<\'TERMI_FIO_FLEX\'\n' + FIO_STATIC_FLEX_PATCH + 'TERMI_FIO_FLEX\n'
+
+LIBIME_ANDROID_LOADER_SETUP = r'''		local termi_proot_bin="$TERMUX_PKG_TMPDIR/termi-proot-bin"
+		mkdir -p "$termi_proot_bin"
+		python3 - "$(command -v termux-proot-run)" "$termi_proot_bin/termux-proot-run" "$TERMUX_PREFIX" <<'TERMI_LIBIME_PROOT'
+from pathlib import Path
+import shlex, sys
+source, target, prefix = map(Path, sys.argv[1:])
+assert (prefix/'opt/aosp/bin/linker64').is_file(), 'Source-built Android linker missing'
+s = source.read_text()
+anchor = '-R / "$@"'
+assert s.count(anchor) == 1, 'LibIME proot root contract changed'
+target.write_text(s.replace(anchor, '-R / -b '+shlex.quote(str(prefix/'opt/aosp')+':/system')+' "$@"'))
+target.chmod(0o755)
+TERMI_LIBIME_PROOT
+		export PATH="$termi_proot_bin:$PATH"
+'''
+
 ICES_SOUNDCARD_PATCH = r'''from pathlib import Path
 import hashlib
 import sys
@@ -2143,6 +2185,21 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
 \tCPPFLAGS="${CPPFLAGS/$_termi_cpp_system/}"
 \t[[ "$CPPFLAGS" != *"$_termi_cpp_system"* ]] || termux_error_exit "SkiaSharp duplicate C++ header input"
 ''')
+        anchor = '\textra_asmflags=[] \\\n'
+        assert t.count(anchor) == 2, 'SkiaSharp two GN configuration blocks changed'
+        t = t.replace(anchor, anchor + '\textra_cflags_cc=[ \'-nostdinc++\', \'-I${TERMUX_PREFIX}/include/c++/v1\' ] \\\n')
+        anchor = '\tlocal LIBS_LDFLAGS="$(pkg-config --libs freetype2 libpng libwebp expat opengl egl)"\n'
+        assert t.count(anchor) == 1, 'SkiaSharp GN package flags changed'
+        t = t.replace(anchor, anchor + '''\tlocal termi_lib_flags="" termi_flag
+\tfor termi_flag in $LIBS_CFLAGS; do
+\t\tif [[ "$termi_flag" == "-I$TERMUX_PREFIX/include" ]]; then
+\t\t\ttermi_lib_flags+=" -isystem$TERMUX_PREFIX/include"
+\t\telse
+\t\t\ttermi_lib_flags+=" $termi_flag"
+\t\tfi
+\tdone
+\tLIBS_CFLAGS="${termi_lib_flags# }"
+''')
         return matching_cxx(t)
     change('libskiasharp', skiasharp_headers)
 
@@ -2158,8 +2215,29 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
         anchor = 'TERMUX_PKG_DEPENDS="libshout"'
         assert t.count(anchor) == 1, 'IceS ALSA provider changed'
         t = t.replace(anchor, 'TERMUX_PKG_DEPENDS="alsa-lib, libshout"')
+        assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'IceS private provider declaration changed'
+        t += '\nTERMUX_PKG_BUILD_DEPENDS="libtheora, libspeex"\n'
         return hook(t, 'termux_step_pre_configure', ICES_SOUNDCARD_SETUP)
     change('ices', ices_headers)
+
+    def simulavr_architecture(t):
+        assert '_VERSION_MAJOR=1\n_VERSION_MINOR=1\n_VERSION_PATCH=0' in t, 'SimulAVR version changed'
+        return hook(t, 'termux_step_pre_configure', SIMULAVR_ARCH_SETUP)
+    change('simulavr', simulavr_architecture)
+
+    def fio_static_flex(t):
+        assert 'TERMUX_PKG_VERSION="3.43"' in t, 'fio version changed'
+        assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'fio build providers changed'
+        t += '\nTERMUX_PKG_BUILD_DEPENDS="flex"\n'
+        return hook(t, 'termux_step_pre_configure', FIO_STATIC_FLEX_SETUP)
+    change('fio', fio_static_flex, tree='root-packages')
+
+    def libime_android_loader(t):
+        assert 'TERMUX_PKG_VERSION="1.1.17"' in t, 'LibIME version changed'
+        anchor = '\t\ttermux_setup_proot\n'
+        assert t.count(anchor) == 1, 'LibIME proot setup changed'
+        return t.replace(anchor, anchor + LIBIME_ANDROID_LOADER_SETUP)
+    change('libime', libime_android_loader, tree='x11-packages')
 
     # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
     # otherwise inherits Android CPPFLAGS/pkg-config paths from the recipe.
