@@ -2266,6 +2266,9 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
 
     def qemu_system_kernel_header(t):
         assert 'TERMUX_PKG_VERSION="1:11.1.2"' in t, 'QEMU version changed'
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="libtasn1"'
+        assert t.count(anchor) == 1, 'QEMU SDL image providers changed'
+        t = t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="libtasn1, libdeflate"')
         return hook(t, 'termux_step_pre_configure', '''\tpython3 - "$TERMUX_PKG_SRCDIR/block/linux-aio.c" <<'TERMI_QEMU_SYSTEM_RWF'
 from pathlib import Path
 import sys
@@ -2305,6 +2308,25 @@ TERMI_CC_DEPRECATED
         assert t.count(anchor) == 1, 'Quilt release endpoint changed'
         return t.replace(anchor, 'https://download.savannah.nongnu.org/releases/quilt/quilt-${TERMUX_PKG_VERSION}.tar.gz')
     change('quilt', quilt_official_release)
+
+    def ghc_android_loader(t, name, version):
+        assert 'TERMUX_PKG_VERSION=' + version + '\n' in t, name + ' version changed'
+        assert 'TERMUX_PKG_BUILD_DEPENDS="aosp-libs"' in t, name + ' AOSP provider changed'
+        anchor = '\t\ttermux_setup_ghc_iserv\n'
+        assert t.count(anchor) == 1, name + ' interpreter setup changed'
+        return t.replace(anchor, anchor + r'''		[[ -f "$TERMUX_PREFIX/opt/aosp/bin/linker64" ]] || termux_error_exit "Source-built Android loader missing"
+		local termi_iserv="$TERMUX_PKG_TMPDIR/termi-iserv"
+		mkdir -p "$termi_iserv"
+		local ghc_bin_dir="$(ghc --print-libdir)/../bin" suffix
+		for suffix in "" -dyn; do
+			printf '#!/bin/bash\nexec /usr/bin/env -u LD_PRELOAD -u LD_LIBRARY_PATH "%s/proot" -q "%s/qemu-%s" -R / -b "%s/opt/aosp:/system" /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH="%s/lib" ANDROID_ROOT=/system ANDROID_DATA=/data "%s/ghc-iserv%s" "$@"\n' \
+			    "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH" "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH" "$TERMUX_ARCH" "$TERMUX_PREFIX" "$TERMUX_PREFIX" "$ghc_bin_dir" "$suffix" > "$termi_iserv/termux-ghc-iserv$suffix"
+			chmod 755 "$termi_iserv/termux-ghc-iserv$suffix"
+		done
+		export PATH="$termi_iserv:$PATH"
+''')
+    for name, version in [('cabal-install', '3.16.1.0'), ('hledger', '"1.52.4"'), ('hledger-ui', '"1.52.4"')]:
+        change(name, lambda t, n=name, v=version: ghc_android_loader(t, n, v))
 
     # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
     # otherwise inherits Android CPPFLAGS/pkg-config paths from the recipe.

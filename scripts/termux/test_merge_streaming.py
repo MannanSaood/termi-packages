@@ -65,11 +65,12 @@ class StreamingMergeTests(unittest.TestCase):
             previous=Path.cwd()
             try:
                 os.chdir(root)
-                with patch.object(sys,'argv',['merge','--manifest',str(manifest),'--output','build/merged','--tag','candidate-99-1-0']),patch.object(merge_releases,'run',side_effect=read),patch.object(merge_releases.subprocess,'run',side_effect=command):
+                with patch.object(sys,'argv',['merge','--manifest',str(manifest),'--output','build/merged','--tag','candidate-99-1-0']),patch.object(merge_releases,'run',side_effect=read),patch.object(merge_releases.subprocess,'run',side_effect=command),patch.object(merge_releases,'publish_verified') as publication:
                     if corrupt_log:
                         with self.assertRaisesRegex(ValueError,'hash-pinned'):merge_releases.main()
                         return
                     merge_releases.main()
+                    publication.assert_called_once()
                 ledger=json.loads(Path('build/merged/catalog-ledger.json').read_text())
                 self.assertEqual({'a','b'},{n for n,r in ledger['recipes'].items() if r['status']=='built'})
                 self.assertEqual('failed',ledger['recipes']['c']['status'])
@@ -100,8 +101,9 @@ class StreamingMergeTests(unittest.TestCase):
             previous=Path.cwd()
             try:
                 os.chdir(root)
-                with patch.object(sys,'argv',['merge','--manifest',str(manifest),'--output','build/merged','--tag','candidate-99-1-0']),patch.object(merge_releases,'run',return_value='{"visibility":"PUBLIC"}'),patch.object(merge_releases.subprocess,'run',side_effect=fake_command):
+                with patch.object(sys,'argv',['merge','--manifest',str(manifest),'--output','build/merged','--tag','candidate-99-1-0']),patch.object(merge_releases,'run',return_value='{"visibility":"PUBLIC"}'),patch.object(merge_releases.subprocess,'run',side_effect=fake_command),patch.object(merge_releases,'publish_verified') as publication:
                     merge_releases.main()
+                    publication.assert_called_once()
                 inventory=json.loads(Path('build/merged/inventory.json').read_text())
                 ledger=json.loads(Path('build/merged/catalog-ledger.json').read_text())
                 self.assertEqual(3,len(inventory['packages']))

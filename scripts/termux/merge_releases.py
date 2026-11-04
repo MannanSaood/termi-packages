@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import tarfile
+import time
 
 from parallel_catalog import merge
 from seed import pinned, digest
@@ -15,6 +16,37 @@ from selected_candidate import ledger_from_progress
 
 def run(command):
     return subprocess.check_output(command,text=True)
+
+
+def publish_verified(files, repository, tag, attempts=3):
+    """Upload serially; reconcile uncertain outcomes without overwriting assets."""
+    subprocess.run(["gh", "release", "create", tag, "--repo", repository,
+                    "--title", tag, "--notes",
+                    "Verified compatible Termi candidate union. Unsigned, not runtime approved.",
+                    "--prerelease", "--latest=false"], check=True)
+    for path in files:
+        expected = (path.stat().st_size, "sha256:" + digest(path))
+        for attempt in range(attempts):
+            release = json.loads(run(["gh", "api", f"repos/{repository}/releases/tags/{tag}"]))
+            assets = [a for a in release["assets"] if a["name"] == path.name]
+            if assets:
+                if len(assets) != 1 or assets[0]["state"] != "uploaded" or (
+                        assets[0]["size"], assets[0].get("digest")) != expected:
+                    raise ValueError("Preserve conflicting/incomplete release asset: " + path.name)
+                break
+            result = subprocess.run(["gh", "release", "upload", tag, str(path),
+                                     "--repo", repository], check=False)
+            # Even a successful CLI return needs authoritative server readback.
+            release = json.loads(run(["gh", "api", f"repos/{repository}/releases/tags/{tag}"]))
+            assets = [a for a in release["assets"] if a["name"] == path.name]
+            if assets:
+                if len(assets) != 1 or assets[0]["state"] != "uploaded" or (
+                        assets[0]["size"], assets[0].get("digest")) != expected:
+                    raise ValueError("Preserve conflicting/incomplete release asset: " + path.name)
+                break
+            if attempt + 1 == attempts:
+                raise RuntimeError(f"Upload unconfirmed: {path.name}, exit {result.returncode}")
+            time.sleep(3)
 
 
 def main():
@@ -124,9 +156,7 @@ def main():
     finally:
         if archive:archive.close()
     files=[args.output/n for n in ["inventory.json","catalog-ledger.json","catalog-plan.json"]]+bundles
-    subprocess.run(["gh","release","create",args.tag,*map(str,files),"--repo",repository,"--title",args.tag,
-                    "--notes","Verified compatible Termi candidate union; alternate build hashes retained. Unsigned, not runtime approved.",
-                    "--prerelease","--latest=false"],check=True)
+    publish_verified(files, repository, args.tag)
     print(json.dumps(dict(tag=args.tag,pins={n:digest(args.output/n) for n in ["inventory.json","catalog-ledger.json","catalog-plan.json"]})),flush=True)
 
 
