@@ -2239,6 +2239,73 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
         return t.replace(anchor, anchor + LIBIME_ANDROID_LOADER_SETUP)
     change('libime', libime_android_loader, tree='x11-packages')
 
+    # Independent remaining roots: preserve features and isolate compatibility.
+    def icewm_android_loader(t):
+        assert 'TERMUX_PKG_VERSION="4.1.0"' in t, 'IceWM version changed'
+        anchor = '\t\ttermux_setup_proot\n'
+        assert t.count(anchor) == 1, 'IceWM proot setup changed'
+        return t.replace(anchor, anchor + LIBIME_ANDROID_LOADER_SETUP)
+    change('icewm', icewm_android_loader, tree='x11-packages')
+
+    def erofs_private_getsubopt(t):
+        assert 'TERMUX_PKG_VERSION="1.9.4"' in t, 'EROFS version changed'
+        return hook(t, 'termux_step_pre_configure', '''\tlocal termi_getsubopt="$TERMUX_PKG_TMPDIR/getsubopt"
+\tmkdir -p "$termi_getsubopt"
+\t$CC $CFLAGS $CPPFLAGS -fvisibility=hidden -c "$TERMUX_SCRIPTDIR/packages/libnl/getsubopt.c" -o "$termi_getsubopt/getsubopt.o"
+\t$AR crs "$termi_getsubopt/libgetsubopt.a" "$termi_getsubopt/getsubopt.o"
+\tLDFLAGS+=" -L$termi_getsubopt"''')
+    change('erofs-utils', erofs_private_getsubopt, tree='root-packages')
+
+    def hurl_bindgen_api(t):
+        assert 'TERMUX_PKG_VERSION="8.0.1"' in t, 'Hurl version changed'
+        for anchor in ['--target=arm-linux-androideabi', '--target=${TERMUX_ARCH}-linux-android']:
+            assert t.count(anchor + '"') == 1, 'Hurl bindgen target changed'
+            t = t.replace(anchor + '"', anchor + '${TERMUX_PKG_API_LEVEL}"')
+        return t
+    change('hurl', hurl_bindgen_api)
+
+    def qemu_system_kernel_header(t):
+        assert 'TERMUX_PKG_VERSION="1:11.1.2"' in t, 'QEMU version changed'
+        return hook(t, 'termux_step_pre_configure', '''\tpython3 - "$TERMUX_PKG_SRCDIR/block/linux-aio.c" <<'TERMI_QEMU_SYSTEM_RWF'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]); s = p.read_text()
+anchor = '#include "qemu/osdep.h"'
+assert s.count(anchor) == 1, 'QEMU Linux AIO include changed'
+p.write_text(s.replace(anchor, anchor+'\\n#ifndef RWF_DSYNC\\n#include <linux/fs.h>\\n#endif'))
+TERMI_QEMU_SYSTEM_RWF
+''')
+    change('qemu-system-x86-64', qemu_system_kernel_header, tree='x11-packages')
+
+    def dropbear_bundled_crypto(t):
+        assert 'TERMUX_PKG_VERSION="2026.94"' in t, 'Dropbear version changed'
+        assert '--enable-bundled-libtom' not in t, 'Dropbear crypto selection changed'
+        return t + '\nTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-bundled-libtom"\n'
+    change('dropbear', dropbear_bundled_crypto)
+
+    def git_cliff_cc_deprecation(t):
+        assert 'TERMUX_PKG_VERSION="2.14.2"' in t, 'git-cliff version changed'
+        anchor = '\tpatch -p1 --ignore-whitespace -d "$dir" < "$patch"\n'
+        assert t.count(anchor) == 1, 'git-cliff vendor patch changed'
+        return t.replace(anchor, anchor + '''\tpython3 - "$dir/src/parallel/job_token.rs" <<'TERMI_CC_DEPRECATED'
+from pathlib import Path
+import hashlib, sys
+p = Path(sys.argv[1]); raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '6cceffcf0f7e7d82d775287e88a4f9a62dc690c321933204f9b531cf40072bf1', 'Locked cc 1.2.49 token source changed'
+anchor = b'        pub(super) async fn acquire(&self) -> JobToken {'
+assert raw.count(anchor) == 1, 'cc token acquire changed'
+p.write_bytes(raw.replace(anchor, b'        #[allow(deprecated)]\\n' + anchor))
+TERMI_CC_DEPRECATED
+''')
+    change('git-cliff', git_cliff_cc_deprecation)
+
+    def quilt_official_release(t):
+        assert 'TERMUX_PKG_VERSION="0.69"' in t, 'Quilt version changed'
+        anchor = 'https://savannah.nongnu.org/download/quilt/quilt-${TERMUX_PKG_VERSION}.tar.gz'
+        assert t.count(anchor) == 1, 'Quilt release endpoint changed'
+        return t.replace(anchor, 'https://download.savannah.nongnu.org/releases/quilt/quilt-${TERMUX_PKG_VERSION}.tar.gz')
+    change('quilt', quilt_official_release)
+
     # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
     # otherwise inherits Android CPPFLAGS/pkg-config paths from the recipe.
     change('below', lambda t: t.replace('\tcargo fetch --target $CARGO_TARGET_NAME\n', '''\tcargo fetch --target $CARGO_TARGET_NAME
