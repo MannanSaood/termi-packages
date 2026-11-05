@@ -1489,7 +1489,7 @@ TERMI_PIPEWIRE_AVAHI''')))
         t, count = re.subn(r'^TERMUX_PKG_DEPENDS="([^"]*)"$',
                            lambda m: 'TERMUX_PKG_DEPENDS="avahi, '+m[1]+'"', t, flags=re.M)
         assert count == 1, 'Avahi consumer dependency anchor changed'
-        return hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PREFIX" "$TERMUX_PKG_SRCDIR" <<'TERMI_CONSUMER_AVAHI'
+        return hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PREFIX" "$TERMUX_PKG_SRCDIR" "$TERMUX_STANDALONE_TOOLCHAIN" <<'TERMI_CONSUMER_AVAHI'
 from pathlib import Path
 import sys
 prefix=Path(sys.argv[1]);root=Path(sys.argv[2])
@@ -1497,9 +1497,12 @@ header=prefix/'include/avahi-common/malloc.h'
 assert header.is_file(), 'Installed Avahi malloc header missing'
 s=header.read_text()
 assert s.count('#include_next <malloc.h>')==1, 'Avahi malloc shim changed'
-assert (prefix/'include/malloc.h').is_file(), 'Prefix malloc header missing'
+malloc=prefix/'include/malloc.h'
+if not malloc.is_file():
+    malloc=Path(sys.argv[3])/'sysroot/usr/include/malloc.h'
+assert malloc.is_file(), 'Pinned Android malloc header missing'
 private=root/'src/termi-avahi-malloc.h'
-private.write_text(s.replace('#include_next <malloc.h>', '#include "'+str(prefix/'include/malloc.h')+'"'))
+private.write_text(s.replace('#include_next <malloc.h>', '#include "'+str(malloc)+'"'))
 changed=0
 for p in root.rglob('*'):
     if not p.is_file() or p.suffix not in ('.c', '.cc', '.cpp', '.cxx', '.h', '.hpp') or p==private:
