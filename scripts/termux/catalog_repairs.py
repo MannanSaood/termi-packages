@@ -2366,6 +2366,87 @@ TERMI_GHC_CXX
     for name, version in [('darcs', '"2.18.5"'), ('pandoc', '"3.12.1"')]:
         change(name, lambda t, n=name, v=version: ghc_private_cxx(t, n, v))
 
+    def mozilla_host_tools(t, version):
+        assert 'TERMUX_PKG_VERSION="'+version+'"' in t, 'Mozilla version changed'
+        anchor = '\t./mach configure\n'
+        assert t.count(anchor) == 1, 'Mozilla configure changed'
+        setup = r"""	if [[ "$TERMUX_ON_DEVICE_BUILD" == false ]]; then
+		python3 - "$TERMUX_PKG_TMPDIR/termi-host-tools" "$TERMUX_PREFIX" "$TERMUX_STANDALONE_TOOLCHAIN" <<'TERMI_MOZ_HOST'
+from pathlib import Path
+import json, sys
+directory, prefix, toolchain = sys.argv[1:]
+d = Path(directory)
+d.mkdir(exist_ok=True)
+body = r'''import os, sys
+roots = ROOTS
+def target_path(s):
+    return any(s == r or s.startswith(r + '/') for r in roots if r)
+args = []
+i = 0
+while i < len(sys.argv[1:]):
+    a = sys.argv[i+1]
+    if a in ('-I', '-isystem', '-iquote', '-L', '--sysroot', '-target', '--target') and i+2 < len(sys.argv):
+        value = sys.argv[i+2]
+        if target_path(value) or (a in ('-target', '--target') and 'android' in value):
+            i += 2
+            continue
+    if any(a.startswith(k) and target_path(a[len(k):]) for k in ('-I', '-isystem', '-iquote', '-L', '--sysroot=')):
+        i += 1
+        continue
+    if a in ('-D__ANDROID__', '-DANDROID', '-landroid-shmem', '-landroid-spawn', '-llog') or (a.startswith('--target=') and 'android' in a):
+        i += 1
+        continue
+    args.append(a)
+    i += 1
+env = dict(os.environ)
+for key in ('CPATH', 'C_INCLUDE_PATH', 'CPLUS_INCLUDE_PATH', 'LIBRARY_PATH', 'LD_LIBRARY_PATH', 'LD_PRELOAD', 'CPPFLAGS', 'CFLAGS', 'CXXFLAGS', 'LDFLAGS', 'PKG_CONFIG_PATH', 'PKG_CONFIG_LIBDIR', 'PKG_CONFIG_SYSROOT_DIR'):
+    env.pop(key, None)
+env['PATH'] = '/usr/bin:/bin:' + env.get('PATH', '')
+os.execve(COMPILER, [COMPILER] + args, env)
+'''
+for name, compiler in [('cc', '/usr/bin/gcc'), ('cxx', '/usr/bin/g++')]:
+    assert Path(compiler).is_file(), 'Linux host compiler missing: '+compiler
+    p = d/name
+    p.write_text('#!/usr/bin/python3\n'+body.replace('ROOTS', repr([prefix, toolchain])).replace('COMPILER', repr(compiler)))
+    p.chmod(0o755)
+TERMI_MOZ_HOST
+		export HOST_CC="$TERMUX_PKG_TMPDIR/termi-host-tools/cc"
+		export HOST_CXX="$TERMUX_PKG_TMPDIR/termi-host-tools/cxx"
+		export HOST_CFLAGS="-O2" HOST_CXXFLAGS="-O2" HOST_CPPFLAGS=""
+	fi
+"""
+        return t.replace(anchor, setup+anchor)
+    for name, version in [('firefox', '158.0'), ('librewolf', '158.0-1'), ('thunderbird', '158.0'), ('zen-browser', '1.23.3b')]:
+        change(name, lambda t, v=version: mozilla_host_tools(t, v), tree='x11-packages')
+
+    def rust_private_libraries(t, version, libraries, dependencies):
+        assert 'TERMUX_PKG_VERSION="'+version+'"' in t, 'Rust consumer version changed'
+        match = re.search(r'^TERMUX_PKG_DEPENDS="[^"]*"', t, re.M)
+        assert match, 'Rust runtime providers changed'
+        t = t[:match.end()-1] + ', '+dependencies + t[match.end()-1:]
+        anchor = 'termux_step_make() {\n'
+        assert t.count(anchor) == 1, 'Rust build hook changed'
+        flags = ''.join(' -C link-arg=-l'+lib for lib in libraries)
+        setup = '\tlocal termi_flags="CARGO_TARGET_${CARGO_TARGET_NAME//-/_}_RUSTFLAGS"\n\ttermi_flags="${termi_flags^^}"\n\texport "$termi_flags=${!termi_flags-}'+flags+'"\n'
+        return t.replace(anchor, anchor+setup)
+    for name, version in [('wezterm', '20240203-110809-5046fc22'), ('wezterm-nightly', '20261005+g37254829')]:
+        change(name, lambda t, v=version: rust_private_libraries(t, v, ['bz2', 'brotlidec', 'brotlicommon'], 'libbz2, brotli'), tree='x11-packages')
+    change('zellij', lambda t: rust_private_libraries(t, '0.45.1', ['ssh2', 'ngtcp2_crypto_ossl'], 'libssh2, libngtcp2'))
+
+    def vhs_host_documentation(t):
+        assert 'TERMUX_PKG_VERSION="0.12.1"' in t, 'VHS version changed'
+        anchor = '\tunset CC CXX CFLAGS CXXFLAGS LDFLAGS\n'
+        assert t.count(anchor) == 1, 'VHS host documentation environment changed'
+        return t.replace(anchor, anchor+'\tunset CPPFLAGS CGO_CFLAGS CGO_CPPFLAGS CGO_CXXFLAGS CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH PKG_CONFIG_PATH PKG_CONFIG_LIBDIR PKG_CONFIG_SYSROOT_DIR\n\texport CC=/usr/bin/gcc CXX=/usr/bin/g++\n')
+    change('vhs', vhs_host_documentation)
+
+    def smalltalk_host_dialect(t):
+        assert 'TERMUX_PKG_VERSION="3.2.91"' in t, 'Smalltalk version changed'
+        anchor = '\t"$TERMUX_PKG_SRCDIR"/configure --disable-gtk --disable-bloxtk\n'
+        assert t.count(anchor) == 1, 'Smalltalk host configure changed'
+        return t.replace(anchor, '\tCFLAGS="${CFLAGS:-} -std=gnu99" '+anchor.lstrip())
+    change('smalltalk', smalltalk_host_dialect)
+
     # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
     # otherwise inherits Android CPPFLAGS/pkg-config paths from the recipe.
     change('below', lambda t: t.replace('\tcargo fetch --target $CARGO_TARGET_NAME\n', '''\tcargo fetch --target $CARGO_TARGET_NAME
