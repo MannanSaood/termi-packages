@@ -1566,6 +1566,9 @@ TERMI_CONSUMER_AVAHI''')
     def pypy_android_execution(t, version):
         assert ('TERMUX_PKG_VERSION="'+version+'"\n' in t or
                 'TERMUX_PKG_VERSION='+version+'\n' in t), 'PyPy version changed'
+        dep='TERMUX_PKG_BUILD_DEPENDS="aosp-libs, tk, xorgproto"'
+        assert t.count(dep)==1, 'PyPy builder import provider changed'
+        t=t.replace(dep, 'TERMUX_PKG_BUILD_DEPENDS="aosp-libs, libandroid-stub, tk, xorgproto"')
         bind='-b /proc -b /dev -b /sys\n'
         assert t.count(bind)==1, 'PyPy proot mount anchor changed'
         t=t.replace(bind, bind+'-b $TERMUX_PREFIX/opt/aosp:/system\n')
@@ -1575,6 +1578,7 @@ TERMI_CONSUMER_AVAHI''')
         return hook(t, 'termux_step_pre_configure', r'''	local termi_pypy_loader=linker
 	[[ "$TERMUX_ARCH_BITS" != 64 ]] || termi_pypy_loader=linker64
 	[[ -x "$TERMUX_PREFIX/opt/aosp/bin/$termi_pypy_loader" ]] || termux_error_exit "Source-built AOSP loader missing"
+	[[ -f "$TERMUX_PREFIX/lib/libandroid.so" && -f "$TERMUX_PREFIX/lib/libtermux-platform-ns.so" ]] || termux_error_exit "Source-built Android import helpers missing"
 	python3 - "$TERMUX_PKG_SRCDIR/rpython/translator/platform/termux.py" "$TERMUX_PREFIX" <<'TERMI_PYPY_EXEC'
 from pathlib import Path
 import sys
