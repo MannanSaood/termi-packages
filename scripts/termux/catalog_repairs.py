@@ -2347,12 +2347,12 @@ TERMI_CC_DEPRECATED
     def ghc_private_cxx(t, name, version):
         t = ghc_android_loader(t, name, version)
         anchor = '\t\ttermux_setup_ghc_iserv\n'
-        setup = r'''		python3 - "$CXX" "$TERMUX_PREFIX" "$TERMUX_PKG_TMPDIR/termi-ghc-cxx" <<'TERMI_GHC_CXX'
+        setup = r'''		python3 - "$CXX" "$TERMUX_STANDALONE_TOOLCHAIN" "$TERMUX_PKG_TMPDIR/termi-ghc-cxx" <<'TERMI_GHC_CXX'
 from pathlib import Path
 import shlex, sys
-compiler, prefix, target = sys.argv[1:]
-headers = Path(prefix) / 'include/c++/v1'
-assert (headers/'string').is_file(), 'Source-built libc++ headers missing'
+compiler, toolchain, target = sys.argv[1:]
+headers = Path(toolchain) / 'sysroot/usr/include/c++/v1'
+assert (headers/'string').is_file(), 'Pinned NDK libc++ headers missing'
 command = shlex.split(compiler)
 assert command, 'Missing target C++ compiler'
 p = Path(target)
