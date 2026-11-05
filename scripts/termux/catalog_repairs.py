@@ -2366,10 +2366,7 @@ TERMI_GHC_CXX
     for name, version in [('darcs', '"2.18.5"'), ('pandoc', '"3.12.1"')]:
         change(name, lambda t, n=name, v=version: ghc_private_cxx(t, n, v))
 
-    def mozilla_host_tools(t, version):
-        assert 'TERMUX_PKG_VERSION="'+version+'"' in t, 'Mozilla version changed'
-        anchor = '\t./mach configure\n'
-        assert t.count(anchor) == 1, 'Mozilla configure changed'
+    def clean_host_tools_setup():
         setup = r"""	if [[ "$TERMUX_ON_DEVICE_BUILD" == false ]]; then
 		python3 - "$TERMUX_PKG_TMPDIR/termi-host-tools" "$TERMUX_PREFIX" "$TERMUX_STANDALONE_TOOLCHAIN" <<'TERMI_MOZ_HOST'
 from pathlib import Path
@@ -2415,6 +2412,13 @@ TERMI_MOZ_HOST
 		export HOST_CFLAGS="-O2" HOST_CXXFLAGS="-O2" HOST_CPPFLAGS=""
 	fi
 """
+        return setup
+
+    def mozilla_host_tools(t, version):
+        assert 'TERMUX_PKG_VERSION="'+version+'"' in t, 'Mozilla version changed'
+        anchor = '\t./mach configure\n'
+        assert t.count(anchor) == 1, 'Mozilla configure changed'
+        setup = clean_host_tools_setup()
         return t.replace(anchor, setup+anchor)
     for name, version in [('firefox', '158.0'), ('librewolf', '158.0-1'), ('thunderbird', '158.0'), ('zen-browser', '1.23.3b')]:
         def browser_providers(t, n=name, v=version):
@@ -2425,6 +2429,13 @@ TERMI_MOZ_HOST
                 t = t.replace(anchor, anchor[:-1] + ', googletest, libbsd, libdeflate, libmd, libunibreak, libxres, libxt"')
             return t
         change(name, browser_providers, tree='x11-packages')
+
+    def native_helper_compilers(t, guard):
+        assert guard in t, 'Native-helper recipe version changed'
+        setup = clean_host_tools_setup() + '\tif [[ "$TERMUX_ON_DEVICE_BUILD" == false ]]; then\n\t\texport CC_FOR_BUILD="$HOST_CC" CXX_FOR_BUILD="$HOST_CXX"\n\t\texport CFLAGS_FOR_BUILD="-O2" CXXFLAGS_FOR_BUILD="-O2" CPPFLAGS_FOR_BUILD="" LDFLAGS_FOR_BUILD=""\n\tfi\n'
+        return hook(t, 'termux_step_pre_configure', setup)
+    change('suite3270', lambda t: native_helper_compilers(t, 'TERMUX_PKG_VERSION=4.1ga11'))
+    change('frida', lambda t: native_helper_compilers(t, '_MAJOR_VERSION=17\n_MINOR_VERSION=2\n_MICRO_VERSION=14\n'), tree='root-packages')
 
     def rust_private_libraries(t, version, libraries, dependencies):
         assert 'TERMUX_PKG_VERSION="'+version+'"' in t, 'Rust consumer version changed'
