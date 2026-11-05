@@ -1553,6 +1553,14 @@ TERMI_CONSUMER_AVAHI''')
 	fi''')
     change('bazel', bazel_isolated_prefix)
 
+    # The original dependency list omits librhash. A full-catalog prefix
+    # accidentally enabled its non-cross-aware runtime probe; a focused seed
+    # must follow the recipe's declared dependency boundary.
+    def dar_isolated_prefix(t):
+        assert 'TERMUX_PKG_VERSION="2.8.6"\n' in t, 'Dar version changed'
+        return hook(t, 'termux_step_pre_configure', r'''	[[ ! -e "$TERMUX_PREFIX/include/rhash.h" ]] || termux_error_exit "Dar focused seed contains undeclared librhash header"''')
+    change('dar', dar_isolated_prefix)
+
     # LLVM 14's SmallVector uses uint32_t/uint64_t but relies on transitive
     # includes removed by newer host standard libraries. Fix the owning header.
     change('ldc', lambda t: matching_cxx(hook(t, 'termux_step_host_build', '''
