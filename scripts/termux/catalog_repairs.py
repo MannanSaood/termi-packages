@@ -1516,6 +1516,30 @@ TERMI_CONSUMER_AVAHI''')
     change('mpd', lambda t: avahi_consumer_malloc(t, '0.24.16'))
     change('tinysparql', lambda t: avahi_consumer_malloc(t, '3.12.0'))
 
+    # Old cc/backtrace-sys emits an unversioned target after inherited flags.
+    # Append the configured Android API in a target-only private C wrapper.
+    def termplay_api_compiler(t):
+        assert 'TERMUX_PKG_VERSION=2.0.6\n' in t, 'Termplay version changed'
+        return hook(t, 'termux_step_pre_configure', r'''	local termi_api_cc="$TERMUX_PKG_TMPDIR/termi-api-cc"
+	printf '#!/bin/bash\nexec %q "$@" --target=%q\n' "$CC" "${TERMUX_HOST_PLATFORM}${TERMUX_PKG_API_LEVEL}" > "$termi_api_cc"
+	chmod 755 "$termi_api_cc"
+	local termi_cc_key="CC_${CARGO_TARGET_NAME//-/_}"
+	export "$termi_cc_key=$termi_api_cc"''')
+    change('termplay', termplay_api_compiler)
+
+    # ICU's public LocalPointer template uses C++17 auto non-type parameters.
+    # Keep Qt's flags/features and force that dialect last at this compiler.
+    def qtlocation_icu_dialect(t):
+        assert 'TERMUX_PKG_VERSION="5.15.18"\n' in t, 'Qt Location version changed'
+        anchor='\t\t-spec "${TERMUX_PREFIX}/lib/qt/mkspecs/termux-cross"'
+        assert t.count(anchor)==1, 'Qt Location qmake anchor changed'
+        t=t.replace(anchor, anchor+' \\\n\t\t"QMAKE_CXX=$termi_location_cxx"')
+        setup=r'''	local termi_location_cxx="$TERMUX_PKG_TMPDIR/termi-location-cxx"
+	printf '#!/bin/bash\nexec %q "$@" -std=c++17\n' "$CXX" > "$termi_location_cxx"
+	chmod 755 "$termi_location_cxx"'''
+        return hook(t, 'termux_step_configure', setup)
+    change('qt5-qtlocation', qtlocation_icu_dialect, tree='x11-packages')
+
     # LLVM 14's SmallVector uses uint32_t/uint64_t but relies on transitive
     # includes removed by newer host standard libraries. Fix the owning header.
     change('ldc', lambda t: matching_cxx(hook(t, 'termux_step_host_build', '''
