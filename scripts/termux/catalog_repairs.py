@@ -2427,6 +2427,8 @@ TERMI_MOZ_HOST
                 anchor = 'TERMUX_PKG_BUILD_DEPENDS="libcpufeatures, libice, libsm"'
                 assert t.count(anchor) == 1, 'Mozilla build providers changed'
                 t = t.replace(anchor, anchor[:-1] + ', googletest, libbsd, libdeflate, libmd, libunibreak, libxres, libxt"')
+            if n == 'librewolf':
+                t = hook(t, 'termux_step_make', '\tTERMUX_PKG_MAKE_PROCESSES=1\n\texport CARGO_BUILD_JOBS=1\n')
             return t
         change(name, browser_providers, tree='x11-packages')
 
