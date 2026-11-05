@@ -1481,6 +1481,38 @@ for p in root.rglob('*.c'):
 assert changed>0, 'PipeWire Avahi consumer includes changed'
 TERMI_PIPEWIRE_AVAHI''')))
 
+    # These consumers hit the same prefix/NDK malloc include_next collision
+    # as PipeWire. Keep the installed Avahi header and all features intact.
+    def avahi_consumer_malloc(t, version):
+        assert ('TERMUX_PKG_VERSION='+version+'\n' in t or
+                'TERMUX_PKG_VERSION="'+version+'"\n' in t), 'Avahi consumer version changed'
+        t, count = re.subn(r'^TERMUX_PKG_DEPENDS="([^"]*)"$',
+                           lambda m: 'TERMUX_PKG_DEPENDS="avahi, '+m[1]+'"', t, flags=re.M)
+        assert count == 1, 'Avahi consumer dependency anchor changed'
+        return hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PREFIX" "$TERMUX_PKG_SRCDIR" <<'TERMI_CONSUMER_AVAHI'
+from pathlib import Path
+import sys
+prefix=Path(sys.argv[1]);root=Path(sys.argv[2])
+header=prefix/'include/avahi-common/malloc.h'
+assert header.is_file(), 'Installed Avahi malloc header missing'
+s=header.read_text()
+assert s.count('#include_next <malloc.h>')==1, 'Avahi malloc shim changed'
+assert (prefix/'include/malloc.h').is_file(), 'Prefix malloc header missing'
+private=root/'src/termi-avahi-malloc.h'
+private.write_text(s.replace('#include_next <malloc.h>', '#include "'+str(prefix/'include/malloc.h')+'"'))
+changed=0
+for p in root.rglob('*'):
+    if not p.is_file() or p.suffix not in ('.c', '.cc', '.cpp', '.cxx', '.h', '.hpp') or p==private:
+        continue
+    s=p.read_text()
+    old='#include <avahi-common/malloc.h>'
+    if old in s:
+        p.write_text(s.replace(old, '#include "'+str(private)+'"'));changed+=1
+assert changed>0, 'Avahi consumer includes changed'
+TERMI_CONSUMER_AVAHI''')
+    change('mpd', lambda t: avahi_consumer_malloc(t, '0.24.16'))
+    change('tinysparql', lambda t: avahi_consumer_malloc(t, '3.12.0'))
+
     # LLVM 14's SmallVector uses uint32_t/uint64_t but relies on transitive
     # includes removed by newer host standard libraries. Fix the owning header.
     change('ldc', lambda t: matching_cxx(hook(t, 'termux_step_host_build', '''
