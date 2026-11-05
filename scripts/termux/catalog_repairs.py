@@ -1561,6 +1561,37 @@ TERMI_CONSUMER_AVAHI''')
         return hook(t, 'termux_step_pre_configure', r'''	[[ ! -e "$TERMUX_PREFIX/include/rhash.h" ]] || termux_error_exit "Dar focused seed contains undeclared librhash header"''')
     change('dar', dar_isolated_prefix)
 
+    # Cross-executed RPython probes need the existing AOSP loader mounted at
+    # /system. Keep Android library paths inside the guest, never on host PyPy.
+    def pypy_android_execution(t, version):
+        assert ('TERMUX_PKG_VERSION="'+version+'"\n' in t or
+                'TERMUX_PKG_VERSION='+version+'\n' in t), 'PyPy version changed'
+        bind='-b /proc -b /dev -b /sys\n'
+        assert t.count(bind)==1, 'PyPy proot mount anchor changed'
+        t=t.replace(bind, bind+'-b $TERMUX_PREFIX/opt/aosp:/system\n')
+        guest='\t$PROOT_TARGET env -i \\\n'
+        assert t.count(guest)==1, 'PyPy guest packaging environment changed'
+        t=t.replace(guest,guest+'\t\tLD_PRELOAD= \\\n\t\tLD_LIBRARY_PATH="$TERMUX_PREFIX/lib" \\\n\t\tANDROID_ROOT=/system \\\n\t\tANDROID_DATA=/data \\\n')
+        return hook(t, 'termux_step_pre_configure', r'''	local termi_pypy_loader=linker
+	[[ "$TERMUX_ARCH_BITS" != 64 ]] || termi_pypy_loader=linker64
+	[[ -x "$TERMUX_PREFIX/opt/aosp/bin/$termi_pypy_loader" ]] || termux_error_exit "Source-built AOSP loader missing"
+	python3 - "$TERMUX_PKG_SRCDIR/rpython/translator/platform/termux.py" "$TERMUX_PREFIX" <<'TERMI_PYPY_EXEC'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);prefix=sys.argv[2];s=p.read_text()
+anchor='        args = PROOT_TARGET_ARGS[1:] + args'
+assert s.count(anchor)==1, 'RPython guest execution anchor changed'
+guest=["/usr/bin/env", "LD_PRELOAD=", "LD_LIBRARY_PATH="+prefix+"/lib", "ANDROID_ROOT=/system", "ANDROID_DATA=/data"]
+s=s.replace(anchor, '        args = PROOT_TARGET_ARGS[1:] + '+repr(guest)+' + args')
+anchor='        returncode, stdout, stderr = _run_subprocess(proot_exec, args, env)'
+assert s.count(anchor)==1, 'RPython host execution anchor changed'
+clean='\n'.join(['        host_env = dict(os.environ if env is None else env)', '        host_env.pop("LD_PRELOAD", None)', '        host_env.pop("LD_LIBRARY_PATH", None)', '        returncode, stdout, stderr = _run_subprocess(proot_exec, args, host_env)'])
+s=s.replace(anchor,clean)
+p.write_text(s)
+TERMI_PYPY_EXEC''')
+    change('pypy', lambda t: pypy_android_execution(t, '8.0.1'))
+    change('pypy3', lambda t: pypy_android_execution(t, '8.0.0'))
+
     # LLVM 14's SmallVector uses uint32_t/uint64_t but relies on transitive
     # includes removed by newer host standard libraries. Fix the owning header.
     change('ldc', lambda t: matching_cxx(hook(t, 'termux_step_host_build', '''
