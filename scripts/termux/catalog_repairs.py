@@ -2417,7 +2417,14 @@ TERMI_MOZ_HOST
 """
         return t.replace(anchor, setup+anchor)
     for name, version in [('firefox', '158.0'), ('librewolf', '158.0-1'), ('thunderbird', '158.0'), ('zen-browser', '1.23.3b')]:
-        change(name, lambda t, v=version: mozilla_host_tools(t, v), tree='x11-packages')
+        def browser_providers(t, n=name, v=version):
+            t = mozilla_host_tools(t, v)
+            if n != 'firefox':
+                anchor = 'TERMUX_PKG_BUILD_DEPENDS="libcpufeatures, libice, libsm"'
+                assert t.count(anchor) == 1, 'Mozilla build providers changed'
+                t = t.replace(anchor, anchor[:-1] + ', googletest, libbsd, libdeflate, libmd, libunibreak, libxres, libxt"')
+            return t
+        change(name, browser_providers, tree='x11-packages')
 
     def rust_private_libraries(t, version, libraries, dependencies):
         assert 'TERMUX_PKG_VERSION="'+version+'"' in t, 'Rust consumer version changed'
@@ -2444,7 +2451,7 @@ TERMI_MOZ_HOST
         assert 'TERMUX_PKG_VERSION="3.2.91"' in t, 'Smalltalk version changed'
         anchor = '\t"$TERMUX_PKG_SRCDIR"/configure --disable-gtk --disable-bloxtk\n'
         assert t.count(anchor) == 1, 'Smalltalk host configure changed'
-        return t.replace(anchor, '\tCFLAGS="${CFLAGS:-} -std=gnu99" '+anchor.lstrip())
+        return t.replace(anchor, '\tCFLAGS="${CFLAGS:-} -std=gnu99 -Wno-error=incompatible-pointer-types" '+anchor.lstrip())
     change('smalltalk', smalltalk_host_dialect)
 
     # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
