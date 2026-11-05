@@ -27,7 +27,7 @@ class ProgressTests(unittest.TestCase):
             self.assertIn('LLVM extraction stage',snapshot['failures'][-1]['tail'])
             self.assertEqual(51,snapshot['omitted_failure_logs'])
 
-    def test_reporting_recovery_preserves_native_exit_and_final_publication_failures(self):
+    def test_reporting_outages_preserve_native_exit_including_final_update(self):
         class Builder:
             returncode = None
             def poll(self): return self.returncode
@@ -35,7 +35,9 @@ class ProgressTests(unittest.TestCase):
 
         for native_exit, reports, expected in [
             (0, [subprocess.TimeoutExpired('gh', 60), None], 0),
-            (0, [None, subprocess.TimeoutExpired('gh', 60)], 1),
+            # Live reporting is optional; candidate publication is a separate,
+            # mandatory workflow step and is not covered by this reporter.
+            (0, [None, subprocess.TimeoutExpired('gh', 60)], 0),
             (7, [subprocess.TimeoutExpired('gh', 60), None], 7),
         ]:
             with self.subTest(native_exit=native_exit, expected=expected), tempfile.TemporaryDirectory() as tmp:

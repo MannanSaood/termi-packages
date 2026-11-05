@@ -68,13 +68,17 @@ def gh(repository, *arguments):
     return result
 
 
-def publish(repository, tag, directory, value, assets=True):
+def write_local_progress(directory, value):
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "progress.json").write_text(json.dumps(value, indent=2) + "\n")
     (directory / "progress.md").write_text(markdown(value))
     failures = "\n\n".join(f"RECIPE {f['recipe']} STATUS {f['status']} EXIT {f.get('exit_code')}\n{f.get('tail','')}" for f in value.get("failures", []))
     (directory / "failures.log").write_text(failures or "No failed/interrupted recipes recorded at this update.\n")
     (directory / "current.log").write_text(value.get("current_log_tail", "") or "No current compiler log available.\n")
+
+
+def publish(repository, tag, directory, value, assets=True):
+    write_local_progress(directory, value)
     if assets:
         gh(repository, "upload", tag, *[str(directory / name) for name in ["progress.json", "progress.md", "failures.log", "current.log"]], "--clobber")
     gh(repository, "edit", tag, "--notes-file", str(directory / "progress.md"))
@@ -112,13 +116,12 @@ def main():
     visibility = json.loads(subprocess.check_output(["gh", "repo", "view", args.repository, "--json", "visibility"]))["visibility"]
     if visibility != "PUBLIC":
         raise ValueError("Live progress requires the free public package repository")
-    gh(args.repository, "create", args.tag, "--title", "Live build " + args.tag, "--notes", "Preparing source build; counts follow.", "--prerelease", "--latest=false")
-    print("Live progress: https://github.com/" + args.repository + "/releases/tag/" + args.tag, flush=True)
     value = dict(schema=1, updated=datetime.datetime.now(datetime.timezone.utc).isoformat(), status="preparing",
                  counts={}, total_recipes=None, deb_files=None, current=[], failures=[], approved=False)
     directory = args.build_dir.parent / "live-progress"
     process = subprocess.Popen(command)
     next_update, next_assets, failures = 0, 0, 0
+    release_ready = False
     try:
         while True:
             if time.monotonic() >= next_update or process.poll() is not None:
@@ -134,6 +137,17 @@ def main():
                         value["status"] = "completed" if process.returncode == 0 else "stopped-with-errors-or-pending-work"
                         value["build_exit_code"] = process.returncode
                     asset_due = time.monotonic() >= next_assets or process.poll() is not None
+                    write_local_progress(directory, value)
+                    if not release_ready:
+                        # A previous create may have succeeded despite a lost
+                        # response. Reuse that run-specific tag without deleting it.
+                        try:
+                            gh(args.repository, "view", args.tag)
+                        except subprocess.CalledProcessError:
+                            gh(args.repository, "create", args.tag, "--title", "Live build " + args.tag,
+                               "--notes", "Preparing source build; counts follow.", "--prerelease", "--latest=false")
+                        release_ready = True
+                        print("Live progress: https://github.com/" + args.repository + "/releases/tag/" + args.tag, flush=True)
                     publish(args.repository, args.tag, directory, value, assets=asset_due)
                     # A recovered live-report timeout must not turn a successful
                     # compiler and final publication into a failed build job.
@@ -156,7 +170,9 @@ def main():
         if process.poll() is None:
             process.terminate()
             process.wait(timeout=30)
-    raise SystemExit(process.returncode or (1 if failures else 0))
+    # Live reporting is optional. The workflow separately requires candidate
+    # publication and checkpoint export; never hide the compiler's exit code.
+    raise SystemExit(process.returncode)
 
 
 if __name__ == "__main__":
