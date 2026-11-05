@@ -2344,6 +2344,28 @@ TERMI_CC_DEPRECATED
     for name, version in [('cabal-install', '3.16.1.0'), ('hledger', '"1.52.4"'), ('hledger-ui', '"1.52.4"')]:
         change(name, lambda t, n=name, v=version: ghc_android_loader(t, n, v))
 
+    def ghc_private_cxx(t, name, version):
+        t = ghc_android_loader(t, name, version)
+        anchor = '\t\ttermux_setup_ghc_iserv\n'
+        setup = r'''		python3 - "$CXX" "$TERMUX_PREFIX" "$TERMUX_PKG_TMPDIR/termi-ghc-cxx" <<'TERMI_GHC_CXX'
+from pathlib import Path
+import shlex, sys
+compiler, prefix, target = sys.argv[1:]
+headers = Path(prefix) / 'include/c++/v1'
+assert (headers/'string').is_file(), 'Source-built libc++ headers missing'
+command = shlex.split(compiler)
+assert command, 'Missing target C++ compiler'
+p = Path(target)
+p.write_text('#!/bin/bash\nexec '+shlex.join(command+['-nostdinc++', '-I'+str(headers)])+' "$@"\n')
+p.chmod(0o755)
+TERMI_GHC_CXX
+'''
+        options = 'ghc-options: -fexternal-interpreter'
+        assert t.count(options) == 1, name + ' GHC options changed'
+        return t.replace(anchor, anchor + setup).replace(options, 'ghc-options: -pgmcxx=$TERMUX_PKG_TMPDIR/termi-ghc-cxx -fexternal-interpreter')
+    for name, version in [('darcs', '"2.18.5"'), ('pandoc', '"3.12.1"')]:
+        change(name, lambda t, n=name, v=version: ghc_private_cxx(t, n, v))
+
     # libbpf-sys also builds for a Linux-host build dependency. Its Makefile
     # otherwise inherits Android CPPFLAGS/pkg-config paths from the recipe.
     change('below', lambda t: t.replace('\tcargo fetch --target $CARGO_TARGET_NAME\n', '''\tcargo fetch --target $CARGO_TARGET_NAME
