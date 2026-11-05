@@ -1531,14 +1531,27 @@ TERMI_CONSUMER_AVAHI''')
     # Keep Qt's flags/features and force that dialect last at this compiler.
     def qtlocation_icu_dialect(t):
         assert 'TERMUX_PKG_VERSION="5.15.18"\n' in t, 'Qt Location version changed'
+        dep='TERMUX_PKG_BUILD_DEPENDS="qt5-qtbase-cross-tools"'
+        assert t.count(dep)==1, 'Qt Location header provider changed'
+        t=t.replace(dep, 'TERMUX_PKG_BUILD_DEPENDS="qt5-qtbase-cross-tools, ndk-sysroot"')
         anchor='\t\t-spec "${TERMUX_PREFIX}/lib/qt/mkspecs/termux-cross"'
         assert t.count(anchor)==1, 'Qt Location qmake anchor changed'
         t=t.replace(anchor, anchor+' \\\n\t\t"QMAKE_CXX=$termi_location_cxx"')
-        setup=r'''	local termi_location_cxx="$TERMUX_PKG_TMPDIR/termi-location-cxx"
+        setup=r'''	[[ -f "$TERMUX_PREFIX/include/c++/v1/vector" ]] || termux_error_exit "Source-built NDK C++ headers missing"
+	local termi_location_cxx="$TERMUX_PKG_TMPDIR/termi-location-cxx"
 	printf '#!/bin/bash\nexec %q "$@" -std=c++17\n' "$CXX" > "$termi_location_cxx"
 	chmod 755 "$termi_location_cxx"'''
         return hook(t, 'termux_step_configure', setup)
     change('qt5-qtlocation', qtlocation_icu_dialect, tree='x11-packages')
+
+    # A focused seed must not replay unrelated Emscripten cyclic test data.
+    # Fail visibly if the original full-catalog contamination is present.
+    def bazel_isolated_prefix(t):
+        assert 'TERMUX_PKG_VERSION="9.3.0"\n' in t, 'Bazel version changed'
+        return hook(t, 'termux_step_pre_configure', r'''	if [[ -e "$TERMUX_PREFIX/opt/emscripten/test/third_party/wasi-test-suite/fixtures/symlink_to_parent_directory" ]]; then
+		termux_error_exit "Bazel focused seed contains unrelated Emscripten cyclic test fixture"
+	fi''')
+    change('bazel', bazel_isolated_prefix)
 
     # LLVM 14's SmallVector uses uint32_t/uint64_t but relies on transitive
     # includes removed by newer host standard libraries. Fix the owning header.
