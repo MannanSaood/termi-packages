@@ -1596,6 +1596,13 @@ TERMI_PYPY_EXEC''')
     change('pypy', lambda t: pypy_android_execution(t, '8.0.1'))
     change('pypy3', lambda t: pypy_android_execution(t, '8.0.0'))
 
+    # A full-catalog prefix mixed system glslang headers with the bundled
+    # subproject. The recipe's declared dependency-only seed has no glslang.
+    def vapoursynth_isolated_headers(t):
+        assert 'TERMUX_PKG_VERSION="81"\n' in t, 'VapourSynth version changed'
+        return hook(t, 'termux_step_pre_configure', r'''	[[ ! -e "$TERMUX_PREFIX/include/glslang/MachineIndependent/localintermediate.h" ]] || termux_error_exit "VapourSynth focused seed contains unrelated glslang headers"''')
+    change('vapoursynth', vapoursynth_isolated_headers)
+
     # LLVM 14's SmallVector uses uint32_t/uint64_t but relies on transitive
     # includes removed by newer host standard libraries. Fix the owning header.
     change('ldc', lambda t: matching_cxx(hook(t, 'termux_step_host_build', '''
@@ -2546,6 +2553,8 @@ TERMI_MOZ_HOST
                 t = hook(t, 'termux_step_make', '\tTERMUX_PKG_MAKE_PROCESSES=1\n\texport CARGO_BUILD_JOBS=1\n')
             return t
         change(name, browser_providers, tree='x11-packages')
+
+    change('spidermonkey', lambda t: mozilla_host_tools(t, '140.17.0'))
 
     def native_helper_compilers(t, guard):
         assert guard in t, 'Native-helper recipe version changed'
