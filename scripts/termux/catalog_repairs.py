@@ -978,6 +978,13 @@ TERMI_ERLANG_EI
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate"\n'
     change('postgis', postgis_metadata_provider)
     change('ibus-libpinyin', postgis_metadata_provider, tree='x11-packages')
+    def nemo_metadata_providers(t):
+        anchor = 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross"'
+        assert 'TERMUX_PKG_VERSION="6.6.4"' in t and t.count(anchor) == 1, 'Nemo build provider contract changed'
+        # Own-source GTK/TinySPARQL metadata requires these private .pc
+        # providers in a dependency-only prefix; retain all Nemo features.
+        return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross, libdeflate, libxres"')
+    change('nemo', nemo_metadata_providers, tree='x11-packages')
     def gtk_metadata_provider(t):
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'GTK consumer build prerequisites changed'
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate, libxres"\n'
