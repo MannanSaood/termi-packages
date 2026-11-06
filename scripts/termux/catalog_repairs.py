@@ -1030,6 +1030,23 @@ TERMI_VCSH_RELEASE_FRAGMENTS
     (cd "$TERMUX_PKG_SRCDIR" && autoreconf -fi)
 ''')
     change('vcsh', vcsh_regenerated_release)
+    # Current official cgit snapshots were compared byte-for-byte with the
+    # immutable upstream release Git trees (including executable modes and
+    # symlinks). Keep versions, URLs and every other recipe byte unchanged.
+    def verified_release_snapshot(t, version, old_hash, new_hash):
+        assert f'TERMUX_PKG_VERSION={version}\n' in t, 'Release version changed'
+        old = 'TERMUX_PKG_SHA256=' + old_hash + '\n'
+        assert t.count(old) == 1, 'Pinned release checksum changed'
+        return t.replace(old, 'TERMUX_PKG_SHA256=' + new_hash + '\n')
+    # password-store 1.7.4: 1078f2514d579178d5df7042c6a790e9c9b731ad.
+    change('pass', lambda t: verified_release_snapshot(t, '1.7.4',
+        'cfa9faf659f2ed6b38e7a7c3fb43e177d00edbacc6265e6e32215ff40e3793c0',
+        '4c2d0a8b99df8915a87099607a8d912fd05d30651b6f014745c14e4ca8dbbfb7'))
+    # music-file-organizer 1.0.4: 51755459acd2c32b2b9b64b3673160cd2d4edef1.
+    change('music-file-organizer', lambda t: verified_release_snapshot(t, '1.0.4',
+        '9e3e2df24c5293e14c40d85fb480f5d52c0dc9afac845280a356c2fb6531e43e',
+        'a379cea1fe6381b5bface27deeb7e4db1f76b2fb2230dadc1f171b796e9a43d7'))
+
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
         # The full catalog can expose Kerberos' incompatible com_err library.
