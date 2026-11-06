@@ -991,6 +991,18 @@ TERMI_ERLANG_EI
         # in the full catalog prefix. A focused dependency seed excludes it.
         return hook(t, 'termux_step_pre_configure', '''
     [[ ! -e "$TERMUX_PREFIX/bin/ccache" ]] || termux_error_exit "MuseScore focused seed contains an unrelated target ccache executable"
+    python3 - "$TERMUX_PKG_SRCDIR" <<'TERMI_MUSESCORE_QML_UNITY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]) / 'src/framework/extensions/qml/Muse/Extensions/CMakeLists.txt'
+s = p.read_text()
+anchor = 'fixup_qml_module_dependencies(muse_extensions_qml)'
+assert s.count(anchor) == 1 and 'qt_add_qml_module(muse_extensions_qml' in s, 'MuseScore extensions QML target changed'
+# Generated Qt AOT Type and muse::extensions::Type collide only when
+# unrelated source files share a unity translation unit. Keep every source
+# and QML module enabled, compiling this target as separate translation units.
+p.write_text(s.replace(anchor, anchor + '\\nset_target_properties(muse_extensions_qml PROPERTIES UNITY_BUILD OFF)'))
+TERMI_MUSESCORE_QML_UNITY
 ''')
     change('musescore', musescore_isolated_host_tools, tree='x11-packages')
     def gtk_metadata_provider(t):
