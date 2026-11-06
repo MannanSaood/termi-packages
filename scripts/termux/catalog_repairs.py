@@ -985,6 +985,14 @@ TERMI_ERLANG_EI
         # providers in a dependency-only prefix; retain all Nemo features.
         return t.replace(anchor, 'TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross, libdeflate, libxres"')
     change('nemo', nemo_metadata_providers, tree='x11-packages')
+    def musescore_isolated_host_tools(t):
+        assert 'TERMUX_PKG_VERSION="4.7.5"' in t, 'MuseScore source version changed'
+        # CMake previously autodetected an unrelated Android ccache binary
+        # in the full catalog prefix. A focused dependency seed excludes it.
+        return hook(t, 'termux_step_pre_configure', '''
+    [[ ! -e "$TERMUX_PREFIX/bin/ccache" ]] || termux_error_exit "MuseScore focused seed contains an unrelated target ccache executable"
+''')
+    change('musescore', musescore_isolated_host_tools, tree='x11-packages')
     def gtk_metadata_provider(t):
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'GTK consumer build prerequisites changed'
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate, libxres"\n'
