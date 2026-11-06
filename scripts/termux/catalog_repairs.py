@@ -1030,6 +1030,16 @@ TERMI_VCSH_RELEASE_FRAGMENTS
     (cd "$TERMUX_PKG_SRCDIR" && autoreconf -fi)
 ''')
     change('vcsh', vcsh_regenerated_release)
+    def e2tools_isolated_error_provider(t):
+        assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
+        # The full catalog can expose Kerberos' incompatible com_err library.
+        # Keep the declared e2fsprogs provider and verify its private table ABI.
+        return hook(t, 'termux_step_pre_configure', '''
+    [[ ! -e "$TERMUX_PREFIX/lib/libkrb5.so" && ! -e "$TERMUX_PREFIX/bin/krb5-config" ]] || termux_error_exit "e2tools focused seed contains an unrelated Kerberos com_err provider"
+    [[ -f "$TERMUX_PREFIX/lib/libcom_err.a" ]] || termux_error_exit "e2tools e2fsprogs error-table archive missing"
+    "${NM:-nm}" -g --defined-only "$TERMUX_PREFIX/lib/libcom_err.a" | grep '[[:space:]]_et_list$' >/dev/null || termux_error_exit "e2tools e2fsprogs error-table ABI missing"
+''')
+    change('e2tools', e2tools_isolated_error_provider)
     def gtk_metadata_provider(t):
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'GTK consumer build prerequisites changed'
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate, libxres"\n'
