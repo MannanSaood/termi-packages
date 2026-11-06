@@ -1005,6 +1005,31 @@ p.write_text(s.replace(anchor, anchor + '\\nset_target_properties(muse_extension
 TERMI_MUSESCORE_QML_UNITY
 ''')
     change('musescore', musescore_isolated_host_tools, tree='x11-packages')
+    def vcsh_regenerated_release(t):
+        assert 'TERMUX_PKG_VERSION="2.0.10"' in t and 'TERMUX_PKG_BUILD_IN_SRC=true' in t, 'VCSH release contract changed'
+        return hook(t, 'termux_step_pre_configure', '''
+    python3 - "$TERMUX_PKG_SRCDIR" <<'TERMI_VCSH_RELEASE_FRAGMENTS'
+from pathlib import Path
+import hashlib, sys
+root = Path(sys.argv[1])
+s = (root / 'aminclude.am').read_text()
+fragments = [
+    ('que_git_version.am', '.SECONDEXPANSION:\\n', '531a45406f6c657d4ceeeb58ecf6b72b858fa656e90b97f3f3748f641790cd4b'),
+    ('que_shell_completion_dirs.am', 'COMPLETIONS_OUT_DIR = completions\\n', '496fde12bf09a6d532938791bd123b7f6659bdf9a86bb278b4932d996e7c1190'),
+]
+for name, anchor, expected in fragments:
+    assert s.count(anchor) == 1, 'VCSH embedded make fragment changed: ' + name
+    start = s.index(anchor)
+    end = s.index('# vim: ft=automake\\n', start) + len('# vim: ft=automake\\n')
+    text = s[start:end]
+    assert hashlib.sha256(text.encode()).hexdigest() == expected, 'VCSH make fragment hash changed: ' + name
+    p = root / 'build-aux' / name
+    assert not p.exists() or p.read_text() == text, 'VCSH existing make fragment differs: ' + name
+    p.write_text(text)
+TERMI_VCSH_RELEASE_FRAGMENTS
+    (cd "$TERMUX_PKG_SRCDIR" && autoreconf -fi)
+''')
+    change('vcsh', vcsh_regenerated_release)
     def gtk_metadata_provider(t):
         assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'GTK consumer build prerequisites changed'
         return t + '\nTERMUX_PKG_BUILD_DEPENDS="libdeflate, libxres"\n'
