@@ -1720,6 +1720,16 @@ TERMI_LDC_STDINT
         assert t.count('\ttermux_setup_ldc\n') == 1, 'Tilix LDC setup changed'
         return hook(t, 'termux_step_configure', '''\tif [[ "$TERMUX_ON_DEVICE_BUILD" == false ]]; then
 \t\t_termi_ldc_host_xml
+\t\t# GNU ld.bfd needs a link-only path to libandroid-shmem's
+\t\t# indirect Android system dependencies.
+\t\tlocal log_stub android_stub
+\t\tlog_stub=$("$CC" --print-file-name=liblog.so)
+\t\tandroid_stub=$("$CC" --print-file-name=libandroid.so)
+\t\t[[ "$log_stub" == /* && "$android_stub" == /* &&
+\t\t   -f "$log_stub" && -f "$android_stub" &&
+\t\t   "${log_stub%/*}" == "${android_stub%/*}" ]] ||
+\t\t    termux_error_exit "Tilix requires matching NDK liblog and libandroid stubs"
+\t\tLDFLAGS+=" -Wl,-rpath-link=${log_stub%/*}"
 \tfi''') + LDC_HOST_XML_SETUP
     change('tilix', tilix_ldc_host_xml, tree='x11-packages')
 
