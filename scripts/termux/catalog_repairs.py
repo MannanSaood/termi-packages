@@ -221,6 +221,7 @@ conversion = boost / 'numeric/conversion'
 converter = conversion / 'detail/converter.hpp'
 hash_header = boost / 'functional/hash/hash.hpp'
 document = root / 'rapidjson/1.1.0/include/rapidjson/document.h'
+projection = root.parent / 'src/mbgl/layout/symbol_projection.cpp'
 enum_pins = {
     'udt_builtin_mixture_enum': '61025c6776952f21f945cacf15b075736d9aa2dbab100b68918e27b43e6eb392',
     'int_float_mixture_enum': 'e184b040c8bb3390deb8ec866d87c2492a244b7262b2fd0990bdecfacd2093b3',
@@ -230,6 +231,7 @@ pins = {
     converter: '4fd7555782e5840bb052741d2133e1b0890a0d34ad11e1a8eb5a6b1782da8156',
     hash_header: 'c8aab6218c86857cb2fbc98a8a9b95f38519d9f4cc4b5995ea16bbd480da441c',
     document: 'da02371e1747e869c56fbe0a66d66630aefbefee6d615740f2895342c924fc8c',
+    projection: 'cdfca9bc4874eeb9ecf9c32a3c8dece00351a9d98c04ec7f502e33c7f4a83f93',
 }
 pins.update({conversion / (name + '.hpp'): pin for name, pin in enum_pins.items()})
 texts = {}
@@ -254,6 +256,9 @@ for name in enum_pins:
     replace_once(conversion / (name + '.hpp'), 'enum ' + name + '\n', 'enum ' + name + ' : int\n')
 replace_once(document, 'GenericStringRef& operator=(const GenericStringRef& rhs) { s = rhs.s; length = rhs.length; }',
              'GenericStringRef& operator=(const GenericStringRef&) = delete;')
+# PointAndCameraDistance already stores the camera distance as float.
+replace_once(projection, 'static_cast<float>(pos[1] / pos[3]) }, pos[3] };',
+             'static_cast<float>(pos[1] / pos[3]) }, static_cast<float>(pos[3]) };')
 for file, text in texts.items():
     file.write_bytes(text.encode())
 '''
