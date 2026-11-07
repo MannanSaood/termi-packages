@@ -1193,6 +1193,20 @@ TERMI_ORT_FLATBUFFERS''')
             host, host + '\t\t"libutf8proc-dev"\n\t\t"libutf8proc3"\n')
     change('swi-prolog', swi_prolog_utf8proc)
 
+    def ghostty_isolated_zig_headers(t):
+        assert 'TERMUX_PKG_VERSION="1.3.1"\n' in t and 'TERMUX_ZIG_VERSION="0.15.2"\n' in t, 'Ghostty toolchain changed'
+        assert '\t\t--search-prefix "${TERMUX_PREFIX}" \\\n' in t, 'Ghostty Zig include search changed'
+        # Zig supplies the Android C headers through its explicit libc file.
+        return hook(t, 'termux_step_pre_configure', '''	if [[ "$TERMUX_ON_DEVICE_BUILD" == "false" ]]; then
+		local header
+		for header in string.h stdlib.h ctype.h wctype.h wchar.h math.h float.h; do
+			[[ ! -e "$TERMUX_PREFIX/include/$header" ]] ||
+				termux_error_exit "Ghostty requires a focused prefix without duplicate Android C headers ($header)"
+		done
+	fi
+''')
+    change('ghostty', ghostty_isolated_zig_headers, tree='x11-packages')
+
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
         # The full catalog can expose Kerberos' incompatible com_err library.
@@ -2613,14 +2627,21 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
         assert t.count(anchor) == 1, 'Cross-build proot setup changed'
         setup = '\tif [[ "$TERMUX_ARCH" == aarch64 ]]; then\n' + LIBIME_ANDROID_LOADER_SETUP + '\tfi\n'
         return t.replace(anchor, anchor + setup)
-    change('deno', lambda t: android_loader_for_build_tools(t, '1:2.9.7'))
+    def deno_final_build(t):
+        t = android_loader_for_build_tools(t, '1:2.9.7')
+        command = '\tcargo build --jobs "${TERMUX_PKG_MAKE_PROCESSES}" --target "${CARGO_TARGET_NAME}" ${_release_opt}\n'
+        assert t.count(command) == 1, 'Deno final build command changed'
+        # Build only the packaged CLI and bound final-link memory on the free runner.
+        return t.replace(command, '\tCARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \\\n'
+                         '\t\tcargo build --jobs 1 --package deno --bin deno --target "${CARGO_TARGET_NAME}" ${_release_opt}\n')
+    change('deno', deno_final_build)
 
     def gnucash_build_tools(t):
         t = android_loader_for_build_tools(t, '5.17')
         providers = 'TERMUX_PKG_BUILD_DEPENDS="aosp-libs, boost-headers, googletest"'
         assert t.count(providers) == 1, 'GnuCash build providers changed'
-        # WebKit's metadata and the cross-build guest env need these providers.
-        return t.replace(providers, providers[:-1] + ', libacl, libcap, libdeflate, libxres"')
+        # WebKit's metadata, its GStreamer libraries, and guest env need these providers.
+        return t.replace(providers, providers[:-1] + ', libacl, libcap, libdeflate, liborc, libxres"')
     change('gnucash', gnucash_build_tools, tree='x11-packages')
 
     # Independent remaining roots: preserve features and isolate compatibility.
