@@ -1094,6 +1094,23 @@ p.write_bytes(b.replace(old, b'when declared(GC_Strategy):\n  ' + old))
 TERMI_ARTURO_GC''')
     change('arturo', arturo_nim_allocator_api)
 
+    # Chromium 111's Mojo Java generator imports build_utils on the host.
+    # Python removed pipes; shlex.quote has the same shell quoting behavior.
+    def carbonyl_host_shell_quoting(t):
+        assert 'TERMUX_PKG_VERSION=0.0.3\n' in t and '_CHROMIUM_VERSION=111.0.5563.146\n' in t, 'Carbonyl source changed'
+        return hook(t, 'termux_step_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/chromium/src/build/android/gyp/util/build_utils.py" <<'TERMI_CARBONYL_PIPES'
+from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1])
+b = p.read_bytes()
+assert hashlib.sha256(b).hexdigest() == '375a3caf912b057f756be33859e95de7104b61f91aa27e92a6addbc373db2335', 'Chromium host helper changed'
+assert b.count(b'import pipes\n') == b.count(b'pipes.quote') == 1
+assert b'import shlex\n' in b
+p.write_bytes(b.replace(b'import pipes\n', b'').replace(b'pipes.quote', b'shlex.quote'))
+TERMI_CARBONYL_PIPES''')
+    change('carbonyl-host-tools', carbonyl_host_shell_quoting, tree='x11-packages')
+
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
         # The full catalog can expose Kerberos' incompatible com_err library.
