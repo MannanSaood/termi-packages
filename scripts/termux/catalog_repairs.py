@@ -1183,6 +1183,16 @@ TERMI_ORT_FLATBUFFERS''')
         return hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS)
     change('obs-backgroundremoval', obs_backgroundremoval_cxx_headers, tree='x11-packages')
 
+    def swi_prolog_utf8proc(t):
+        assert 'TERMUX_PKG_VERSION="10.1.18"\n' in t, 'SWI-Prolog version changed'
+        target = 'TERMUX_PKG_DEPENDS="libandroid-execinfo, libarchive, libcrypt, libdb, libedit, libgmp, libyaml, ncurses, openssl, ossp-uuid, pcre2, python, unixodbc, zlib"'
+        host = '\t\t"libpython3.14-dev"\n'
+        assert t.count(target) == t.count(host) == 1, 'SWI-Prolog provider configuration changed'
+        # The native QLF compiler loads the same Unicode plugins as the target.
+        return t.replace(target, target.replace('unixodbc, zlib', 'unixodbc, utf8proc, zlib')).replace(
+            host, host + '\t\t"libutf8proc-dev"\n\t\t"libutf8proc3"\n')
+    change('swi-prolog', swi_prolog_utf8proc)
+
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
         # The full catalog can expose Kerberos' incompatible com_err library.
@@ -2609,8 +2619,8 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
         t = android_loader_for_build_tools(t, '5.17')
         providers = 'TERMUX_PKG_BUILD_DEPENDS="aosp-libs, boost-headers, googletest"'
         assert t.count(providers) == 1, 'GnuCash build providers changed'
-        # WebKit's TIFF and GTK metadata require these private providers.
-        return t.replace(providers, providers[:-1] + ', libdeflate, libxres"')
+        # WebKit's metadata and the cross-build guest env need these providers.
+        return t.replace(providers, providers[:-1] + ', libacl, libcap, libdeflate, libxres"')
     change('gnucash', gnucash_build_tools, tree='x11-packages')
 
     # Independent remaining roots: preserve features and isolate compatibility.
