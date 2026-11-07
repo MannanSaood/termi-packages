@@ -1064,7 +1064,14 @@ TERMI_VCSH_RELEASE_FRAGMENTS
         url = 'https://fossies.org/linux/misc/alpine-${TERMUX_PKG_VERSION}.tar.xz'
         assert t.count(url) == 1 and t.count('\tautoreconf -fi\n') == 1, 'Alpine source or configure changed'
         return t.replace(url, 'https://alpineapp.email/alpine/release/src/alpine-${TERMUX_PKG_VERSION}.tar.xz').replace(
-            '\tautoreconf -fi\n', '\tautoconf -f\n')
+            '\tautoreconf -fi\n', '''\t# Modern Autoconf needs Automake's compile auxiliary script.
+\tif [[ ! -f "$TERMUX_PKG_SRCDIR/compile" ]]; then
+\t\tlocal automake_libdir
+\t\tautomake_libdir=$(automake --print-libdir)
+\t\tinstall -m 755 "$automake_libdir/compile" "$TERMUX_PKG_SRCDIR/compile"
+\tfi
+\tautoconf -f
+''')
     change('alpine', alpine_shipped_autotools)
 
     def e2tools_isolated_error_provider(t):
