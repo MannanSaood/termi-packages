@@ -2845,7 +2845,14 @@ TERMI_GHC_CXX
         options = 'ghc-options: -fexternal-interpreter'
         assert t.count(options) == 1, name + ' GHC options changed'
         return t.replace(anchor, anchor + setup).replace(options, 'ghc-options: -pgmcxx=$TERMUX_PKG_TMPDIR/termi-ghc-cxx -fexternal-interpreter')
-    change('darcs', lambda t: ghc_private_cxx(t, 'darcs', '"2.18.5"'))
+    def darcs_ghc_constraints(t):
+        t = ghc_private_cxx(t, 'darcs', '"2.18.5"')
+        anchor = '\techo "packages: cborg memory basement splitmix crypton-x509-system" >>cabal.project.local\n'
+        assert t.count(anchor) == 1, 'Darcs Cabal project setup changed'
+        # This version no longer uses the reserved `forall` identifier.
+        return t.replace(anchor, anchor + '\techo "constraints: constraints == 0.14.4" >>cabal.project.local\n')
+
+    change('darcs', darcs_ghc_constraints)
 
     def pandoc_matching_lua_engine(t):
         t = ghc_private_cxx(t, 'pandoc', '"3.12.1"')
