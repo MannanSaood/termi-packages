@@ -69,6 +69,8 @@ jobs:
           python3 -m unittest discover -s scripts/termux -p 'test_*.py' -v >build/tests.log 2>&1
           node --test scripts/termux/edge/worker.test.mjs >build/worker-tests.log
       - name: Measure disk and reclaim unused tools on disposable GitHub VM only
+        env:
+          FIREFOX_SOURCE_BUILD: ${{ inputs.mode == 'packages' && inputs.recipes == 'firefox' }}
         run: |
           test "$RUNNER_ENVIRONMENT" = github-hosted
           test "$RUNNER_OS" = Linux
@@ -80,6 +82,18 @@ jobs:
             fi
           done
           df -h / | tee build/disk-after.log
+          if [ "$FIREFOX_SOURCE_BUILD" = true ]; then
+            disk_report=$(df -B1 --output=avail /)
+            free_bytes=${disk_report##*$'\n'}
+            if [[ ! "$free_bytes" =~ ^[[:space:]]*[0-9]+$ ]]; then
+              echo "Could not measure Firefox runner disk headroom." >&2
+              exit 1
+            fi
+            if [ "$free_bytes" -lt $((80 * 1024 * 1024 * 1024)) ]; then
+              echo "Firefox needs at least 80 GiB free after runner cleanup. Found $free_bytes bytes." >&2
+              exit 75
+            fi
+          fi
       - name: Fetch and prepare pinned full-feature recipes
         run: |
           revision=$(python3 -c 'import json; print(json.load(open("packages/termux/upstream.lock.json"))["commit"])')
