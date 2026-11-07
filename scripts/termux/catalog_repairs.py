@@ -1121,7 +1121,7 @@ import hashlib
 import sys
 p = Path(sys.argv[1])
 b = p.read_bytes()
-assert hashlib.sha256(b).hexdigest() == '26d989b2a30d4de6010dc3aa89e080d6365fc65ba1577c325e85d96a863bebb5', 'ONNX Runtime dependency declarations changed'
+assert hashlib.sha256(b).hexdigest() == '410c8a89201b5bdf1497f7063e0818ea270d5d5c7c421b0b0c91b46990b7bf12', 'ONNX Runtime dependency declarations changed'
 start = b'onnxruntime_fetchcontent_declare(\n    flatbuffers\n'
 end = b'    FIND_PACKAGE_ARGS 23.5.9 NAMES Flatbuffers flatbuffers\n)\n'
 assert b.count(start) == b.count(end) == 1
