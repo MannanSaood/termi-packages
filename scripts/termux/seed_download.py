@@ -21,7 +21,7 @@ def download(tag, directory, runner=subprocess.run, sleep=time.sleep):
         print(message, flush=True)
         transient = any(s in message.lower() for s in (
             'protocol_error', 'unexpected eof', 'connection reset', 'connection timed out',
-            'i/o timeout', 'tls handshake timeout', 'http 502', 'http 503', 'http 504'))
+            'i/o timeout', 'tls handshake timeout', 'http 500', 'http 502', 'http 503', 'http 504'))
         if not transient or attempt == 2:
             raise subprocess.CalledProcessError(result.returncode, command, output=message)
         print('Retry seed transport with HTTP/2 disabled; hash verification remains mandatory', flush=True)
