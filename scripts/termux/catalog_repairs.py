@@ -2577,6 +2577,16 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
         return t.replace(anchor, anchor + LIBIME_ANDROID_LOADER_SETUP)
     change('libime', libime_android_loader, tree='x11-packages')
 
+    def android_loader_for_build_tools(t, version):
+        assert f'TERMUX_PKG_VERSION="{version}"\n' in t, 'Recipe version changed'
+        assert re.search(r'^TERMUX_PKG_BUILD_DEPENDS="aosp-libs(?:,|")', t, re.M), 'AOSP build provider changed'
+        anchor = '\ttermux_setup_proot\n'
+        assert t.count(anchor) == 1, 'Cross-build proot setup changed'
+        setup = '\tif [[ "$TERMUX_ARCH" == aarch64 ]]; then\n' + LIBIME_ANDROID_LOADER_SETUP + '\tfi\n'
+        return t.replace(anchor, anchor + setup)
+    change('deno', lambda t: android_loader_for_build_tools(t, '1:2.9.7'))
+    change('gnucash', lambda t: android_loader_for_build_tools(t, '5.17'), tree='x11-packages')
+
     # Independent remaining roots: preserve features and isolate compatibility.
     def icewm_android_loader(t):
         assert 'TERMUX_PKG_VERSION="4.1.0"' in t, 'IceWM version changed'
