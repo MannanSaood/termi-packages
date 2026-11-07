@@ -1063,6 +1063,13 @@ TERMI_VCSH_RELEASE_FRAGMENTS
         assert 'TERMUX_PKG_VERSION=2.26\n' in t, 'Alpine version changed'
         url = 'https://fossies.org/linux/misc/alpine-${TERMUX_PKG_VERSION}.tar.xz'
         assert t.count(url) == 1 and t.count('\tautoreconf -fi\n') == 1, 'Alpine source or configure changed'
+        # Legacy recursive IMAP rules do not declare the dependencies between
+        # creating OSTYPE/onceenv outputs and consuming them.
+        t = hook(t, 'termux_step_pre_configure', r'''	TERMUX_PKG_MAKE_PROCESSES=1
+	local os_lnx="$TERMUX_PKG_SRCDIR/imap/src/osdep/unix/os_lnx.c"
+	grep -Fxq 'char *crypt (char *, char *);' "$os_lnx" ||
+	    termux_error_exit "Alpine crypt declaration changed"
+	sed -i 's/^char \*crypt (char \*, char \*);$/#include <crypt.h>/' "$os_lnx"''')
         return t.replace(url, 'https://alpineapp.email/alpine/release/src/alpine-${TERMUX_PKG_VERSION}.tar.xz').replace(
             '\tautoreconf -fi\n', '''\t# Modern Autoconf needs Automake's compile auxiliary script.
 \tif [[ ! -f "$TERMUX_PKG_SRCDIR/compile" ]]; then
@@ -1073,6 +1080,19 @@ TERMI_VCSH_RELEASE_FRAGMENTS
 \tautoconf -f
 ''')
     change('alpine', alpine_shipped_autotools)
+
+    def arturo_nim_allocator_api(t):
+        assert 'TERMUX_PKG_VERSION=0.10.0\n' in t, 'Arturo version changed'
+        return hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/src/extras/mimalloc.nim" <<'TERMI_ARTURO_GC'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+b = p.read_bytes()
+old = b'proc GC_setStrategy(strategy: GC_Strategy) = discard\n'
+assert b.count(old) == 1, 'Arturo allocator compatibility stub changed'
+p.write_bytes(b.replace(old, b'when declared(GC_Strategy):\n  ' + old))
+TERMI_ARTURO_GC''')
+    change('arturo', arturo_nim_allocator_api)
 
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
