@@ -2920,10 +2920,11 @@ TERMI_MOZ_HOST
     for name, version in [('firefox', '158.0'), ('librewolf', '158.0-1'), ('thunderbird', '158.0'), ('zen-browser', '1.23.3b')]:
         def browser_providers(t, n=name, v=version):
             t = mozilla_host_tools(t, v)
-            if n != 'firefox':
-                anchor = 'TERMUX_PKG_BUILD_DEPENDS="libcpufeatures, libice, libsm"'
-                assert t.count(anchor) == 1, 'Mozilla build providers changed'
-                t = t.replace(anchor, anchor[:-1] + ', googletest, libbsd, libdeflate, libmd, libunibreak, libxres, libxt"')
+            anchor = 'TERMUX_PKG_BUILD_DEPENDS="libcpufeatures, libice, libsm"'
+            assert t.count(anchor) == 1, 'Mozilla build providers changed'
+            providers = ('libdeflate, libxres' if n == 'firefox'
+                         else 'googletest, libbsd, libdeflate, libmd, libunibreak, libxres, libxt')
+            t = t.replace(anchor, anchor[:-1] + ', ' + providers + '"')
             if n == 'librewolf':
                 t = hook(t, 'termux_step_pre_configure', r'''	if [[ "$TERMUX_ON_DEVICE_BUILD" == false && "$TERMUX_DEBUG_BUILD" == false ]]; then
 		python3 - "$TERMUX_PKG_SRCDIR/config/makefiles/rust.mk" <<'TERMI_LIBREWOLF_LTO'
