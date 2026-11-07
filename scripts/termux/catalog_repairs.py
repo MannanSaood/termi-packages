@@ -1175,6 +1175,14 @@ TERMI_ORT_FLATBUFFERS''')
             'TERMUX_PKG_SHA256=3913bac4500d360a71bb94e87a69a18da47ac9df6dbcb36317f8e6f215b02381\n')
     change('superhtml', superhtml_patch_base)
 
+    def obs_backgroundremoval_cxx_headers(t):
+        assert 'TERMUX_PKG_VERSION=1.4.1\n' in t, 'OBS Background Removal version changed'
+        assert 'TERMUX_PKG_DEPENDS="obs-studio, onnxruntime, opencv"\n' in t, 'OBS build dependencies changed'
+        assert 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'OBS build providers changed'
+        t += '\nTERMUX_PKG_BUILD_DEPENDS="ndk-sysroot"\n'
+        return hook(t, 'termux_step_pre_configure', NTL_CXX_HEADERS)
+    change('obs-backgroundremoval', obs_backgroundremoval_cxx_headers, tree='x11-packages')
+
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
         # The full catalog can expose Kerberos' incompatible com_err library.
@@ -2596,7 +2604,14 @@ extra_cflags_cc=[\"-nostdinc++\", \"-I${TERMUX_PREFIX}/include/c++/v1\"]''')
         setup = '\tif [[ "$TERMUX_ARCH" == aarch64 ]]; then\n' + LIBIME_ANDROID_LOADER_SETUP + '\tfi\n'
         return t.replace(anchor, anchor + setup)
     change('deno', lambda t: android_loader_for_build_tools(t, '1:2.9.7'))
-    change('gnucash', lambda t: android_loader_for_build_tools(t, '5.17'), tree='x11-packages')
+
+    def gnucash_build_tools(t):
+        t = android_loader_for_build_tools(t, '5.17')
+        providers = 'TERMUX_PKG_BUILD_DEPENDS="aosp-libs, boost-headers, googletest"'
+        assert t.count(providers) == 1, 'GnuCash build providers changed'
+        # WebKit's TIFF and GTK metadata require these private providers.
+        return t.replace(providers, providers[:-1] + ', libdeflate, libxres"')
+    change('gnucash', gnucash_build_tools, tree='x11-packages')
 
     # Independent remaining roots: preserve features and isolate compatibility.
     def icewm_android_loader(t):
