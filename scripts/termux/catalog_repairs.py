@@ -2948,6 +2948,7 @@ assert b.count(old) == 1, 'LibreWolf LTO rule changed'
 p.write_bytes(b.replace(old, new))
 TERMI_LIBREWOLF_LTO
 	fi''')
+            if n in ('firefox', 'librewolf'):
                 t = hook(t, 'termux_step_make', '\tTERMUX_PKG_MAKE_PROCESSES=1\n\texport CARGO_BUILD_JOBS=1\n')
             return t
         change(name, browser_providers, tree='x11-packages')
