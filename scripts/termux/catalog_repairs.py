@@ -1111,6 +1111,25 @@ p.write_bytes(b.replace(b'import pipes\n', b'').replace(b'pipes.quote', b'shlex.
 TERMI_CARBONYL_PIPES''')
     change('carbonyl-host-tools', carbonyl_host_shell_quoting, tree='x11-packages')
 
+    # LoRA's shipped FlatBuffers schema requires the pinned 23.5.26
+    # headers; the general >=23.5.9 search can pick an incompatible v25.
+    def onnxruntime_pinned_flatbuffers(t):
+        assert 'TERMUX_PKG_VERSION="1.31.0"\n' in t, 'ONNX Runtime version changed'
+        return hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/cmake/external/onnxruntime_external_deps.cmake" <<'TERMI_ORT_FLATBUFFERS'
+from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1])
+b = p.read_bytes()
+assert hashlib.sha256(b).hexdigest() == '26d989b2a30d4de6010dc3aa89e080d6365fc65ba1577c325e85d96a863bebb5', 'ONNX Runtime dependency declarations changed'
+start = b'onnxruntime_fetchcontent_declare(\n    flatbuffers\n'
+end = b'    FIND_PACKAGE_ARGS 23.5.9 NAMES Flatbuffers flatbuffers\n)\n'
+assert b.count(start) == b.count(end) == 1
+b = b.replace(start, b'block(SCOPE_FOR VARIABLES)\nset(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)\n' + start)
+p.write_bytes(b.replace(end, b')\nendblock()\n'))
+TERMI_ORT_FLATBUFFERS''')
+    change('onnxruntime', onnxruntime_pinned_flatbuffers)
+
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
         # The full catalog can expose Kerberos' incompatible com_err library.
