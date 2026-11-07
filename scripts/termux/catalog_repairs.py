@@ -1155,6 +1155,15 @@ TERMI_ORT_FLATBUFFERS''')
         'https://codeberg.org/Anoxinon_e.V./xmppc.git',
         'b1b3f62def7963face0e4928e4167ef1301feaa3'))
 
+    def predict_archived_source(t):
+        assert 'TERMUX_PKG_VERSION=2.3.1\n' in t, 'Predict recipe version changed'
+        assert 'TERMUX_PKG_SHA256=6eecccb21117e6ae57941659ac5d1d5f8cf99103ec8448e4fd8c076620bbd77b\n' in t, 'Predict archive pin changed'
+        source = 'TERMUX_PKG_SRCURL=https://www.qsl.net/kd2bd/predict-${TERMUX_PKG_VERSION}-termux.tar.gz\n'
+        assert t.count(source) == 1, 'Predict source URL changed'
+        # The archived copy matches the original recipe's source hash.
+        return t.replace(source, source.replace('=https://', '=https://web.archive.org/web/20250102224952id_/https://'))
+    change('predict', predict_archived_source)
+
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
         # The full catalog can expose Kerberos' incompatible com_err library.
