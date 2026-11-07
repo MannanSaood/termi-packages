@@ -1196,6 +1196,10 @@ TERMI_ORT_FLATBUFFERS''')
     def ghostty_isolated_zig_headers(t):
         assert 'TERMUX_PKG_VERSION="1.3.1"\n' in t and 'TERMUX_ZIG_VERSION="0.15.2"\n' in t, 'Ghostty toolchain changed'
         assert '\t\t--search-prefix "${TERMUX_PREFIX}" \\\n' in t, 'Ghostty Zig include search changed'
+        provider = 'TERMUX_PKG_BUILD_DEPENDS="xorgproto"'
+        assert t.count(provider) == 1, 'Ghostty build providers changed'
+        # GTK's TIFF metadata needs this private pkg-config provider.
+        t = t.replace(provider, 'TERMUX_PKG_BUILD_DEPENDS="xorgproto, libdeflate"')
         # Zig supplies the Android C headers through its explicit libc file.
         return hook(t, 'termux_step_pre_configure', '''	if [[ "$TERMUX_ON_DEVICE_BUILD" == "false" ]]; then
 		local header
