@@ -210,6 +210,57 @@ for p, raw in outputs.items():
 '''
 QT5_PERFETTO_INTEGER_SETUP = '\tpython3 - "$TERMUX_PKG_SRCDIR/src/3rdparty/chromium/third_party/perfetto" <<\'TERMI_QT5_PERFETTO_INTEGER\'\n' + QT5_PERFETTO_INTEGER_PATCH + 'TERMI_QT5_PERFETTO_INTEGER\n'
 
+QT5_LOCATION_MAPBOX_PATCH = r'''import hashlib
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+boost = root / 'boost/1.65.1/include/boost'
+conversion = boost / 'numeric/conversion'
+converter = conversion / 'detail/converter.hpp'
+hash_header = boost / 'functional/hash/hash.hpp'
+document = root / 'rapidjson/1.1.0/include/rapidjson/document.h'
+enum_pins = {
+    'udt_builtin_mixture_enum': '61025c6776952f21f945cacf15b075736d9aa2dbab100b68918e27b43e6eb392',
+    'int_float_mixture_enum': 'e184b040c8bb3390deb8ec866d87c2492a244b7262b2fd0990bdecfacd2093b3',
+    'sign_mixture_enum': 'bfffad1a0069323e40377ddd58a6adc4b3ab213af8c32ad25f7ab898199044ec',
+}
+pins = {
+    converter: '4fd7555782e5840bb052741d2133e1b0890a0d34ad11e1a8eb5a6b1782da8156',
+    hash_header: 'c8aab6218c86857cb2fbc98a8a9b95f38519d9f4cc4b5995ea16bbd480da441c',
+    document: 'da02371e1747e869c56fbe0a66d66630aefbefee6d615740f2895342c924fc8c',
+}
+pins.update({conversion / (name + '.hpp'): pin for name, pin in enum_pins.items()})
+texts = {}
+for file, expected in pins.items():
+    raw = file.read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == expected, 'Bundled Mapbox header changed: ' + str(file)
+    texts[file] = raw.decode()
+
+def replace_once(file, old, new):
+    assert texts[file].count(old) == 1, 'Bundled Mapbox declaration changed: ' + str(file)
+    texts[file] = texts[file].replace(old, new)
+
+# The converter classes already provide their own argument/result types.
+texts[converter], count = re.subn(
+    r': public std::unary_function<\s*BOOST_DEDUCED_TYPENAME Traits::argument_type\s*,BOOST_DEDUCED_TYPENAME Traits::result_type\s*>\s*,public ',
+    ': public ', texts[converter])
+assert count == 3, 'Bundled Boost converters changed'
+replace_once(hash_header, 'struct hash_base : std::unary_function<T, std::size_t> {};',
+             'struct hash_base { typedef T argument_type; typedef std::size_t result_type; };')
+# MPL forms adjacent values even for the first and last enum constants.
+for name in enum_pins:
+    replace_once(conversion / (name + '.hpp'), 'enum ' + name + '\n', 'enum ' + name + ' : int\n')
+replace_once(document, 'GenericStringRef& operator=(const GenericStringRef& rhs) { s = rhs.s; length = rhs.length; }',
+             'GenericStringRef& operator=(const GenericStringRef&) = delete;')
+for file, text in texts.items():
+    file.write_bytes(text.encode())
+'''
+QT5_LOCATION_MAPBOX_SETUP = ('\tpython3 - "$TERMUX_PKG_SRCDIR/src/3rdparty/mapbox-gl-native/deps" '
+                            '<<\'TERMI_QT5_LOCATION_MAPBOX\'\n' + QT5_LOCATION_MAPBOX_PATCH +
+                            'TERMI_QT5_LOCATION_MAPBOX\n')
+
 CHROMIUM_SKIA_FLOAT_PATCH = r'''from pathlib import Path
 import hashlib
 import sys
@@ -1784,7 +1835,8 @@ TERMI_CONSUMER_AVAHI''')
 	local termi_location_cxx="$TERMUX_PKG_TMPDIR/termi-location-cxx"
 	printf '#!/bin/bash\nexec %q "$@" -std=c++17\n' "$CXX" > "$termi_location_cxx"
 	chmod 755 "$termi_location_cxx"'''
-        return hook(t, 'termux_step_configure', setup)
+        t = hook(t, 'termux_step_configure', setup)
+        return hook(t, 'termux_step_post_get_source', QT5_LOCATION_MAPBOX_SETUP)
     change('qt5-qtlocation', qtlocation_icu_dialect, tree='x11-packages')
 
     # A focused seed must not replay unrelated Emscripten cyclic test data.
