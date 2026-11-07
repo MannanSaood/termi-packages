@@ -2925,6 +2925,28 @@ TERMI_MOZ_HOST
                 assert t.count(anchor) == 1, 'Mozilla build providers changed'
                 t = t.replace(anchor, anchor[:-1] + ', googletest, libbsd, libdeflate, libmd, libunibreak, libxres, libxt"')
             if n == 'librewolf':
+                t = hook(t, 'termux_step_pre_configure', r'''	if [[ "$TERMUX_ON_DEVICE_BUILD" == false && "$TERMUX_DEBUG_BUILD" == false ]]; then
+		python3 - "$TERMUX_PKG_SRCDIR/config/makefiles/rust.mk" <<'TERMI_LIBREWOLF_LTO'
+from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1])
+b = p.read_bytes()
+assert hashlib.sha256(b).hexdigest() == '2eb12ce954b8ccf2a98e8ac2ac4cbc4103480d69a3e89f8d6f064bc5b42f052e', 'LibreWolf Rust build rules changed'
+old = b'ifdef RUST_LIBRARY_LTO\ncargo_rustc_flags += -Clto\nendif\n'
+new = (
+    b'ifdef RUST_LIBRARY_LTO\n'
+    b'ifeq ($(notdir $(RUST_LIBRARY_FILE)),libgkrust.a)\n'
+    b'cargo_rustc_flags += -Clto=thin -Ccodegen-units=8\n'
+    b'else\n'
+    b'cargo_rustc_flags += -Clto\n'
+    b'endif\n'
+    b'endif\n'
+)
+assert b.count(old) == 1, 'LibreWolf LTO rule changed'
+p.write_bytes(b.replace(old, new))
+TERMI_LIBREWOLF_LTO
+	fi''')
                 t = hook(t, 'termux_step_make', '\tTERMUX_PKG_MAKE_PROCESSES=1\n\texport CARGO_BUILD_JOBS=1\n')
             return t
         change(name, browser_providers, tree='x11-packages')
