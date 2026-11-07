@@ -1172,6 +1172,17 @@ if digest != patched:
 TERMI_CARBONYL_PIPES''')
     change('carbonyl-host-tools', carbonyl_host_shell_quoting, tree='x11-packages')
 
+    # Mogan's nested cpr CMake probe inherits the prefix C headers from xmake.
+    # Select the matching libc++ wrappers before those C headers.
+    def mogan_libcxx_headers(t):
+        assert 'TERMUX_PKG_VERSION="2026.3.7"\n' in t, 'Mogan source changed'
+        deps = 'TERMUX_PKG_BUILD_DEPENDS="qt6-qtbase-cross-tools"'
+        assert t.count(deps) == 1, 'Mogan build dependencies changed'
+        t = t.replace(deps, 'TERMUX_PKG_BUILD_DEPENDS="qt6-qtbase-cross-tools, ndk-sysroot"')
+        return hook(t, 'termux_step_pre_configure', r'''	[[ -f "$TERMUX_PREFIX/include/c++/v1/filesystem" ]] || termux_error_exit "Source-built NDK C++ headers missing"
+	export CXXFLAGS="-nostdinc++ -I$TERMUX_PREFIX/include/c++/v1 $CXXFLAGS"''')
+    change('mogan', mogan_libcxx_headers, tree='x11-packages')
+
     # LoRA's shipped FlatBuffers schema requires the pinned 23.5.26
     # headers; the general >=23.5.9 search can pick an incompatible v25.
     def onnxruntime_pinned_flatbuffers(t):
