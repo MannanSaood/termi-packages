@@ -2845,8 +2845,16 @@ TERMI_GHC_CXX
         options = 'ghc-options: -fexternal-interpreter'
         assert t.count(options) == 1, name + ' GHC options changed'
         return t.replace(anchor, anchor + setup).replace(options, 'ghc-options: -pgmcxx=$TERMUX_PKG_TMPDIR/termi-ghc-cxx -fexternal-interpreter')
-    for name, version in [('darcs', '"2.18.5"'), ('pandoc', '"3.12.1"')]:
-        change(name, lambda t, n=name, v=version: ghc_private_cxx(t, n, v))
+    change('darcs', lambda t: ghc_private_cxx(t, 'darcs', '"2.18.5"'))
+
+    def pandoc_matching_lua_engine(t):
+        t = ghc_private_cxx(t, 'pandoc', '"3.12.1"')
+        anchor = '\techo "packages: splitmix xml-conduit" >>cabal.project.local\n'
+        assert t.count(anchor) == 1, 'Pandoc Cabal project setup changed'
+        # Pandoc 3.12.1 ships with 0.5.4.1. The newer engine calls a later writer API.
+        return t.replace(anchor, anchor + '\techo "constraints: pandoc-lua-engine == 0.5.4.1" >>cabal.project.local\n')
+
+    change('pandoc', pandoc_matching_lua_engine)
 
     def clean_host_tools_setup():
         setup = r"""	if [[ "$TERMUX_ON_DEVICE_BUILD" == false ]]; then
