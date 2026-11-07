@@ -1130,6 +1130,31 @@ p.write_bytes(b.replace(end, b')\nendblock()\n'))
 TERMI_ORT_FLATBUFFERS''')
     change('onnxruntime', onnxruntime_pinned_flatbuffers)
 
+    # The release archive routes failed, but official Git serves the same
+    # tagged releases. Enforce their immutable commits before building.
+    def verified_git_release(t, version, archive_url, archive_sha, git_url, commit):
+        assert f'TERMUX_PKG_VERSION={version}\n' in t, 'Recipe version changed'
+        url = f'TERMUX_PKG_SRCURL={archive_url}\n'
+        digest = f'TERMUX_PKG_SHA256={archive_sha}\n'
+        assert t.count(url) == t.count(digest) == 1, 'Original archive pin changed'
+        t = t.replace(url, f'TERMUX_PKG_SRCURL=git+{git_url}\nTERMUX_PKG_GIT_BRANCH={version}\n')
+        guard = r'''	[[ "$(git -C "$TERMUX_PKG_SRCDIR" rev-parse --verify HEAD)" == TERMI_RELEASE_COMMIT ]] &&
+	    git -C "$TERMUX_PKG_SRCDIR" diff --quiet HEAD -- ||
+	    termux_error_exit "$TERMUX_PKG_NAME source commit or tracked files changed"'''
+        return hook(t.replace(digest, ''), 'termux_step_post_get_source',
+                    guard.replace('TERMI_RELEASE_COMMIT', commit))
+
+    change('matchbox-keyboard', lambda t: verified_git_release(t, '0.1.1',
+        'https://git.yoctoproject.org/matchbox-keyboard/snapshot/matchbox-keyboard-${TERMUX_PKG_VERSION}.tar.gz',
+        'dd3e9494a9499a3bf3017c8c1e6572a4e91deb20e219717db17c0977750b8bcb',
+        'https://git.yoctoproject.org/matchbox-keyboard',
+        '630d89068dc0a1e9199306d405cb32f892dfa4d3'), tree='x11-packages')
+    change('xmppc', lambda t: verified_git_release(t, '0.1.2',
+        'https://codeberg.org/Anoxinon_e.V./xmppc/archive/${TERMUX_PKG_VERSION}.tar.gz',
+        '05259ec5cba25f693edfe01389a3405835404539c7817fb208c201e29480e6b7',
+        'https://codeberg.org/Anoxinon_e.V./xmppc.git',
+        'b1b3f62def7963face0e4928e4167ef1301feaa3'))
+
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
         # The full catalog can expose Kerberos' incompatible com_err library.
