@@ -1160,10 +1160,15 @@ import hashlib
 import sys
 p = Path(sys.argv[1])
 b = p.read_bytes()
-assert hashlib.sha256(b).hexdigest() == '375a3caf912b057f756be33859e95de7104b61f91aa27e92a6addbc373db2335', 'Chromium host helper changed'
-assert b.count(b'import pipes\n') == b.count(b'pipes.quote') == 1
-assert b'import shlex\n' in b
-p.write_bytes(b.replace(b'import pipes\n', b'').replace(b'pipes.quote', b'shlex.quote'))
+digest = hashlib.sha256(b).hexdigest()
+patched = '9d120e51e121396806694c2fd7c1b3ae3838a5abeab2c49c3e6ba02fa5048253'
+if digest != patched:
+    assert digest == '375a3caf912b057f756be33859e95de7104b61f91aa27e92a6addbc373db2335', 'Chromium host helper changed'
+    assert b.count(b'import pipes\n') == b.count(b'pipes.quote') == 1
+    assert b'import shlex\n' in b
+    updated = b.replace(b'import pipes\n', b'').replace(b'pipes.quote', b'shlex.quote')
+    assert hashlib.sha256(updated).hexdigest() == patched
+    p.write_bytes(updated)
 TERMI_CARBONYL_PIPES''')
     change('carbonyl-host-tools', carbonyl_host_shell_quoting, tree='x11-packages')
 
