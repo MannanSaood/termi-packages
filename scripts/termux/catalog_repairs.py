@@ -1047,6 +1047,15 @@ TERMI_VCSH_RELEASE_FRAGMENTS
         '9e3e2df24c5293e14c40d85fb480f5d52c0dc9afac845280a356c2fb6531e43e',
         'a379cea1fe6381b5bface27deeb7e4db1f76b2fb2230dadc1f171b796e9a43d7'))
 
+    # Frotz 2.55: acf205585a9472d27c07c0fe62da4b8bc89d1ec7.
+    change('frotz', lambda t: verified_release_snapshot(t, '"2.55"',
+        '766d6ee97692e93d04bed755494292ff625fb53d165982c60dbbc7275cbbc6e0',
+        'a8c4c4d79a2aa9b39e0efbbd3e0803f1dc5ef36f75f2c2945e295d190575eb09'))
+    # kew 4.4.1: d8cec7ad9d1b773d47be36fbdd7148ce9885d8fe.
+    change('kew', lambda t: verified_release_snapshot(t, '"4.4.1"',
+        'c0139b3246f82f20e1a01b1ffc1fe05f53ba3f3a0374b1fcacf17a6e7b0500eb',
+        'a38619458cec59dd314311226c23a85109dd3504a35fe8388a08daff7a7dfccb'))
+
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
         # The full catalog can expose Kerberos' incompatible com_err library.
