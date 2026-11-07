@@ -1170,7 +1170,21 @@ if digest != patched:
     assert hashlib.sha256(updated).hexdigest() == patched
     p.write_bytes(updated)
 TERMI_CARBONYL_PIPES''')
-    change('carbonyl-host-tools', carbonyl_host_shell_quoting, tree='x11-packages')
+    # New gperf emits an attribute after the legacy fallthrough comment.
+    def carbonyl_gperf_fallthrough(t):
+        t = carbonyl_host_shell_quoting(t)
+        return hook(t, 'termux_step_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/chromium/src/third_party/blink/renderer/build/scripts/gperf.py" <<'TERMI_CARBONYL_GPERF'
+from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1])
+raw = p.read_bytes()
+assert hashlib.sha256(raw).hexdigest() == '27d33bd8b3d5b7c4b92739ca0fd254f9bedc2f4d3bb6dd19d8447b6462629fe4', 'Carbonyl gperf wrapper changed'
+anchor = b"        gperf_output = gperf_output.replace('/*FALLTHROUGH*/',\n                                            '  [[fallthrough]];')\n"
+assert raw.count(anchor) == 1, 'Carbonyl gperf fallthrough contract changed'
+p.write_bytes(raw.replace(anchor, b"        if '[[fallthrough]]' not in gperf_output:\n" + b''.join(b'    ' + line for line in anchor.splitlines(keepends=True))))
+TERMI_CARBONYL_GPERF''')
+    change('carbonyl-host-tools', carbonyl_gperf_fallthrough, tree='x11-packages')
 
     # Mogan's nested cpr CMake probe inherits the prefix C headers from xmake.
     # Select the matching libc++ wrappers before those C headers.
@@ -2925,8 +2939,8 @@ TERMI_MOZ_HOST
             providers = ('libdeflate, libxres' if n == 'firefox'
                          else 'googletest, libbsd, libdeflate, libmd, libunibreak, libxres, libxt')
             t = t.replace(anchor, anchor[:-1] + ', ' + providers + '"')
-            if n == 'librewolf':
-                t = hook(t, 'termux_step_pre_configure', r'''	if [[ "$TERMUX_ON_DEVICE_BUILD" == false && "$TERMUX_DEBUG_BUILD" == false ]]; then
+            if n in ('firefox', 'librewolf'):
+                rust_lto_hook = r'''	if [[ "$TERMUX_ON_DEVICE_BUILD" == false && "$TERMUX_DEBUG_BUILD" == false ]]; then
 		python3 - "$TERMUX_PKG_SRCDIR/config/makefiles/rust.mk" <<'TERMI_LIBREWOLF_LTO'
 from pathlib import Path
 import hashlib
@@ -2947,8 +2961,10 @@ new = (
 assert b.count(old) == 1, 'LibreWolf LTO rule changed'
 p.write_bytes(b.replace(old, new))
 TERMI_LIBREWOLF_LTO
-	fi''')
-            if n in ('firefox', 'librewolf'):
+	fi'''
+                if n == 'firefox':
+                    rust_lto_hook = rust_lto_hook.replace('LIBREWOLF', 'FIREFOX').replace('LibreWolf', 'Firefox')
+                t = hook(t, 'termux_step_pre_configure', rust_lto_hook)
                 t = hook(t, 'termux_step_make', '\tTERMUX_PKG_MAKE_PROCESSES=1\n\texport CARGO_BUILD_JOBS=1\n')
             return t
         change(name, browser_providers, tree='x11-packages')
