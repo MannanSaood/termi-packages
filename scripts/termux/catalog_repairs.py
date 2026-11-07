@@ -1713,6 +1713,16 @@ TERMI_LDC_STDINT
 \tTERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DCMAKE_CXX_COMPILER_LAUNCHER=$termi_ldc_launcher"
 ''').replace('termux_step_post_configure() {', 'termux_step_post_configure() {\n\t_termi_ldc_host_xml').replace('termux_step_make() {', 'termux_step_make() {\n\t_termi_ldc_host_xml').replace('libcurl, zlib"','libcurl, libandroid-execinfo, zlib"').replace('-lphobos2-ldc;-ldruntime-ldc;', '-lphobos2-ldc;-ldruntime-ldc;-landroid-execinfo;') + LDC_HOST_XML_SETUP)
 
+    # Tilix invokes the same Linux LDC bootstrap through Meson. Supply its
+    # private host library before configuration, without changing the target.
+    def tilix_ldc_host_xml(t):
+        assert 'TERMUX_PKG_VERSION=1.9.6\n' in t, 'Tilix version changed'
+        assert t.count('\ttermux_setup_ldc\n') == 1, 'Tilix LDC setup changed'
+        return hook(t, 'termux_step_configure', '''\tif [[ "$TERMUX_ON_DEVICE_BUILD" == false ]]; then
+\t\t_termi_ldc_host_xml
+\tfi''') + LDC_HOST_XML_SETUP
+    change('tilix', tilix_ldc_host_xml, tree='x11-packages')
+
     # API-26 libc headers omit RWF_DSYNC; Linux AIO still needs its kernel
     # UAPI constant. Include the defining kernel header rather than invent it.
     change('qemu-system-x86-64-headless', lambda t: hook(t, 'termux_step_pre_configure', '''
