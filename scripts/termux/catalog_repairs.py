@@ -1164,6 +1164,17 @@ TERMI_ORT_FLATBUFFERS''')
         return t.replace(source, source.replace('=https://', '=https://web.archive.org/web/20250102224952id_/https://'))
     change('predict', predict_archived_source)
 
+    def superhtml_patch_base(t):
+        assert 'TERMUX_PKG_VERSION="0.7.0"\n' in t, 'SuperHTML version changed'
+        source = ('TERMUX_PKG_SRCURL="git+https://github.com/kristoff-it/superhtml"\n'
+                  'TERMUX_PKG_GIT_BRANCH="main"\n')
+        assert t.count(source) == 1, 'SuperHTML source configuration changed'
+        # All seven preimage blobs in the existing patch match this revision.
+        return t.replace(source,
+            'TERMUX_PKG_SRCURL=https://codeload.github.com/kristoff-it/superhtml/tar.gz/23ef2f44ca0df2d2e05a0be3874370553c5b591d\n'
+            'TERMUX_PKG_SHA256=3913bac4500d360a71bb94e87a69a18da47ac9df6dbcb36317f8e6f215b02381\n')
+    change('superhtml', superhtml_patch_base)
+
     def e2tools_isolated_error_provider(t):
         assert 'TERMUX_PKG_VERSION="0.1.2"' in t and 'TERMUX_PKG_DEPENDS="e2fsprogs"' in t, 'e2tools error provider contract changed'
         # The full catalog can expose Kerberos' incompatible com_err library.
