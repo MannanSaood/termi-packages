@@ -921,6 +921,14 @@ def apply(change, hook, prepared):
         # its target C++ compiler, leaving host tools and C commands unchanged.
         return hook(text, 'termux_step_pre_configure', QT6_WEBENGINE_CXX_LAUNCHER)
     change('qt6-qtwebengine', qt6_webengine_headers, tree='x11-packages')
+
+    def signon_ui_pkgconfig(t):
+        anchor = 'TERMUX_PKG_DEPENDS="glib, libaccounts-qt, libc++, libnotify, libproxy, qt6-qtbase, qt6-qtdeclarative, qt6-qtpositioning, qt6-qtwebengine, signond"\n'
+        assert t.count(anchor) == 1 and 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'signon-ui dependency contract changed'
+        # libnotify reaches libdeflate through gdk-pixbuf and libtiff metadata.
+        return t.replace(anchor, anchor + 'TERMUX_PKG_BUILD_DEPENDS="libdeflate"\n')
+
+    change('signon-ui', signon_ui_pkgconfig, tree='x11-packages')
     def netpbm_host_language(text):
         anchor = '\techo "CFLAGS_FOR_BUILD = " >> config.mk'
         assert text.count(anchor) == 1, 'Netpbm host language flags anchor changed'
