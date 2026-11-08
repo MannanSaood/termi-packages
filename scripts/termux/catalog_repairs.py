@@ -1179,10 +1179,16 @@ import hashlib
 import sys
 p = Path(sys.argv[1])
 raw = p.read_bytes()
-assert hashlib.sha256(raw).hexdigest() == '27d33bd8b3d5b7c4b92739ca0fd254f9bedc2f4d3bb6dd19d8447b6462629fe4', 'Carbonyl gperf wrapper changed'
-anchor = b"        gperf_output = gperf_output.replace('/*FALLTHROUGH*/',\n                                            '  [[fallthrough]];')\n"
-assert raw.count(anchor) == 1, 'Carbonyl gperf fallthrough contract changed'
-p.write_bytes(raw.replace(anchor, b"        if '[[fallthrough]]' not in gperf_output:\n" + b''.join(b'    ' + line for line in anchor.splitlines(keepends=True))))
+original = '27d33bd8b3d5b7c4b92739ca0fd254f9bedc2f4d3bb6dd19d8447b6462629fe4'
+patched = 'b03fbd2c3bf06c4d6fd22f68fa2ac21b975a8ca90a2975ea5291e7fdf1ff2dab'
+actual = hashlib.sha256(raw).hexdigest()
+assert actual in (original, patched), 'Carbonyl gperf wrapper changed'
+if actual == original:
+    anchor = b"        gperf_output = gperf_output.replace('/*FALLTHROUGH*/',\n                                            '  [[fallthrough]];')\n"
+    assert raw.count(anchor) == 1, 'Carbonyl gperf fallthrough contract changed'
+    updated = raw.replace(anchor, b"        if '[[fallthrough]]' not in gperf_output:\n" + b''.join(b'    ' + line for line in anchor.splitlines(keepends=True)))
+    assert hashlib.sha256(updated).hexdigest() == patched
+    p.write_bytes(updated)
 TERMI_CARBONYL_GPERF''')
     change('carbonyl-host-tools', carbonyl_gperf_fallthrough, tree='x11-packages')
 
