@@ -1192,7 +1192,6 @@ if digest != patched:
 TERMI_CARBONYL_PIPES''')
     # New gperf emits an attribute after the legacy fallthrough comment.
     def carbonyl_gperf_fallthrough(t):
-        t = carbonyl_host_shell_quoting(t)
         return hook(t, 'termux_step_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/chromium/src/third_party/blink/renderer/build/scripts/gperf.py" <<'TERMI_CARBONYL_GPERF'
 from pathlib import Path
 import hashlib
@@ -1210,7 +1209,7 @@ if actual == original:
     assert hashlib.sha256(updated).hexdigest() == patched
     p.write_bytes(updated)
 TERMI_CARBONYL_GPERF''')
-    change('carbonyl-host-tools', carbonyl_gperf_fallthrough, tree='x11-packages')
+    change('carbonyl-host-tools', lambda t: carbonyl_gperf_fallthrough(carbonyl_host_shell_quoting(t)), tree='x11-packages')
 
     def carbonyl_float_headers(t):
         assert '_CHROMIUM_VERSION=111.0.5563.146\n' in t, 'Carbonyl Chromium version changed'
@@ -1239,7 +1238,7 @@ if actual == original:
 TERMI_CARBONYL_PYTHON
 ''')
 
-    change('carbonyl', carbonyl_float_headers, tree='x11-packages')
+    change('carbonyl', lambda t: carbonyl_gperf_fallthrough(carbonyl_float_headers(t)), tree='x11-packages')
 
     # Mogan's nested cpr CMake probe inherits the prefix C headers from xmake.
     # Select the matching libc++ wrappers before those C headers.
