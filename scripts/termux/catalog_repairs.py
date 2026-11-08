@@ -1222,6 +1222,21 @@ TERMI_CARBONYL_GPERF''')
 		termux_error_exit "Carbonyl cannot find Clang's float.h"
 	fi
 	CXXFLAGS+=" -include $termi_clang_float"
+	python3 - "$TERMUX_PKG_SRCDIR/chromium/src/build/android/gyp/util/build_utils.py" <<'TERMI_CARBONYL_PYTHON'
+from pathlib import Path
+import hashlib
+import sys
+p = Path(sys.argv[1])
+raw = p.read_bytes()
+original = '375a3caf912b057f756be33859e95de7104b61f91aa27e92a6addbc373db2335'
+patched = '9d120e51e121396806694c2fd7c1b3ae3838a5abeab2c49c3e6ba02fa5048253'
+actual = hashlib.sha256(raw).hexdigest()
+assert actual in (original, patched), 'Carbonyl Chromium Python utility changed'
+if actual == original:
+    updated = raw.replace(b'import pipes\n', b'').replace(b'pipes.quote', b'shlex.quote')
+    assert hashlib.sha256(updated).hexdigest() == patched
+    p.write_bytes(updated)
+TERMI_CARBONYL_PYTHON
 ''')
 
     change('carbonyl', carbonyl_float_headers, tree='x11-packages')
@@ -2553,18 +2568,55 @@ p.write_text(s)
 TERMI_XRDP'''), tree='x11-packages')
 
     # GHC's Android interpreter needs the same own-AOSP binding as libntl.
-    # Regenerate only this recipe's iserv wrappers after setup, not global tools.
-    change('git-annex', lambda t: t.replace('\t\ttermux_setup_ghc_iserv\n', '''\t\ttermux_setup_ghc_iserv
-\t\tlocal termi_iserv="$TERMUX_PKG_TMPDIR/termi-iserv"
-\t\tmkdir -p "$termi_iserv"
-\t\tlocal ghc_bin_dir="$(ghc --print-libdir)/../bin" suffix
-\t\tfor suffix in "" -dyn; do
-\t\t\tprintf '#!/bin/bash\\nexec /usr/bin/env -u LD_PRELOAD -u LD_LIBRARY_PATH "%s/proot" -q "%s/qemu-%s" -R / -b "%s/opt/aosp:/system" /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH="%s/lib" ANDROID_ROOT=/system ANDROID_DATA=/data "%s/ghc-iserv%s" "$@"\\n' \\
-\t\t\t    "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH" "$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH" "$TERMUX_ARCH" "$TERMUX_PREFIX" "$TERMUX_PREFIX" "$ghc_bin_dir" "$suffix" > "$termi_iserv/termux-ghc-iserv$suffix"
-\t\t\tchmod 755 "$termi_iserv/termux-ghc-iserv$suffix"
-\t\tdone
-\t\texport PATH="$termi_iserv:$PATH"
-'''))
+    def git_annex_iserv(t):
+        setup = '\t\ttermux_setup_ghc_iserv\n'
+        assert t.count(setup) == 1, 'Git Annex external interpreter setup changed'
+        return t.replace(setup, r'''		termux_setup_ghc_iserv
+		local termi_iserv="$TERMUX_PKG_TMPDIR/termi-iserv"
+		mkdir -p "$termi_iserv"
+		local ghc_bin_dir="$(ghc --print-libdir)/../bin" suffix
+		for suffix in "" -dyn; do
+			local wrapper="$termi_iserv/termux-ghc-iserv$suffix"
+			{
+				printf '#!/bin/bash\n'
+				printf 'proot=%q\nqemu=%q\nandroid_system=%q\nandroid_lib=%q\niserv=%q\n' \
+					"$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/proot" \
+					"$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/qemu-$TERMUX_ARCH" \
+					"$TERMUX_PREFIX/opt/aosp" "$TERMUX_PREFIX/lib" "$ghc_bin_dir/ghc-iserv$suffix"
+				cat <<-'TERMI_GIT_ANNEX_ISERV'
+					status=0
+					/usr/bin/env -u LD_PRELOAD -u LD_LIBRARY_PATH "$proot" -q "$qemu" -R / \
+						-b "$android_system:/system" /usr/bin/env LD_PRELOAD= LD_LIBRARY_PATH="$android_lib" \
+						ANDROID_ROOT=/system ANDROID_DATA=/data "$iserv" "$@" || status=$?
+					if (( status != 0 )); then
+						printf 'Git Annex external interpreter %s exited %d\n' "$iserv" "$status" >&2
+					fi
+					exit "$status"
+				TERMI_GIT_ANNEX_ISERV
+			} > "$wrapper"
+			chmod 755 "$wrapper"
+		done
+		export PATH="$termi_iserv:$PATH"
+		local probe="$termi_iserv/probe"
+		mkdir -p "$probe"
+		cat > "$probe/TermiIservProbe.hs" <<-'TERMI_GIT_ANNEX_PROBE'
+			{-# LANGUAGE TemplateHaskell #-}
+			module TermiIservProbe where
+			probe :: Int
+			probe = $( [| 42 |] )
+		TERMI_GIT_ANNEX_PROBE
+		(
+			cd "$probe" &&
+			ghc -v2 -fforce-recomp -fexternal-interpreter -pgmi="$termi_iserv/termux-ghc-iserv" -c TermiIservProbe.hs
+		) || termux_error_exit "Git Annex external interpreter smoke test failed"
+		cat >>cabal.project.local <<-'TERMI_GIT_ANNEX_CABAL'
+			package persistent-sqlite
+			  ghc-options: -v3
+		TERMI_GIT_ANNEX_CABAL
+''')
+
+    change('git-annex', git_annex_iserv)
+
 
     # Independent catalog failures can be repaired and built concurrently.
     def ckermit_host_main(t):
