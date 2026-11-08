@@ -5,11 +5,15 @@ import subprocess
 import time
 
 
-def download(tag, directory, runner=subprocess.run, sleep=time.sleep):
+def download(tag, directory, runner=None, sleep=time.sleep, *,
+             patterns=('*.json', '*.deb', '*.tar')):
     if not re.fullmatch(r'candidate-[0-9]+-[0-9]+-[0-9]+', tag):
         raise ValueError('Require a Termi candidate tag')
+    if runner is None:
+        runner = subprocess.run
     command = ['gh', 'release', 'download', tag, '--repo', 'MannanSaood/termi-packages',
-               '--pattern', '*.json', '--pattern', '*.deb', '--pattern', '*.tar', '--dir', str(directory)]
+               *[arg for pattern in patterns for arg in ('--pattern', pattern)],
+               '--dir', str(directory)]
     for attempt in range(3):
         env = dict(os.environ)
         if attempt:
@@ -24,5 +28,5 @@ def download(tag, directory, runner=subprocess.run, sleep=time.sleep):
             'i/o timeout', 'tls handshake timeout', 'http 500', 'http 502', 'http 503', 'http 504'))
         if not transient or attempt == 2:
             raise subprocess.CalledProcessError(result.returncode, command, output=message)
-        print('Retry seed transport with HTTP/2 disabled; hash verification remains mandatory', flush=True)
+        print(f'Retry {tag} transport with HTTP/2 disabled; hash verification remains mandatory', flush=True)
         sleep(5 * (attempt + 1))

@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -62,6 +63,7 @@ class StreamingMergeTests(unittest.TestCase):
                     target=Path(args[args.index('--dir')+1])
                     for source in directory.iterdir():shutil.copyfile(source,target/source.name)
                     if corrupt_log:(target/'build.log').write_text('tampered log')
+                    return subprocess.CompletedProcess(args, 0, '', '')
             previous=Path.cwd()
             try:
                 os.chdir(root)
@@ -76,7 +78,7 @@ class StreamingMergeTests(unittest.TestCase):
                 self.assertEqual('failed',ledger['recipes']['c']['status'])
             finally:os.chdir(previous)
 
-    def test_incremental_merge_reclaims_inputs_and_keeps_all_provenance(self):
+    def test_incremental_merge_retries_transfer_and_keeps_all_provenance(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
             fixture=test_parallel_catalog.MergeTests()
@@ -93,11 +95,19 @@ class StreamingMergeTests(unittest.TestCase):
                 if command[1:3]==['release','download']:
                     index=int(command[3].split('-')[1])-1
                     directory=Path(command[command.index('--dir')+1])
-                    if downloads:
+                    if downloads and directory != downloads[-1]:
                         self.assertFalse(downloads[-1].exists())
+                    if index == 1 and directory not in downloads:
+                        downloads.append(directory)
+                        (directory/'inventory.json').write_text('partial transfer')
+                        return subprocess.CompletedProcess(command, 1, '', 'HTTP 500')
+                    if index == 1:
+                        self.assertIn('--clobber', command)
+                        self.assertEqual('partial transfer', (directory/'inventory.json').read_text())
                     downloads.append(directory)
                     for source in (root/f'source{index}').iterdir():
                         shutil.copyfile(source,directory/source.name)
+                    return subprocess.CompletedProcess(command, 0, '', '')
             previous=Path.cwd()
             try:
                 os.chdir(root)

@@ -11,6 +11,7 @@ import time
 
 from parallel_catalog import merge
 from seed import pinned, digest
+from seed_download import download
 from selected_candidate import ledger_from_progress
 
 
@@ -74,9 +75,7 @@ def main():
         patterns = ["*.json", "*.deb", "*.tar"]
         if entry.get('selected_progress', {}).get('build_log_sha256'):
             patterns.append('*build.log')
-        subprocess.run(["gh","release","download",tag,"--repo",repository,
-                        *[arg for pattern in patterns for arg in ['--pattern', pattern]],
-                        "--dir",str(directory)],check=True)
+        download(tag, directory, patterns=patterns)
         inventory=json.loads(pinned(directory,"inventory.json",entry["inventory_sha256"]).read_text())
         plan_path=pinned(directory,"catalog-plan.json",entry["plan_sha256"])
         plan=json.loads(plan_path.read_text())
