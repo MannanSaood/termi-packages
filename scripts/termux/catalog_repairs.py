@@ -927,9 +927,18 @@ def apply(change, hook, prepared):
         assert t.count(anchor) == 1 and 'TERMUX_PKG_BUILD_DEPENDS=' not in t, 'signon-ui dependency contract changed'
         # libnotify reaches libdeflate through gdk-pixbuf and libtiff metadata.
         t = t.replace(anchor, anchor + 'TERMUX_PKG_BUILD_DEPENDS="libdeflate"\n')
-        flags = 'QMAKE_CXXFLAGS="-isystem$TERMUX__PREFIX__INCLUDE_DIR"'
-        assert t.count(flags) == 1, 'signon-ui qmake compiler flags changed'
-        return t.replace(flags, 'QMAKE_CXXFLAGS="-nostdinc++ -I$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include/c++/v1 -isystem$TERMUX__PREFIX__INCLUDE_DIR"')
+        compiler = 'QMAKE_CXX="$CXX"'
+        assert t.count(compiler) == 1, 'signon-ui qmake compiler contract changed'
+        t = t.replace(compiler, 'QMAKE_CXX="$termi_signon_cxx"')
+        # host-qmake6 splits spaced values in its forwarded arguments.
+        return hook(t, 'termux_step_configure', r'''	local termi_signon_cxx
+	if [[ "$TERMUX_ON_DEVICE_BUILD" != true ]]; then
+		termi_signon_cxx="$TERMUX_PKG_TMPDIR/termi-signon-cxx"
+		local termi_signon_headers="$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include/c++/v1"
+		[[ -f "$termi_signon_headers/math.h" ]] || termux_error_exit "NDK libc++ headers missing"
+		printf '#!/bin/bash\nexec %q -nostdinc++ -I%q "$@"\n' "$CXX" "$termi_signon_headers" > "$termi_signon_cxx"
+		chmod 755 "$termi_signon_cxx"
+	fi''')
 
     change('signon-ui', signon_ui_pkgconfig, tree='x11-packages')
     def netpbm_host_language(text):
