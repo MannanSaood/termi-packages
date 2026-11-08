@@ -1212,48 +1212,19 @@ if actual == original:
 TERMI_CARBONYL_GPERF''')
     change('carbonyl-host-tools', carbonyl_gperf_fallthrough, tree='x11-packages')
 
-    def carbonyl_icu_limits(t):
+    def carbonyl_float_headers(t):
         assert '_CHROMIUM_VERSION=111.0.5563.146\n' in t, 'Carbonyl Chromium version changed'
-        return hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/chromium/src/third_party/icu/source/common/putil.cpp" "$TERMUX_PKG_SRCDIR/chromium/src/third_party/icu/source/common/ucurr.cpp" <<'TERMI_CARBONYL_ICU'
-from pathlib import Path
-import hashlib
-import sys
-p = Path(sys.argv[1])
-raw = p.read_bytes()
-original = '188558aaaeb69165194ab6de7395aba9b0a0c6f2fcffac50b29ea1ef4b4a1ccb'
-patched = '4cc543eb7f196ae180eb8071cf5489a7f0e2b1027ec452d2161bc11907337f31'
-actual = hashlib.sha256(raw).hexdigest()
-assert actual in (original, patched), 'Carbonyl ICU source changed'
-if actual == original:
-    header = b'#include <float.h>\n'
-    call = b'pow(2.0, DBL_MANT_DIG + 1.0)'
-    assert raw.count(header) == raw.count(call) == 1
-    updated = raw.replace(header, header + b'#include <limits>\n')
-    updated = updated.replace(call, b'pow(2.0, std::numeric_limits<double>::digits + 1.0)')
-    assert hashlib.sha256(updated).hexdigest() == patched
-    p.write_bytes(updated)
+        # GN's target C++ flags place the Termi headers before Clang's builtin
+        # headers. Load the actual target compiler's float definitions first.
+        return hook(t, 'termux_step_pre_configure', r'''	local termi_clang_float
+	termi_clang_float="$("$CC" -print-resource-dir)/include/float.h"
+	if [ ! -r "$termi_clang_float" ]; then
+		termux_error_exit "Carbonyl cannot find Clang's float.h"
+	fi
+	CXXFLAGS+=" -include $termi_clang_float"
+''')
 
-p = Path(sys.argv[2])
-raw = p.read_bytes()
-original = '4d6b8bcb8016a8645cfe1a6200b8ce4aa30b4df5b8c3d0e2f6d108ef23e04caa'
-patched = 'b4ed5d76386eeb2a6681fd195d0755918c8b95a3cec2810a05878016ce3972ea'
-actual = hashlib.sha256(raw).hexdigest()
-assert actual in (original, patched), 'Carbonyl ICU currency source changed'
-if actual == original:
-    replacements = (
-        (b'#include "unicode/ucurr.h"\n', b'#include <limits>\n\n#include "unicode/ucurr.h"\n'),
-        (b'UDate fromDate = U_DATE_MIN;', b'UDate fromDate = -std::numeric_limits<UDate>::max();'),
-        (b'UDate toDate = U_DATE_MAX;', b'UDate toDate = std::numeric_limits<UDate>::max();'),
-    )
-    updated = raw
-    for before, after in replacements:
-        assert updated.count(before) == 1
-        updated = updated.replace(before, after)
-    assert hashlib.sha256(updated).hexdigest() == patched
-    p.write_bytes(updated)
-TERMI_CARBONYL_ICU''')
-
-    change('carbonyl', carbonyl_icu_limits, tree='x11-packages')
+    change('carbonyl', carbonyl_float_headers, tree='x11-packages')
 
     # Mogan's nested cpr CMake probe inherits the prefix C headers from xmake.
     # Select the matching libc++ wrappers before those C headers.
