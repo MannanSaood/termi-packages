@@ -1212,9 +1212,9 @@ if actual == original:
 TERMI_CARBONYL_GPERF''')
     change('carbonyl-host-tools', carbonyl_gperf_fallthrough, tree='x11-packages')
 
-    def carbonyl_icu_mantissa(t):
+    def carbonyl_icu_limits(t):
         assert '_CHROMIUM_VERSION=111.0.5563.146\n' in t, 'Carbonyl Chromium version changed'
-        return hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/chromium/src/third_party/icu/source/common/putil.cpp" <<'TERMI_CARBONYL_ICU'
+        return hook(t, 'termux_step_pre_configure', r'''	python3 - "$TERMUX_PKG_SRCDIR/chromium/src/third_party/icu/source/common/putil.cpp" "$TERMUX_PKG_SRCDIR/chromium/src/third_party/icu/source/common/ucurr.cpp" <<'TERMI_CARBONYL_ICU'
 from pathlib import Path
 import hashlib
 import sys
@@ -1232,9 +1232,28 @@ if actual == original:
     updated = updated.replace(call, b'pow(2.0, std::numeric_limits<double>::digits + 1.0)')
     assert hashlib.sha256(updated).hexdigest() == patched
     p.write_bytes(updated)
+
+p = Path(sys.argv[2])
+raw = p.read_bytes()
+original = '4d6b8bcb8016a8645cfe1a6200b8ce4aa30b4df5b8c3d0e2f6d108ef23e04caa'
+patched = 'b4ed5d76386eeb2a6681fd195d0755918c8b95a3cec2810a05878016ce3972ea'
+actual = hashlib.sha256(raw).hexdigest()
+assert actual in (original, patched), 'Carbonyl ICU currency source changed'
+if actual == original:
+    replacements = (
+        (b'#include "unicode/ucurr.h"\n', b'#include <limits>\n\n#include "unicode/ucurr.h"\n'),
+        (b'UDate fromDate = U_DATE_MIN;', b'UDate fromDate = -std::numeric_limits<UDate>::max();'),
+        (b'UDate toDate = U_DATE_MAX;', b'UDate toDate = std::numeric_limits<UDate>::max();'),
+    )
+    updated = raw
+    for before, after in replacements:
+        assert updated.count(before) == 1
+        updated = updated.replace(before, after)
+    assert hashlib.sha256(updated).hexdigest() == patched
+    p.write_bytes(updated)
 TERMI_CARBONYL_ICU''')
 
-    change('carbonyl', carbonyl_icu_mantissa, tree='x11-packages')
+    change('carbonyl', carbonyl_icu_limits, tree='x11-packages')
 
     # Mogan's nested cpr CMake probe inherits the prefix C headers from xmake.
     # Select the matching libc++ wrappers before those C headers.
