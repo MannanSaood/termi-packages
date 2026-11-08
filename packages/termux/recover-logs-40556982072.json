@@ -1,0 +1,8 @@
+{
+  "tag": "checkpoint-40556982072-1",
+  "manifest_sha256": "4015e3b4a728cb722dadb9d70f24fcedee56c50f2f8fdaa75800cab1d075b30b",
+  "input_identity": "aff7d6aa4f608913fa50fa940d7dc86bcad0f7557dabdd9cd4a46ac9ad5223c4",
+  "logs": [
+    "git-annex-1.log"
+  ]
+}
