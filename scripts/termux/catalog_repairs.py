@@ -1,5 +1,6 @@
 """Repairs grounded in the first completed four-lane catalog failure logs."""
 import re
+from pathlib import Path
 
 SIMULAVR_ARCH_PATCH = r'''from pathlib import Path
 import hashlib
@@ -1242,7 +1243,25 @@ if actual == original:
 TERMI_CARBONYL_PYTHON
 ''')
 
-    change('carbonyl', lambda t: carbonyl_gperf_fallthrough(carbonyl_float_headers(t)), tree='x11-packages')
+    def carbonyl_runtime_launcher(t):
+        revision = 'TERMUX_PKG_REVISION=3\n'
+        assert t.count(revision) == 1, 'Carbonyl package revision changed'
+        t = t.replace(revision, 'TERMUX_PKG_REVISION=4\n')
+        launcher = Path(__file__).with_name('carbonyl_launcher.sh').read_text()
+        interposer = Path(__file__).with_name('carbonyl_launcher.c').read_text()
+        return hook(t, 'termux_step_post_make_install', r'''	local carbonyl_dir="$TERMUX_PREFIX/lib/carbonyl"
+	cat > "$TERMUX_PKG_TMPDIR/carbonyl_launcher.c" <<'TERMI_CARBONYL_C'
+''' + interposer + r'''TERMI_CARBONYL_C
+	"$CC" -shared -fPIC -O2 -Wall -Wextra -Werror "$TERMUX_PKG_TMPDIR/carbonyl_launcher.c" \
+		-o "$carbonyl_dir/libtermi-carbonyl-exe.so" -ldl
+	[[ -L "$TERMUX_PREFIX/bin/carbonyl" ]] || termux_error_exit "Unexpected Carbonyl launcher"
+	rm -- "$TERMUX_PREFIX/bin/carbonyl"
+	cat > "$TERMUX_PREFIX/bin/carbonyl" <<'TERMI_CARBONYL_LAUNCHER'
+''' + launcher + r'''TERMI_CARBONYL_LAUNCHER
+	chmod 755 "$TERMUX_PREFIX/bin/carbonyl"
+''')
+
+    change('carbonyl', lambda t: carbonyl_runtime_launcher(carbonyl_gperf_fallthrough(carbonyl_float_headers(t))), tree='x11-packages')
 
     # Mogan's nested cpr CMake probe inherits the prefix C headers from xmake.
     # Select the matching libc++ wrappers before those C headers.

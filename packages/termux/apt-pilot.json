@@ -8,8 +8,9 @@
   "roots": {
     "git": "2.56.0-2",
     "git-annex": "10.20261006-1",
-    "carbonyl": "0.0.3-4"
+    "carbonyl": "0.0.3-5"
   },
+  "repair_carbonyl": true,
   "files": [
     "abseil-cpp_20260817.0_aarch64.deb",
     "adwaita-icon-theme-legacy_46.2-1_all.deb",
