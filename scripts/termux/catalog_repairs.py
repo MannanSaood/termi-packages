@@ -1213,6 +1213,10 @@ TERMI_CARBONYL_GPERF''')
 
     def carbonyl_float_headers(t):
         assert '_CHROMIUM_VERSION=111.0.5563.146\n' in t, 'Carbonyl Chromium version changed'
+        # Crashpad builds its libcurl transport using target headers.
+        deps = 'TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm,'
+        assert t.count(deps) == 1, 'Carbonyl runtime dependencies changed'
+        t = t.replace(deps, deps.replace('libc++, libdrm,', 'libc++, libcurl, libdrm,'))
         # GN's target C++ flags place the Termi headers before Clang's builtin
         # headers. Load the actual target compiler's float definitions first.
         return hook(t, 'termux_step_pre_configure', r'''	local termi_clang_float
