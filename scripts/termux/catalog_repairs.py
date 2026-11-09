@@ -2574,7 +2574,8 @@ TERMI_XRDP'''), tree='x11-packages')
     def git_annex_iserv(t):
         dependencies = 'libandroid-utimes, libffi, libiconv, libgmp, libmagic, libsqlite"'
         assert t.count(dependencies) == 1, 'Git Annex shared library dependencies changed'
-        t = t.replace(dependencies, dependencies[:-1] + ', libseccomp"')
+        # The existing libmagic archive auto-detected seccomp and lzip.
+        t = t.replace(dependencies, dependencies[:-1] + ', libseccomp, lzlib"')
         setup = '\t\ttermux_setup_ghc_iserv\n'
         assert t.count(setup) == 1, 'Git Annex external interpreter setup changed'
         return t.replace(setup, r'''		termux_setup_ghc_iserv
@@ -2625,7 +2626,8 @@ TERMI_XRDP'''), tree='x11-packages')
 			$(pure [])
 			probe :: Int
 			probe = $(do
-			  runIO (dlopen "libseccomp.so" [RTLD_NOW] >>= dlclose)
+			  runIO $ mapM_ (\library -> dlopen library [RTLD_NOW] >>= dlclose)
+			    ["libseccomp.so", "liblz.so.1", "libmagic.so"]
 			  [| 42 |])
 		TERMI_GIT_ANNEX_PROBE
 		(
