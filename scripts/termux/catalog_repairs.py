@@ -2576,6 +2576,16 @@ TERMI_XRDP'''), tree='x11-packages')
         assert t.count(dependencies) == 1, 'Git Annex shared library dependencies changed'
         # The existing libmagic archive auto-detected seccomp and lzip.
         t = t.replace(dependencies, dependencies[:-1] + ', libseccomp, lzlib"')
+        packages = '\t\tpackages: splitmix entropy basement cborg memory xml-conduit persistent-sqlite network-bsd'
+        assert t.count(packages) == 1, 'Git Annex local Cabal package list changed'
+        t = t.replace(packages, packages + ' "$magic_source"')
+        project = '\tcat <<-EOF >>cabal.project.local\n'
+        assert project in t, 'Git Annex Cabal project setup changed'
+        t = t.replace(project, r'''	# Avoid Cabal's HTTP mirror fallback for the pinned libmagic binding.
+	local magic_source="$TERMUX_PKG_CACHEDIR/magic-1.1.tar.gz"
+	termux_download https://hackage-content.haskell.org/package/magic-1.1/magic-1.1.tar.gz \
+		"$magic_source" b21c3b69f57b64199c1d7be0ac8ea1d02d698be59943058f6a2d642ea57ce082
+''' + project, 1)
         setup = '\t\ttermux_setup_ghc_iserv\n'
         assert t.count(setup) == 1, 'Git Annex external interpreter setup changed'
         return t.replace(setup, r'''		termux_setup_ghc_iserv
