@@ -1,0 +1,18 @@
+{
+  "source_tag": "candidate-42579362771-1-0",
+  "pins": {
+    "inventory.json": "8470aa0512e91216cd82f0fcbb0fb564f0b540fbfa26ce3a1d68733d6d8ede6a",
+    "catalog-ledger.json": "f3c385b62a89333c8082e38fa5130371a395cfaee794ccd78d0d16a942076371",
+    "catalog-plan.json": "8139a98daa42754342657993edbf7ce4b892b725348f7334dbbc7b91c9a07112"
+  },
+  "tag_prefix": "apt-catalog-3268-v1",
+  "batch_size": 900,
+  "counts": {"main": 3001, "x11": 1189, "root": 96},
+  "replacement": {
+    "tag": "apt-pilot-42601145578-1",
+    "base_file": "carbonyl_0.0.3-4_aarch64.deb",
+    "base_sha256": "75aaf307d80ba00d5ad2d4523791427e5dabaaf515b10032a7035e329d717d8f",
+    "file": "carbonyl_0.0.3-5_aarch64.deb",
+    "sha256": "735a5ed3705a2577565ab17626f1ce370e4317eba9e94835e749acb4f5ab3cbd"
+  }
+}

@@ -122,7 +122,7 @@ def stage(work, config):
                     continue
                 record = records[member.name]
                 filename = re.sub(r"[^A-Za-z0-9_.-]", "_", member.name)
-                if not member.isfile() or member.name in staged or record["channel"] not in ("main", "x11"):
+                if not member.isfile() or member.name in staged or record["channel"] not in config.get("channels", ("main", "x11")):
                     raise ValueError("Unexpected selected archive")
                 path = output / filename
                 with archive.extractfile(member) as source, path.open("xb") as destination:
@@ -138,10 +138,23 @@ def stage(work, config):
     repair = None
     if config.get("repair_carbonyl"):
         repair = repack_carbonyl(work, output, staged, config["roots"]["carbonyl"])
+    if replacement := config.get("replacement"):
+        original = staged.pop(replacement["base_file"])
+        replacement_release = json.loads(gh("api", f"repos/{REPOSITORY}/releases/tags/{replacement['tag']}"))
+        asset, = (a for a in replacement_release["assets"] if a["name"] == replacement["file"])
+        archive = download(replacement["tag"], asset, output)
+        if digest(archive) != replacement["sha256"] or original["sha256"] != replacement["base_sha256"]:
+            raise ValueError("Carbonyl replacement or base digest differs")
+        (output / original["asset"]).unlink()
+        staged[archive.name] = dict(original, file=archive.name, original_file=archive.name,
+                                    asset=archive.name, bytes=archive.stat().st_size, sha256=replacement["sha256"],
+                                    control=original["control"].replace("Version: 0.0.3-4\n", "Version: 0.0.3-5\n"))
     index = subprocess.check_output(["dpkg-scanpackages", "--multiversion", ".", "/dev/null"], cwd=output)
     index = re.sub(rb"(?m)^Filename: \./", b"Filename: ", index)
+    if config.get("canonical_index"):
+        index = b"\n\n".join(sorted(index.strip().split(b"\n\n"))) + b"\n\n"
     (output / "Packages").write_bytes(index)
-    manifest = dict(source=tag, pins=pins, roots=config["roots"], packages=list(staged.values()),
+    manifest = dict(source=tag, pins=pins, roots=config["roots"], packages=[staged[name] for name in sorted(staged)],
                     index_sha256=hashlib.sha256(index).hexdigest(), status="unsigned-test-staging")
     if repair:
         manifest["carbonyl_repair"] = repair
