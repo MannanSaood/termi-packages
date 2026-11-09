@@ -1,0 +1,21 @@
+name: Stage GitHub APT pilot assets
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: termi-apt-pilot
+  cancel-in-progress: false
+jobs:
+  stage:
+    if: github.event.repository.full_name == 'MannanSaood/termi-packages' && !github.event.repository.private
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify source and stage individual release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/termux/stage_apt_pilot.py
