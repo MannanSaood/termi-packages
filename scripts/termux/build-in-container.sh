@@ -97,6 +97,21 @@ elif [ "$mode" = packages ]; then
     mkdir -p /home/builder/catalog-state/logs
     python3 /home/builder/catalog_progress.py --root "$PWD" --state /home/builder/catalog-state --selected "$@"
     for root in "$@"; do
+        if [ "$root" = git-annex ]; then
+            # The browser download URL can return 504. Seed the upstream cache
+            # with the same pinned host tool through GitHub's asset API.
+            cleaner="${TERMUX_TOPDIR:-$HOME/.termux-build}/_cache/termux-elf-cleaner"
+            cleaner_sha=59645fb25b84d11f108436e83d9df5e874ba4eb76ab62948869a23a3ee692fa7
+            if ! printf '%s  %s\n' "$cleaner_sha" "$cleaner" | sha256sum --check --status; then
+                mkdir -p "$(dirname "$cleaner")"
+                curl --fail --silent --show-error --location --retry 3 --max-time 60 \
+                    -H 'Accept: application/octet-stream' \
+                    https://api.github.com/repos/termux/termux-elf-cleaner/releases/assets/217964734 \
+                    -o "$cleaner.part"
+                printf '%s  %s\n' "$cleaner_sha" "$cleaner.part" | sha256sum --check --status
+                mv -f "$cleaner.part" "$cleaner"
+            fi
+        fi
         recipe=""
         for tree in packages root-packages x11-packages; do
             if [ -f "$tree/$root/build.sh" ]; then recipe="$tree/$root"; fi
