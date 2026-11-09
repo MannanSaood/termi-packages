@@ -2572,6 +2572,9 @@ TERMI_XRDP'''), tree='x11-packages')
 
     # GHC's Android interpreter needs the same own-AOSP binding as libntl.
     def git_annex_iserv(t):
+        dependencies = 'libandroid-utimes, libffi, libiconv, libgmp, libmagic, libsqlite"'
+        assert t.count(dependencies) == 1, 'Git Annex shared library dependencies changed'
+        t = t.replace(dependencies, dependencies[:-1] + ', libseccomp"')
         setup = '\t\ttermux_setup_ghc_iserv\n'
         assert t.count(setup) == 1, 'Git Annex external interpreter setup changed'
         return t.replace(setup, r'''		termux_setup_ghc_iserv
@@ -2616,9 +2619,14 @@ TERMI_XRDP'''), tree='x11-packages')
 		cat > "$probe/TermiIservProbe.hs" <<-'TERMI_GIT_ANNEX_PROBE'
 			{-# LANGUAGE TemplateHaskell #-}
 			module TermiIservProbe where
+			import Language.Haskell.TH.Syntax (runIO)
+			import System.Posix.DynamicLinker (RTLDFlags(RTLD_NOW), dlclose, dlopen)
+
 			$(pure [])
 			probe :: Int
-			probe = $( [| 42 |] )
+			probe = $(do
+			  runIO (dlopen "libseccomp.so" [RTLD_NOW] >>= dlclose)
+			  [| 42 |])
 		TERMI_GIT_ANNEX_PROBE
 		(
 			cd "$probe" &&
