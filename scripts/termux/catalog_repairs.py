@@ -2577,14 +2577,25 @@ TERMI_XRDP'''), tree='x11-packages')
         return t.replace(setup, r'''		termux_setup_ghc_iserv
 		local termi_iserv="$TERMUX_PKG_TMPDIR/termi-iserv"
 		mkdir -p "$termi_iserv"
+		local proot_dir="$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH"
+		local qemu="$proot_dir/qemu-$TERMUX_ARCH"
+		if [[ "$TERMUX_ARCH" == aarch64 && "$(uname -m)" == x86_64 ]]; then
+			# QEMU 7.2 can stall the Android GHC runtime during heap setup.
+			local qemu_package="$TERMUX_PKG_CACHEDIR/qemu-user-static_8.2.2+ds-0ubuntu1.18_amd64.deb"
+			termux_download \
+				https://archive.ubuntu.com/ubuntu/pool/universe/q/qemu/qemu-user-static_8.2.2+ds-0ubuntu1.18_amd64.deb \
+				"$qemu_package" 5bb397f66063efa349f6fd5cb3b68cd96f29edd0994e4ba5115cf0859a716bf0
+			qemu="$termi_iserv/qemu-aarch64"
+			dpkg-deb --fsys-tarfile "$qemu_package" | tar -xOf - ./usr/bin/qemu-aarch64-static > "$qemu"
+			chmod 755 "$qemu"
+		fi
 		local ghc_bin_dir="$(ghc --print-libdir)/../bin" suffix
 		for suffix in "" -dyn; do
 			local wrapper="$termi_iserv/termux-ghc-iserv$suffix"
 			{
 				printf '#!/bin/bash\n'
 				printf 'proot=%q\nqemu=%q\nandroid_system=%q\nandroid_lib=%q\niserv=%q\n' \
-					"$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/proot" \
-					"$TERMUX_COMMON_CACHEDIR/proot-bin-$TERMUX_ARCH/qemu-$TERMUX_ARCH" \
+					"$proot_dir/proot" "$qemu" \
 					"$TERMUX_PREFIX/opt/aosp" "$TERMUX_PREFIX/lib" "$ghc_bin_dir/ghc-iserv$suffix"
 				cat <<-'TERMI_GIT_ANNEX_ISERV'
 					status=0
@@ -2605,6 +2616,7 @@ TERMI_XRDP'''), tree='x11-packages')
 		cat > "$probe/TermiIservProbe.hs" <<-'TERMI_GIT_ANNEX_PROBE'
 			{-# LANGUAGE TemplateHaskell #-}
 			module TermiIservProbe where
+			$(pure [])
 			probe :: Int
 			probe = $( [| 42 |] )
 		TERMI_GIT_ANNEX_PROBE
