@@ -828,6 +828,24 @@ QT6_WEBENGINE_CXX_LAUNCHER = r'''	local termi_qt_cxx termi_qt_launcher
 
 
 def apply(change, hook, prepared):
+    def codex_runtime_launcher(t):
+        assert 'TERMUX_PKG_VERSION="0.163.0"\n' in t, 'Codex source changed'
+        deps = 'TERMUX_PKG_DEPENDS="git, libc++, openssl"'
+        assert t.count(deps) == 1, 'Codex runtime dependencies changed'
+        t = t.replace(deps, 'TERMUX_PKG_DEPENDS="coreutils, git, libc++, openssl"')
+        launcher = Path(__file__).with_name('codex_launcher.sh').read_text()
+        return hook(t, 'termux_step_post_make_install', r'''	local codex_dir="$TERMUX_PREFIX/libexec/codex"
+	[[ -x "$TERMUX_PREFIX/bin/codex" && ! -L "$TERMUX_PREFIX/bin/codex" &&
+	   -x "$TERMUX_PREFIX/bin/codex-code-mode-host" ]] || termux_error_exit "Unexpected Codex executables"
+	install -d "$codex_dir"
+	mv -- "$TERMUX_PREFIX/bin/codex" "$codex_dir/codex"
+	ln -s ../../bin/codex-code-mode-host "$codex_dir/codex-code-mode-host"
+	sed "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" > "$TERMUX_PREFIX/bin/codex" <<'TERMI_CODEX_LAUNCHER'
+''' + launcher + r'''TERMI_CODEX_LAUNCHER
+	chmod 755 "$TERMUX_PREFIX/bin/codex"
+''')
+
+    change('codex', codex_runtime_launcher)
     def megacmd_target_headers(text):
         version = 'TERMUX_PKG_VERSION=(\n\t"2.6.0"\n\t"10.19.0"\n)\n'
         anchor = '\nTERMUX_PKG_DEPENDS='
