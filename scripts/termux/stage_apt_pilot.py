@@ -102,8 +102,16 @@ def stage(work, config):
     assets = {a["name"]: a for a in release["assets"]}
     pins = config["pins"]
     for name, pin in pins.items():
-        if digest(download(tag, assets[name], work)) != pin:
+        matching = [a for a in assets.values()
+                    if re.fullmatch(r"(?:[0-9]{4}-)?" + re.escape(name), a["name"])
+                    and a["digest"] == "sha256:" + pin]
+        if len(matching) != 1:
+            raise ValueError(f"Expected one pinned candidate asset: {name}")
+        path = download(tag, matching[0], work)
+        if digest(path) != pin:
             raise ValueError(f"Candidate pin mismatch: {name}")
+        if path.name != name:
+            path.rename(work / name)
     inventory = json.loads((work / "inventory.json").read_text())
     records = {r["file"]: r for r in inventory["packages"]}
     selected = set(config["files"])
@@ -113,7 +121,7 @@ def stage(work, config):
     output.mkdir()
     staged = {}
     for name, asset in sorted(assets.items()):
-        if not re.fullmatch(r"packages-[0-9]+\.tar", name):
+        if not re.fullmatch(r"(?:[0-9]{4}-)?packages-[0-9]+\.tar", name):
             continue
         bundle = download(tag, asset, work)
         with tarfile.open(bundle, "r|") as archive:
@@ -135,6 +143,26 @@ def stage(work, config):
             break
     if staged.keys() != selected:
         raise ValueError("Candidate did not contain the complete selection")
+    if config["roots"] == {"codex": "0.163.0-1"}:
+        package, = staged.values()
+        path = output / package["asset"]
+        tree = work / "codex-layout"
+        subprocess.run(["dpkg-deb", "--extract", path, tree], check=True)
+        prefix = "/data/data/com.terminal.nextgen/files/usr"
+        runtime = tree / prefix.lstrip("/")
+        launcher = runtime / "bin/codex"
+        expected = Path(__file__).with_name("codex_launcher.sh").read_text().replace("@TERMUX_PREFIX@", prefix)
+        if launcher.is_symlink() or launcher.read_text() != expected or not launcher.stat().st_mode & stat.S_IXUSR:
+            raise ValueError("Codex archive does not contain the tested launcher")
+        for relative in ("libexec/codex/codex", "bin/codex-code-mode-host"):
+            binary = runtime / relative
+            with binary.open("rb") as handle:
+                header = handle.read(20)
+            if binary.is_symlink() or header[:6] != b"\x7fELF\x02\x01" or header[18:20] != b"\xb7\x00":
+                raise ValueError(f"Expected source-built Android ARM64 executable: {relative}")
+        helper = runtime / "libexec/codex/codex-code-mode-host"
+        if not helper.is_symlink() or helper.readlink().as_posix() != "../../bin/codex-code-mode-host":
+            raise ValueError("Codex code-mode helper is missing from the launcher directory")
     repair = None
     if config.get("repair_carbonyl"):
         repair = repack_carbonyl(work, output, staged, config["roots"]["carbonyl"])
@@ -171,7 +199,7 @@ def main():
         output = stage(Path(directory), config)
         gh("release", "create", tag, "-R", REPOSITORY, "--prerelease",
            "--latest=false", "--title", "Termi ARM64 APT pilot", "--notes",
-           "Isolated Git Annex and Carbonyl test snapshot. Await signed metadata and phone validation.")
+           "Isolated package test snapshot. Await signed metadata and phone validation.")
         paths = sorted(output.iterdir())
         gh("release", "upload", tag, "-R", REPOSITORY, *map(str, paths))
         release = json.loads(gh("api", f"repos/{REPOSITORY}/releases/tags/{tag}"))
